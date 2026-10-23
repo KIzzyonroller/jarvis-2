@@ -1,0 +1,19 @@
+# secrets and per-PC files: never commit these
+.env
+*.env
+!.env.example
+update_source.txt
+sign.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# downloaded models (the app downloads its own)
+models/
+
+# build output
+build/
+dist/
+Releases/

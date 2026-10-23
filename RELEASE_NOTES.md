@@ -1,0 +1,1 @@
+- First installable version: Setup.exe, automatic updates, API keys set up inside the app.

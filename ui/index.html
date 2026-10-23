@@ -1,0 +1,1717 @@
+<!doctype html>
+<html lang="en" data-ai="jarvis">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>J.A.R.V.I.S.</title>
+<style>
+@font-face{font-family:"Michroma";font-weight:400;font-display:swap;src:url(fonts/michroma-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-weight:300;font-display:swap;src:url(fonts/jost-latin-300-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-weight:400;font-display:swap;src:url(fonts/jost-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-weight:500;font-display:swap;src:url(fonts/jost-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-weight:600;font-display:swap;src:url(fonts/jost-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Big Shoulders Display";font-weight:500;font-display:swap;src:url(fonts/big-shoulders-display-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Big Shoulders Display";font-weight:700;font-display:swap;src:url(fonts/big-shoulders-display-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Big Shoulders Display";font-weight:800;font-display:swap;src:url(fonts/big-shoulders-display-latin-800-normal.woff2) format("woff2")}
+@font-face{font-family:"Chakra Petch";font-weight:400;font-display:swap;src:url(fonts/chakra-petch-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Chakra Petch";font-weight:500;font-display:swap;src:url(fonts/chakra-petch-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Chakra Petch";font-weight:600;font-display:swap;src:url(fonts/chakra-petch-latin-600-normal.woff2) format("woff2")}
+
+/* ============================================================ tokens
+   Jarvis: cold projection-light cyan on deep space, warm gold for YOUR words.
+   Ultron: arterial crimson on near-black, ember for your words. Approval = amber / signal yellow. */
+:root{
+  --void:#02060b; --vrgb:2,6,11; --ink:#dff6ff; --c:#7fe7ff; --crgb:127,231,255; --deep:#1b8fb3;
+  --you:#ffc46b; --dim:#5f7f8f; --alarm:#ff9d2e; --argb:255,157,46;
+  --display:"Michroma",sans-serif; --dispw:400; --text:"Jost",sans-serif; --textw:400;
+  --top:52px; --dw:clamp(260px,22vw,316px); --lw:var(--dw); --rw:var(--dw);
+  --side:max(var(--lw),var(--rw)); --sub:25px;
+}
+:root[data-ai=ultron]{
+  --void:#080203; --vrgb:8,2,3; --ink:#f4e9e4; --c:#ff3046; --crgb:255,48,70; --deep:#8a1020;
+  --you:#ff8a3d; --dim:#86636a; --alarm:#ffd34d; --argb:255,211,77;
+  --display:"Big Shoulders Display",sans-serif; --dispw:800; --text:"Chakra Petch",sans-serif; --textw:500; --sub:24px;
+}
+body.no-left{--lw:0px} body.no-right{--rw:0px}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--void);color:var(--ink);font:var(--textw) 15px/1.45 var(--text);transition:background-color .7s;
+  -webkit-font-smoothing:antialiased;user-select:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input{font:inherit}
+:focus-visible{outline:1.5px solid var(--c);outline-offset:2px}
+[hidden]{display:none!important}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:rgba(var(--crgb),.18)}::-webkit-scrollbar-track{background:transparent}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+#fx{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
+
+/* ============================================================ top strip */
+#top{position:fixed;top:0;left:0;right:0;height:var(--top);z-index:6;display:flex;align-items:center;gap:6px;padding:0 6px 0 8px;
+  transition:opacity .6s .5s}
+.drag{flex:1;align-self:stretch;display:flex;align-items:center;gap:14px;min-width:0}
+#wordmark{font:var(--dispw) 14px/1 var(--display);letter-spacing:.34em;color:var(--c);white-space:nowrap;
+  text-shadow:0 0 18px rgba(var(--crgb),.5)}
+:root[data-ai=ultron] #wordmark{font-size:21px;letter-spacing:.2em}
+.ico{width:34px;height:32px;display:grid;place-items:center;color:var(--dim);flex:none;transition:color .2s}
+.ico:hover{color:var(--ink)}
+.ico svg{width:18px;height:18px}
+.ico[aria-pressed=true]{color:var(--c)}
+#who{position:absolute;left:50%;top:10px;transform:translateX(-50%);display:flex;gap:2px;padding:3px;
+  border:1px solid rgba(var(--crgb),.16)}
+#who button{padding:6px 16px 5px;font:var(--dispw) 11px/1 var(--display);letter-spacing:.2em;color:var(--dim);transition:color .2s,background .2s}
+:root[data-ai=ultron] #who button{font-size:14px;letter-spacing:.14em;padding:5px 16px 4px}
+#who button:hover{color:var(--ink)}
+#who button[aria-pressed=true]{color:var(--void);background:var(--c)}
+#who button[data-ai=both][aria-pressed=true]{background:linear-gradient(90deg,#7fe7ff,#ff3046)}
+.chips{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);z-index:4;display:flex;gap:6px;align-items:center;transition:opacity .6s .7s}
+body.booting .chips{opacity:0}
+.pill{background:rgba(var(--vrgb),.7)}
+#dict-chip span{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 10px;font-size:12.5px;white-space:nowrap;
+  border:1px solid rgba(var(--crgb),.25);color:var(--ink)}
+.pill i{width:6px;height:6px;background:var(--c);transform:rotate(45deg)}
+#mic-chip{border-color:rgba(var(--argb),.6);color:var(--alarm)} #mic-chip i{background:var(--alarm)}
+#clock{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;margin:0 6px 0 10px}
+#time{font:var(--dispw) 13px var(--display);letter-spacing:.12em;color:var(--ink)}
+:root[data-ai=ultron] #time{font-size:17px}
+#date{font-size:11.5px;color:var(--dim)}
+.win{display:flex}.win button{width:38px;height:32px;display:grid;place-items:center;color:var(--dim)}
+.win button:hover{color:var(--ink);background:rgba(var(--crgb),.08)} .win #b-close:hover{background:#c42b3a;color:#fff}
+.win svg{width:12px;height:12px}
+
+/* ============================================================ drawers */
+.drawer{position:fixed;top:var(--top);bottom:0;width:var(--dw);z-index:3;display:flex;flex-direction:column;
+  transition:opacity .55s ease,transform .7s cubic-bezier(.2,.8,.2,1)}
+#left{left:0;background:linear-gradient(90deg,rgba(var(--vrgb),.94),rgba(var(--vrgb),.8));border-right:1px solid rgba(var(--crgb),.09)}
+#right{right:0;background:linear-gradient(270deg,rgba(var(--vrgb),.94),rgba(var(--vrgb),.8));border-left:1px solid rgba(var(--crgb),.09)}
+body.no-left #left{transform:translateX(-102%);opacity:0;pointer-events:none}
+body.no-right #right{transform:translateX(102%);opacity:0;pointer-events:none}
+/* while he's working with you, everything else steps back */
+body.focus:not(.no-left) #left:not(:hover):not(:focus-within){opacity:.16;transform:translateX(-8px)}
+body.focus:not(.no-right) #right:not(:hover):not(:focus-within){opacity:.16;transform:translateX(8px)}
+body.booting #left{transform:translateX(-102%);opacity:0}
+body.booting #right{transform:translateX(102%);opacity:0}
+body.booting #top,body.booting #cmd{opacity:0}
+.d-head{flex:none;height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;
+  font:var(--dispw) 11px var(--display);letter-spacing:.24em;color:var(--c)}
+:root[data-ai=ultron] .d-head{font-size:14px;letter-spacing:.16em}
+.d-head small{font:400 12px var(--text);letter-spacing:0;color:var(--dim)}
+.d-body{flex:1;overflow-y:auto;padding:0 18px 22px;user-select:text}
+
+/* conversation */
+#log{display:flex;flex-direction:column;gap:16px;padding-top:4px}
+.m{font-size:14px;line-height:1.5;word-wrap:break-word}
+.m .ts{font-size:11px;color:var(--dim);margin-right:8px}
+.m .who{display:inline;font:var(--dispw) 10px var(--display);letter-spacing:.18em;color:var(--c)}
+:root[data-ai=ultron] .m .who{font-size:12.5px;letter-spacing:.1em}
+.who.ai-jarvis{color:#7fe7ff!important}.who.ai-ultron{color:#ff3046!important}
+.m .txt{margin-top:2px;white-space:pre-wrap}
+.m.user .txt{color:var(--you)}
+.m.system{font-size:12.5px;color:var(--dim);padding-left:10px;border-left:2px solid rgba(var(--crgb),.22)}
+.empty{font-size:13.5px;color:var(--dim);line-height:1.6;padding-top:6px}
+.turn .turn-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--dim);cursor:default;margin-bottom:4px}
+.turn.done.has-steps .turn-head{cursor:pointer}
+.turn.done.has-steps .turn-head:hover{color:var(--ink)}
+.turn-head .chev{display:inline-block;width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+  transform:rotate(-45deg);margin-right:8px;transition:transform .2s}
+.turn.open .chev{transform:rotate(45deg)}
+.turn.done:not(.open) .steps{display:none}
+.steps{display:flex;flex-direction:column;gap:4px;margin:2px 0 6px;padding-left:10px;border-left:1px solid rgba(var(--crgb),.15)}
+.step{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:baseline;font-size:12.5px;color:var(--dim)}
+.step b{font-weight:500;color:var(--ink)}
+.step .ic{width:6px;height:6px;transform:rotate(45deg);background:var(--dim)}
+.step.pending .ic{background:var(--c);animation:blink .8s steps(2) infinite}
+.step.ok .ic{background:var(--c)} .step.fail .ic{background:var(--alarm)} .step.fail .det{color:var(--alarm)}
+.step .reason{grid-column:2/4;font-size:12px;color:var(--dim);max-height:80px;overflow:hidden;opacity:.8}
+.step img.seen{grid-column:2/4;max-width:100%;margin-top:4px;border:1px solid rgba(var(--crgb),.25);cursor:zoom-in}
+
+/* system drawer */
+.sec{padding:14px 0 6px;border-top:1px solid rgba(var(--crgb),.08)}
+.sec:first-child{border-top:0;padding-top:2px}
+.sec h3{font:500 12.5px var(--text);color:var(--dim);margin-bottom:10px;display:flex;justify-content:space-between}
+.meter{display:grid;grid-template-columns:72px 1fr 44px;align-items:center;gap:10px;font-size:13px;margin-bottom:8px}
+.meter .bar{height:4px;background:rgba(var(--crgb),.1);position:relative;overflow:hidden}
+.meter .bar i{position:absolute;inset:0 auto 0 0;width:0;background:var(--c);transition:width .8s ease}
+.meter.hot .bar i{background:var(--alarm)} .meter.hot .n{color:var(--alarm)}
+.meter .n{text-align:right;font-variant-numeric:tabular-nums}
+.meter small{grid-column:2/4;margin-top:-6px;font-size:11.5px;color:var(--dim)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:13px;font-variant-numeric:tabular-nums}
+.kv span:nth-child(odd){color:var(--dim)}
+#spark{width:100%;height:34px;display:block;margin:6px 0 8px}
+.slider{display:grid;grid-template-columns:72px 1fr 32px;align-items:center;gap:10px;font-size:13px;margin-bottom:10px}
+.slider output{text-align:right;font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;appearance:none;height:18px;background:transparent;cursor:pointer;--p:50%}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:linear-gradient(90deg,var(--c) var(--p),rgba(var(--crgb),.15) var(--p))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;margin-top:-3.5px;background:var(--ink);transform:rotate(45deg)}
+.media{display:flex;gap:4px;margin-bottom:10px}
+.media button{flex:1;height:34px;display:grid;place-items:center;border:1px solid rgba(var(--crgb),.15);color:var(--ink)}
+.media button:hover,.qgrid button:hover{border-color:rgba(var(--crgb),.5);background:rgba(var(--crgb),.06)}
+.media button.on{color:var(--alarm);border-color:rgba(var(--argb),.5)}
+.media svg{width:16px;height:16px}
+.qgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.qgrid button{white-space:nowrap;overflow:hidden;display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;font-size:13px;border:1px solid rgba(var(--crgb),.12);text-align:left}
+.qgrid svg{width:15px;height:15px;color:var(--c);flex:none}
+.tabs{display:flex;gap:14px;margin-bottom:8px}
+.tabs button{font-size:13px;color:var(--dim);padding:2px 0;border-bottom:1.5px solid transparent}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--c)}
+.tabs sup{font-size:10px;color:var(--c);margin-left:3px}
+.list{list-style:none;display:flex;flex-direction:column;gap:7px;font-size:13px}
+.list li{display:flex;justify-content:space-between;gap:10px}
+.list li span:last-child{color:var(--dim);white-space:nowrap}
+.list li.soon span:last-child{color:var(--alarm)}
+.list li.col{flex-direction:column;gap:0}
+.list .note{color:var(--dim);font-size:12.5px;line-height:1.55}
+.perm{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;padding:7px 0}
+.perm b{font-weight:500;font-size:13.5px}
+.perm span{grid-column:1;font-size:12px;color:var(--dim);line-height:1.4}
+.sw{grid-row:1/3;grid-column:2;width:34px;height:18px;border:1px solid rgba(var(--crgb),.35);position:relative;transition:background .2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:10px;height:10px;background:var(--dim);transition:transform .2s,background .2s}
+.sw[aria-checked=true]{background:rgba(var(--argb),.18);border-color:var(--alarm)}
+.sw[aria-checked=true]::after{transform:translateX(16px);background:var(--alarm)}
+.fine{font-size:12px;color:var(--dim);line-height:1.5;margin-top:8px}
+.link{color:var(--c);font-size:12.5px;margin-top:8px;text-decoration:underline;text-underline-offset:3px}
+#model{color:var(--dim)}
+
+/* ============================================================ the stage: him, front and centre */
+#stage{position:fixed;top:var(--top);bottom:104px;left:50%;transform:translateX(-50%);z-index:2;
+  width:min(780px,calc(100vw - 2 * var(--side) - 48px));display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:width .7s cubic-bezier(.2,.8,.2,1)}
+#you{min-height:58px;max-width:620px;display:flex;align-items:flex-end;justify-content:center;text-align:center;
+  font:400 19px/1.45 var(--text);color:var(--you);transition:opacity .5s,color .4s}
+#you span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#you.faint{color:var(--dim);opacity:.7}
+#you.gone{opacity:0}
+#presence{flex:none;width:100%;height:clamp(200px,40vh,340px);margin:8px 0 2px;transition:height .5s cubic-bezier(.2,.8,.2,1);
+  border-radius:50%;cursor:pointer}
+#presence:focus-visible{outline:none}
+body.duo #presence{border-radius:0}
+body.asking #presence{height:clamp(150px,25vh,236px)}
+#state{height:20px;display:flex;gap:10px;align-items:baseline;font:var(--dispw) 11px var(--display);letter-spacing:.26em;color:var(--c)}
+:root[data-ai=ultron] #state{font-size:14.5px;letter-spacing:.18em}
+#state .t{font:400 12px var(--text);letter-spacing:0;color:var(--dim);font-variant-numeric:tabular-nums}
+body.st-awaiting #state{color:var(--alarm)}
+#subs{margin-top:12px;min-height:calc(var(--sub) * 1.36 * 3 + 58px);max-width:660px;text-align:center;display:flex;flex-direction:column;align-items:center}
+#said-by{height:18px;font:var(--dispw) 10.5px var(--display);letter-spacing:.22em;color:var(--c);opacity:0;transition:opacity .3s}
+:root[data-ai=ultron] #said-by{font-size:13px;letter-spacing:.14em}
+body.duo #said-by{opacity:1}
+#sub{font:var(--textw) var(--sub)/1.36 var(--text);color:var(--ink);text-shadow:0 0 28px rgba(var(--crgb),.28);
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;transition:opacity .6s}
+#sub.thought{font-size:15.5px;line-height:1.5;color:var(--dim);text-shadow:none;-webkit-line-clamp:2}
+#sub.gone{opacity:0}
+#sub.in{animation:subIn .32s ease-out}
+@keyframes subIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+#chips{height:30px;margin-top:12px;display:flex;gap:6px;justify-content:center;overflow:hidden;flex-wrap:wrap;transition:opacity .5s}
+.chip{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 10px 0 9px;font-size:12.5px;white-space:nowrap;max-width:300px;
+  border:1px solid rgba(var(--crgb),.2);color:var(--ink);background:rgba(var(--vrgb),.5)}
+.chip span{overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+.chip i{width:6px;height:6px;transform:rotate(45deg);background:var(--c);flex:none}
+.chip.pending i{animation:blink .7s steps(2) infinite}
+.chip.fail{border-color:rgba(var(--argb),.5)}.chip.fail i{background:var(--alarm)}
+#chips.gone{opacity:0}
+body.asking #subs,body.asking #chips{display:none}
+#bootlog{display:none;margin-top:14px;font-size:12.5px;line-height:1.7;color:var(--dim);text-align:center;min-height:90px}
+#bootlog div:last-child{color:var(--ink)}
+#bootlog .bad{color:var(--alarm)!important}
+body.booting #bootlog{display:block}
+body.booting #subs,body.booting #chips{display:none}
+
+/* ============================================================ approval */
+#ask{margin-top:14px;width:min(620px,100%);padding:16px 18px 14px;border:1px solid rgba(var(--argb),.6);
+  background:rgba(var(--vrgb),.88);box-shadow:0 0 70px rgba(var(--argb),.13);animation:askIn .22s ease-out}
+@keyframes askIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+#ask .head{display:flex;justify-content:space-between;align-items:baseline;font:var(--dispw) 10.5px var(--display);letter-spacing:.24em;color:var(--alarm)}
+:root[data-ai=ultron] #ask .head{font-size:13.5px;letter-spacing:.14em}
+#ask .head span{font:500 13px var(--text);letter-spacing:0;font-variant-numeric:tabular-nums}
+#ask h2{font:500 20px/1.3 var(--text);margin:6px 0 10px;color:var(--ink)}
+#ask pre{font:12.5px/1.5 "Cascadia Mono",Consolas,monospace;max-height:84px;overflow:auto;padding:8px 10px;margin-bottom:12px;
+  background:rgba(var(--argb),.06);border-left:2px solid var(--alarm);white-space:pre-wrap;word-break:break-word;user-select:text}
+#ask pre:empty{display:none}
+.btns{display:flex;gap:8px}
+.btns button{height:44px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;gap:10px;font-size:15px;
+  border:1px solid rgba(var(--crgb),.25);transition:background .15s,border-color .15s}
+.btns kbd{font:500 11px var(--text);min-width:20px;height:20px;padding:0 4px;display:grid;place-items:center;border:1px solid currentColor;opacity:.7}
+#a-no{flex:1;color:var(--ink)} #a-no:hover{border-color:var(--ink)}
+#a-always{flex:1.5;color:var(--alarm);border-color:rgba(var(--argb),.45)} #a-always:hover{background:rgba(var(--argb),.1)}
+#a-yes{flex:1.2;background:var(--alarm);border-color:var(--alarm);color:#140a00;font-weight:600} #a-yes:hover{filter:brightness(1.1)}
+#ask .fine{margin-top:10px}
+#keys{margin-top:14px;width:min(620px,100%);padding:16px 18px 14px;border:1px solid rgba(var(--crgb),.45);
+  background:rgba(var(--vrgb),.9);box-shadow:0 0 70px rgba(var(--crgb),.1);animation:askIn .22s ease-out}
+#keys .head{font:var(--dispw) 10.5px var(--display);letter-spacing:.24em;color:var(--c)}
+#keys h2{font:500 20px/1.3 var(--text);margin:6px 0 6px;color:var(--ink)}
+#keys .fine{margin:0 0 12px;color:var(--dim);font-size:14px;line-height:1.45}
+#keys .fine a{color:var(--c)}
+.kf{display:grid;gap:4px;margin-bottom:10px;font-size:13px;color:var(--dim)}
+.kf input{height:40px;padding:0 10px;font:14px "Cascadia Mono",Consolas,monospace;color:var(--ink);background:rgba(var(--crgb),.05);
+  border:1px solid rgba(var(--crgb),.25);outline:none}
+.kf input:focus-visible{border-color:var(--c)}
+#k-msg{min-height:1.4em;color:var(--you)}
+#k-later{flex:1;color:var(--ink)} #k-later:hover{border-color:var(--ink)}
+#k-save{flex:2;background:var(--c);border-color:var(--c);color:#02121a;font-weight:600} #k-save:hover{filter:brightness(1.1)}
+#k-save:disabled{opacity:.5}
+
+/* ============================================================ command line */
+#cmd{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:4;width:min(640px,calc(100vw - 2 * var(--side) - 48px));
+  height:52px;display:flex;align-items:center;gap:6px;transition:opacity .6s .7s,width .7s cubic-bezier(.2,.8,.2,1)}
+#cmd::before{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:rgba(var(--crgb),.22)}
+#cmd::after{content:"";position:absolute;left:50%;bottom:-1px;height:3px;width:22%;transform:translateX(-50%);background:var(--c);
+  box-shadow:0 0 18px var(--c);transition:width .4s ease;opacity:.85}
+#cmd:focus-within::after{width:100%}
+#input{flex:1;height:100%;background:none;border:0;outline:0;color:var(--ink);font:var(--textw) 17px var(--text);caret-color:var(--c);padding:0 6px}
+#input::placeholder{color:var(--dim)}
+#cmd .ico{width:40px;height:40px}
+#cmd .ico svg{width:20px;height:20px}
+#mic.muted{color:var(--alarm)}
+#mic.off{opacity:.35}
+#hints{position:fixed;bottom:9px;left:50%;transform:translateX(-50%);z-index:4;font-size:11.5px;color:var(--dim);white-space:nowrap;opacity:.8;transition:opacity .4s;display:flex;gap:22px}
+#hints span:empty{display:none}
+body.focus #hints,body.booting #hints{opacity:0}
+
+/* ============================================================ alerts, toasts, persona glitch */
+#alert{position:fixed;top:calc(var(--top) + 12px);left:50%;transform:translateX(-50%);z-index:7;max-width:560px;padding:10px 16px;
+  border:1px solid rgba(var(--argb),.6);background:rgba(var(--vrgb),.92);color:var(--ink);font-size:14px;cursor:pointer;display:flex;gap:10px}
+#alert b{color:var(--alarm);font-weight:600}
+#toasts{position:fixed;top:calc(var(--top) + 64px);left:50%;transform:translateX(-50%);z-index:7;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+.toast{padding:7px 14px;font-size:13px;background:rgba(var(--vrgb),.92);border:1px solid rgba(var(--crgb),.3);animation:askIn .2s ease-out}
+body.swap #stage{animation:swap .6s steps(6)}
+@keyframes swap{0%{filter:none}30%{filter:hue-rotate(60deg) contrast(1.4);transform:translateX(calc(-50% + 3px))}60%{filter:hue-rotate(-40deg);transform:translateX(calc(-50% - 2px))}100%{filter:none}}
+@keyframes blink{50%{opacity:.25}}
+/* ============================================================ holographic panels: what he's doing, beside him */
+#holo{position:fixed;inset:0;z-index:4;pointer-events:none}
+.hp{position:absolute;width:var(--w,270px);max-height:196px;overflow:hidden;color:var(--ink);
+  background:linear-gradient(180deg,rgba(var(--crgb),.11),rgba(var(--vrgb),.82) 46%);
+  border:1px solid rgba(var(--crgb),.38);box-shadow:0 0 34px rgba(var(--crgb),.14),inset 0 0 22px rgba(var(--crgb),.07);
+  animation:hpIn .5s cubic-bezier(.2,.8,.2,1) both;transition:top .45s cubic-bezier(.2,.8,.2,1),left .45s cubic-bezier(.2,.8,.2,1),opacity .7s,filter .7s,transform .7s}
+.hp::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(180deg,transparent 0 2px,rgba(var(--crgb),.045) 2px 3px)}
+.hp::after{content:"";position:absolute;left:0;right:0;height:40%;top:0;pointer-events:none;transform:translateY(-100%);
+  background:linear-gradient(180deg,transparent,rgba(var(--crgb),.10),transparent);animation:hpScan 2.6s linear infinite}
+.hp.done::after{animation:none;opacity:0}
+.hp.out{opacity:0;filter:blur(5px) brightness(1.6);transform:scale(.97)}
+.hp.fail{border-color:rgba(var(--argb),.6)}
+@keyframes hpIn{0%{opacity:0;clip-path:inset(49% 0 49% 0);filter:brightness(2.4)}55%{opacity:1;clip-path:inset(0 0 0 0)}100%{filter:none;clip-path:inset(0 0 0 0)}}
+@keyframes hpScan{to{transform:translateY(250%)}}
+.hp .hh{display:flex;align-items:center;gap:8px;height:25px;padding:0 10px;border-bottom:1px solid rgba(var(--crgb),.22);
+  font:var(--dispw) 9.5px/1 var(--display);letter-spacing:.2em;color:var(--c);white-space:nowrap}
+:root[data-ai=ultron] .hp .hh{font-size:12.5px;letter-spacing:.12em}
+.hp .hh i{width:6px;height:6px;flex:none;background:var(--c);transform:rotate(45deg);animation:blink .7s steps(2) infinite}
+.hp.done .hh i{animation:none} .hp.fail .hh i{background:var(--alarm)}
+.hp .hh span{margin-left:auto;font:400 11px var(--text);letter-spacing:0;color:var(--dim);font-variant-numeric:tabular-nums}
+.hp .bd{position:relative;padding:9px 10px 10px;font-size:12.5px;line-height:1.45}
+.hp .sub{color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hp .big{font:500 17px/1.25 var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hp .row{display:flex;gap:10px;align-items:center}
+/* search: radar sweep */
+.radar{width:78px;height:78px;flex:none}
+.radar circle,.radar line{fill:none;stroke:rgba(var(--crgb),.35);stroke-width:.8}
+.radar .sw{transform-origin:50px 50px;animation:spin 1.6s linear infinite}
+.radar .sw path{fill:url(#rg);stroke:none}
+.radar .bl{fill:var(--c);stroke:none;opacity:0;animation:blip 1.6s linear infinite}
+.hp.done .radar .sw{animation-duration:4s}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blip{0%,40%{opacity:0}45%{opacity:1}100%{opacity:0}}
+/* terminal */
+.term{font:11.5px/1.45 "Cascadia Mono",Consolas,monospace;margin:0;white-space:pre-wrap;word-break:break-all;max-height:150px;overflow:hidden;color:var(--ink)}
+.term b{color:var(--c);font-weight:400}
+.term .cur{display:inline-block;width:7px;height:12px;background:var(--c);vertical-align:-1px;animation:blink .8s steps(2) infinite}
+/* lists */
+.hl{list-style:none;font-size:12px;line-height:1.5}
+.hl li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;animation:liIn .3s ease-out forwards}
+.hl li::before{content:"";display:inline-block;width:4px;height:4px;margin:0 7px 2px 0;background:var(--c);transform:rotate(45deg)}
+@keyframes liIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+/* launch / progress */
+.seg{display:flex;gap:3px;margin-top:8px}
+.seg i{flex:1;height:6px;background:rgba(var(--crgb),.14)}
+.seg i{animation:segOn 1.1s steps(1) infinite}
+.hp.done .seg i{animation:none;background:var(--c)}
+@keyframes segOn{0%{background:rgba(var(--crgb),.14)}50%{background:var(--c)}}
+/* media */
+.thumb{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;border:1px solid rgba(var(--crgb),.25);margin-bottom:6px;max-height:112px}
+.eq{display:flex;gap:3px;align-items:flex-end;height:30px;margin-top:6px}
+.eq i{flex:1;background:var(--c);height:100%;transform-origin:bottom;transform:scaleY(.2);animation:eq .9s ease-in-out infinite alternate;opacity:.85}
+@keyframes eq{to{transform:scaleY(1)}}
+/* level */
+.lvl{font:var(--dispw) 30px/1 var(--display);color:var(--c)}
+.lvlbar{height:5px;background:rgba(var(--crgb),.14);margin-top:8px}.lvlbar i{display:block;height:100%;background:var(--c);transition:width .8s}
+/* gauges */
+.gs{display:grid;grid-template-columns:62px 1fr 34px;gap:5px 8px;align-items:center;font-size:11.5px}
+.gs i{height:4px;background:rgba(var(--crgb),.14);position:relative}.gs i b{position:absolute;inset:0 auto 0 0;background:var(--c);transition:width 1s}
+/* screen scan */
+.shot{position:relative;min-height:80px}
+.shot img{width:100%;display:block;max-height:140px;object-fit:cover;object-position:top;filter:saturate(.6) contrast(1.1)}
+.shot::after{content:"";position:absolute;left:0;right:0;height:2px;background:var(--c);box-shadow:0 0 12px var(--c);top:0;animation:shotScan 1.8s ease-in-out infinite alternate}
+.hp.done .shot::after{opacity:0}
+@keyframes shotScan{to{top:calc(100% - 2px)}}
+.shot .ph{color:var(--dim);font-size:12px;padding:24px 0;text-align:center}
+/* blender cube */
+.cube3{width:64px;height:64px;margin:6px auto 4px;perspective:260px}
+.cube3 div{width:100%;height:100%;position:relative;transform-style:preserve-3d;animation:cube 6s linear infinite}
+.cube3 span{position:absolute;inset:0;border:1px solid var(--c);background:rgba(var(--crgb),.06)}
+.cube3 span:nth-child(1){transform:translateZ(32px)}.cube3 span:nth-child(2){transform:rotateY(180deg) translateZ(32px)}
+.cube3 span:nth-child(3){transform:rotateY(90deg) translateZ(32px)}.cube3 span:nth-child(4){transform:rotateY(-90deg) translateZ(32px)}
+.cube3 span:nth-child(5){transform:rotateX(90deg) translateZ(32px)}.cube3 span:nth-child(6){transform:rotateX(-90deg) translateZ(32px)}
+@keyframes cube{to{transform:rotateX(-20deg) rotateY(360deg)}}
+.cube3 div{transform:rotateX(-20deg)}
+/* targeting */
+.tgt{width:64px;height:64px;flex:none}
+.tgt circle,.tgt line{fill:none;stroke:var(--c);stroke-width:1}
+.tgt .rot{transform-origin:32px 32px;animation:spin 3s linear infinite}
+/* reasoning */
+.think{font-size:11.5px;line-height:1.5;color:var(--dim);max-height:140px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(180deg,transparent,#000 30%)}
+.think b{color:var(--ink);font-weight:400}
+@media (prefers-reduced-motion:reduce){.hp,.hp::after{animation:none!important}}
+/* briefing cards */
+.wx{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center}
+.wx svg{width:46px;height:46px;grid-row:1/3;color:var(--c)}
+.wx svg *{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.wx .t{font:var(--dispw) 28px/1 var(--display);color:var(--ink)}
+:root[data-ai=ultron] .wx .t{font-size:34px}
+.wx .t .u{font:400 17px var(--text);margin-left:3px;vertical-align:6px;color:var(--dim)}
+.wx .l{font-size:12.5px;color:var(--dim);line-height:1.3}
+.wx .r{grid-column:1/3;display:flex;gap:14px;font-size:12px;color:var(--dim);margin-top:4px}
+.wx .r b{color:var(--ink);font-weight:500}
+.hl.plain li::before{background:var(--dim)}
+.hl li b{font-weight:500;color:var(--c);margin-right:6px}
+
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01s!important}}
+@media (max-width:1180px){:root{--dw:280px} body:not(.no-left):not(.no-right){--side:var(--dw)}}
+</style>
+</head>
+<body class="booting st-booting">
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<header id="top">
+  <button class="ico" id="t-left" aria-label="Show conversation" aria-pressed="true" title="Conversation">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h14M3 8h9M3 12h14M3 16h7"/></svg></button>
+  <div class="drag pywebview-drag-region"><span id="wordmark" class="pywebview-drag-region">J.A.R.V.I.S.</span></div>
+  <div id="who" role="group" aria-label="Who you're talking to">
+    <button data-ai="jarvis" aria-pressed="true">Jarvis</button><button data-ai="both" aria-pressed="false" title="Both of them, taking turns">Both</button><button data-ai="ultron" aria-pressed="false">Ultron</button>
+  </div>
+  <div id="clock"><span id="time">--:--</span><span id="date"></span></div>
+  <button class="ico" id="t-right" aria-label="Show system panel" aria-pressed="true" title="System">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h8M15 5h2M3 10h2M9 10h8M3 15h10M17 15h0"/><circle cx="13" cy="5" r="2"/><circle cx="7" cy="10" r="2"/><circle cx="15" cy="15" r="2"/></svg></button>
+  <div class="win">
+    <button id="b-min" aria-label="Minimize"><svg viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.2"/></svg></button>
+    <button id="b-max" aria-label="Maximize"><svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
+    <button id="b-close" aria-label="Close"><svg viewBox="0 0 12 12"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke="currentColor" stroke-width="1.2"/></svg></button>
+  </div>
+</header>
+
+<aside class="drawer" id="left" aria-label="Conversation">
+  <div class="d-head">Conversation<small id="turns-n"></small></div>
+  <div class="d-body" id="log-wrap"><div id="log"><p class="empty" id="empty">Nothing yet. Say <span class="ai-name">Jarvis</span>'s name and ask for something, or type below.</p></div></div>
+</aside>
+
+<aside class="drawer" id="right" aria-label="System">
+  <div class="d-head">System<small id="uptime"></small></div>
+  <div class="d-body">
+    <section class="sec">
+      <div class="meter" id="m-cpu"><span>Processor</span><span class="bar"><i></i></span><span class="n">--</span></div>
+      <div class="meter" id="m-ram"><span>Memory</span><span class="bar"><i></i></span><span class="n">--</span><small id="r-ram"></small></div>
+      <div class="meter" id="m-disk"><span>Drive</span><span class="bar"><i></i></span><span class="n">--</span><small id="r-disk"></small></div>
+      <canvas id="spark" aria-hidden="true"></canvas>
+      <div class="kv" style="margin-bottom:8px"><span>Spent today</span><span id="r-spend">--</span><span>This month</span><span id="r-month">--</span></div>
+      <div class="kv"><span>Download</span><span id="r-down">--</span><span>Upload</span><span id="r-up">--</span>
+        <span>Battery</span><span id="r-bat">--</span><span>Processes</span><span id="r-procs">--</span></div>
+    </section>
+    <section class="sec">
+      <h3>Controls</h3>
+      <div class="media">
+        <button data-act="previous" aria-label="Previous track"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 4h1.6v12H5zM16 4.5v11L7.5 10z"/></svg></button>
+        <button data-act="play_pause" aria-label="Play or pause"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 4l7 6-7 6zM12.5 4h2v12h-2zM16 4h2v12h-2z"/></svg></button>
+        <button data-act="next" aria-label="Next track"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M13.4 4H15v12h-1.6zM4 4.5v11l8.5-5.5z"/></svg></button>
+        <button data-act="mute" id="mute" aria-label="Mute sound"><svg viewBox="0 0 20 20"><path d="M3 8h3l4-4v12l-4-4H3z" fill="currentColor"/><path d="M13 7c1.3 1.6 1.3 4.4 0 6M15.5 5c2.5 3 2.5 7 0 10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      </div>
+      <label class="slider"><span>Volume</span><input type="range" id="vol" min="0" max="100" value="50"><output id="vol-out">50</output></label>
+      <div class="perm" style="padding:2px 0 10px"><b>Holographic panels</b><button class="sw" role="switch" id="holo-sw" aria-checked="true" aria-label="Show holographic panels while he works"></button><span>Pop-up visuals beside him while he works.</span></div>
+      <div class="perm" style="padding:2px 0 6px"><b>Sound effects</b><button class="sw" role="switch" id="sfx-sw" aria-checked="true" aria-label="Sound effects"></button><span>Chimes and hums as he listens, thinks and works.</span></div>
+      <label class="slider" id="sfx-vol-row"><span>Effects</span><input type="range" id="sfx-vol" min="0" max="100" value="60"><output id="sfx-vol-out">60</output></label>
+      <div class="perm" style="padding:2px 0 10px" id="auto-row" hidden><b>Start with Windows</b><button class="sw" role="switch" id="auto-sw" aria-checked="false" aria-label="Start with Windows"></button><span>Starts quietly in the corner when you log in.</span></div>
+      <div class="perm" style="padding:2px 0 10px" id="dbot-row"><b>Discord sending</b><button class="sw" role="switch" id="dbot-sw" aria-checked="false" aria-label="Let him send Discord messages through his bot"></button><span id="dbot-t">Lets him post through his Discord bot. You still approve each message.</span></div>
+      <label class="slider"><span>Brightness</span><input type="range" id="bri" min="0" max="100" value="70"><output id="bri-out">70</output></label>
+      <div class="qgrid">
+        <button data-act="lock"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="9" width="12" height="9"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>Lock PC</button>
+        <button data-act="screenshot"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6V2h4M14 2h4v4M18 14v4h-4M6 18H2v-4"/><circle cx="10" cy="10" r="3"/></svg>Screenshot</button>
+        <button data-act="desktop"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="16" height="11"/><path d="M7 17h6M10 14v3"/></svg>Show desktop</button>
+        <button data-act="dark_mode"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 12.5A6.5 6.5 0 017.5 5a6.5 6.5 0 107.5 7.5z"/></svg>Dark mode</button>
+        <button data-act="status"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 10h4l2-5 4 10 2-5h4"/></svg>Diagnostics</button>
+        <button id="keys-btn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="10" r="3.5"/><path d="M10 10h8M15 10v3M17.5 10v2"/></svg>API keys</button>
+        <button data-act="reset"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10a6 6 0 106-6H6M8 1L5 4l3 3"/></svg>New chat</button>
+      </div>
+    </section>
+    <section class="sec">
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="rem" aria-selected="true">Reminders<sup id="rem-n"></sup></button>
+        <button role="tab" data-tab="mem" aria-selected="false">Memory<sup id="mem-n"></sup></button>
+        <button role="tab" data-tab="rtn" aria-selected="false">Routines<sup id="rtn-n"></sup></button>
+      </div>
+      <ul class="list" id="rem"></ul><ul class="list" id="mem" hidden></ul><ul class="list" id="rtn" hidden></ul>
+    </section>
+    <section class="sec">
+      <h3>Allowed without asking</h3>
+      <div id="perms"></div>
+      <p class="fine">Off means he asks each time. Shutting down, emptying the Recycle Bin and commands that delete or format always ask. Read-only commands and reading your files never ask.</p>
+      <button class="link" id="perm-reset">Ask about everything again</button>
+    </section>
+    <section class="sec" id="jobs-sec">
+      <h3>Background jobs</h3>
+      <ul class="list" id="jobs"><li class="note">None yet. Try “in the background, research the best budget USB mics and make me a shortlist”.</li></ul>
+    </section>
+    <section class="sec">
+      <h3>Connectors</h3>
+      <div id="conn"><p class="fine" style="margin-top:0">Plug him into other apps (calendar, email, notes, smart home...) through MCP.</p></div>
+      <button class="link" data-act="connectors_file">Edit connectors</button>&nbsp;&nbsp;<button class="link" data-act="connectors_reload">Reconnect</button>
+    </section>
+    <section class="sec"><p class="fine">Brain <span id="model">--</span></p></section>
+  </div>
+</aside>
+
+<main id="stage">
+  <div id="you" class="gone" aria-live="polite"><span></span></div>
+  <button id="presence" aria-label="Talk to him (Ctrl+Space)" title="Click to talk"></button>
+  <div id="state"><span id="st-word">Initializing</span><span class="t" id="st-time"></span></div>
+  <div id="bootlog" aria-live="polite"></div>
+  <div id="subs" aria-live="polite"><div id="said-by"></div><p id="sub" class="gone"></p><div id="chips"></div></div>
+  <section id="ask" hidden role="alertdialog" aria-labelledby="a-title" aria-describedby="a-detail">
+    <div class="head">Needs your OK<span id="a-left"></span></div>
+    <h2 id="a-title"></h2>
+    <pre id="a-detail"></pre>
+    <div class="btns">
+      <button id="a-no">Deny<kbd>N</kbd></button>
+      <button id="a-always">Always allow<kbd>A</kbd></button>
+      <button id="a-yes">Allow<kbd>Y</kbd></button>
+    </div>
+    <p class="fine" id="a-hint">Or say yes, no, or “yes, always”.</p>
+  </section>
+  <section id="keys" hidden role="dialog" aria-labelledby="k-title">
+    <div class="head">Setup</div>
+    <h2 id="k-title">Add your Claude API key</h2>
+    <p class="fine">He thinks with Claude. Make a key at console.anthropic.com (API keys), add a few dollars of credit, and paste it below. It's saved only on this PC.</p>
+    <label class="kf"><span>Anthropic API key</span><input id="k-ant" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..."></label>
+    <label class="kf"><span>Groq key, optional (makes his hearing faster; free at console.groq.com)</span><input id="k-groq" type="password" autocomplete="off" spellcheck="false" placeholder="gsk_..."></label>
+    <p class="fine" id="k-msg" role="status"></p>
+    <div class="btns"><button id="k-later">Later</button><button id="k-save">Save and restart</button></div>
+  </section>
+</main>
+
+<footer id="cmd">
+  <button class="ico" id="mic" aria-label="Mute microphone" aria-pressed="false" title="Mic on/off">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="7" y="2" width="6" height="11" rx="3"/><path d="M4 10a6 6 0 0012 0M10 16v3"/><path class="slash" d="M3 3l14 14" opacity="0"/></svg></button>
+  <input id="input" autocomplete="off" spellcheck="false" placeholder="Speak, or type to Jarvis" aria-label="Type a message">
+  <button class="ico" id="send" aria-label="Send"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10h13M11 5l5 5-5 5"/></svg></button>
+</footer>
+<div class="chips" id="pills">
+  <button class="pill" id="mic-chip" hidden title="Click to turn the mic back on"><i></i>Mic off<span id="mic-left"></span></button>
+  <button class="pill" id="dict-chip" hidden><i></i><span></span></button>
+</div>
+<div id="hints"><span>Ctrl+Space to talk</span><span>Esc stops him</span><span id="hk-mute"></span></div>
+<div id="alert" hidden><b>Heads up</b><span id="alert-text"></span></div>
+<div id="toasts"></div>
+<div id="holo" aria-hidden="true"><svg width="0" height="0" style="position:absolute"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0" stop-color="currentColor" stop-opacity="0"/><stop offset="1" stop-color="currentColor" stop-opacity=".55"/></linearGradient></defs></svg></div>
+
+<script>
+(() => {
+"use strict";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let api = null;
+const call = (fn, ...a) => { try { api && api[fn] && api[fn](...a); } catch (e) { console.error(e); } };
+const store = { get(k, d) { try { const v = localStorage.getItem("hud." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem("hud." + k, JSON.stringify(v)); } catch (e) {} } };
+
+let state = "booting", muted = false, aiKey = null, aiName = "Jarvis", duoOn = false, speaker = "jarvis", voiceOK = true;
+let micLevel = 0, voiceLevel = 0, voiceAt = -1e9, visible = true;
+
+// ================================================================ the presence (canvas)
+const TAU = Math.PI * 2;
+const cv = $("#fx"), g = cv.getContext("2d");
+const COL = {
+  jarvis: { c: [127, 231, 255], deep: [27, 143, 179], hot: [223, 246, 255], alarm: [255, 157, 46], dim: [95, 127, 143] },
+  ultron: { c: [255, 48, 70], deep: [110, 10, 24], hot: [255, 138, 61], bone: [244, 233, 228], alarm: [255, 211, 77], dim: [134, 99, 106] },
+};
+const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const noise = (i, t) => .5 + .5 * Math.sin(t * 9.1 + i * 1.7) * Math.sin(t * 5.3 + i * .61);
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 1.5); W = innerWidth; H = innerHeight; presenceBox = null;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  sizeSpark(); kick();
+}
+// one 3D point -> screen (simple perspective, z>0 is away from you)
+function rot(p, ax, ay, ax2) {
+  let [x, y, z] = p, c = Math.cos(ax), s = Math.sin(ax);
+  [y, z] = [y * c - z * s, y * s + z * c];
+  c = Math.cos(ay); s = Math.sin(ay); [x, z] = [x * c + z * s, -x * s + z * c];
+  c = Math.cos(ax2); s = Math.sin(ax2); [y, z] = [y * c - z * s, y * s + z * c];
+  return [x, y, z];
+}
+const persp = (z) => 3.2 / (3.2 + z);
+
+// Jarvis: a gyroscope of great circles around a light core
+const RINGS = Array.from({ length: 7 }, (_, i) => ({ tilt: (i / 7) * Math.PI + .2, phi: i * .9, w: (i % 2 ? 1 : -1) * (.16 + .045 * i), r: 1 - (i % 3) * .04 }));
+const U = Array.from({ length: 73 }, (_, k) => [Math.cos(k / 72 * TAU), Math.sin(k / 72 * TAU)]);
+// Ultron: a cluster of crystal shards around a dark eye
+const SHARDS = (() => { const n = 18, out = []; let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < n; i++) { const y = 1 - (i + .5) / n * 2, r = Math.sqrt(1 - y * y), a = i * 2.39996;
+    out.push({ d: [Math.cos(a) * r, y * .85, Math.sin(a) * r], len: .62 + .4 * rnd(), w: .085 + .05 * rnd(), ph: rnd() * TAU }); }
+  return out; })();
+
+const PARTS = Array.from({ length: reduced ? 0 : 56 }, () => ({ a: Math.random() * TAU, r: 0, v: .5 + Math.random() * .7, live: false }));
+const DUST = Array.from({ length: reduced ? 0 : 28 }, () => ({ x: Math.random(), y: Math.random(), v: .004 + Math.random() * .01, s: Math.random() < .2 ? 1.6 : 1 }));
+let ripples = [], lastRipple = 0;
+const look = { jarvis: { a: 1, x: 0, s: 1 }, ultron: { a: 0, x: 0, s: .85 } };
+let spin = { jarvis: 0, ultron: 0 }, voiceS = 0, micS = 0, awaitFrac = null, alarmT = 0, muteT = 0, bootStart = performance.now();
+const SPEED = { booting: .3, idle: .5, listening: .8, transcribing: 1.3, thinking: 2.7, speaking: 1.1, awaiting: .35, dictating: .7 };
+let venv = null, vsync = 16.7, lastRaf = 0, tick = 0, presenceBox = null;
+let speedS = .3, last = 0, raf = 0, askT0 = 0, askSecs = 45, frameAvg = 16.7, slowPC = false;
+
+function targets() {
+  const solo = duoOn ? null : (aiKey || "jarvis");
+  for (const k of ["jarvis", "ultron"]) {
+    const L = look[k];
+    if (solo) { L.ta = k === solo ? 1 : 0; L.tx = 0; L.ts = k === solo ? 1 : .8; }
+    else { const on = k === speaker; L.ta = on ? 1 : .5; L.tx = k === "jarvis" ? -1 : 1; L.ts = on ? 1 : .84; }
+  }
+}
+function step(L, dt) { const k = 1 - Math.exp(-dt * 5); L.a += (L.ta - L.a) * k; L.x += (L.tx - L.x) * k; L.s += (L.ts - L.s) * k; }
+
+function drawJarvis(x, y, R, A, t, b) {
+  const C = COL.jarvis, alarm = alarmT, col = mix(C.c, C.alarm, alarm), hot = mix(C.hot, [255, 226, 180], alarm);
+  const dimC = mix(col, C.dim, muteT * .8), v = voiceS * (speaker === "jarvis" || !duoOn ? 1 : .2);
+  const tiltG = .32 + .05 * Math.sin(t * .3), breath = 1 + .015 * Math.sin(t * 1.3) + .06 * v;
+  g.save(); g.globalAlpha = A * (1 - muteT * .5);
+  // glow + core
+  let gr = g.createRadialGradient(x, y, 0, x, y, R * 1.1);
+  gr.addColorStop(0, rgba(hot, .9 * (.65 + .35 * v) * ease(b * 2)));
+  gr.addColorStop(.14, rgba(dimC, .55 * (.7 + .3 * v)));
+  gr.addColorStop(.45, rgba(dimC, .10 + .08 * v));
+  gr.addColorStop(1, rgba(dimC, 0));
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, R * 1.1, 0, TAU); g.fill();
+  // great circles: back halves faint, front halves bright
+  RINGS.forEach((rg, i) => {
+    const vis = clamp(b * 8 - i * .7); if (vis <= 0) return;
+    const rr = R * rg.r * breath * (1 + .035 * v * Math.sin(t * 7 + i)), phi = rg.phi + spin.jarvis * rg.w * 3;
+    const n = Math.max(2, Math.round(72 * vis));
+    // rotate the circle's two axis vectors once; every point is a mix of them (no per-point trig or arrays)
+    const ct = Math.cos(rg.tilt), st = Math.sin(rg.tilt), cp = Math.cos(phi), sp = Math.sin(phi), cg = Math.cos(tiltG), sg = Math.sin(tiltG);
+    const ax = cp, ay = 0, az = -sp;                                   // (1,0,0) after tilt + phi
+    const bx = st * sp, by = ct, bz = st * cp;                         // (0,1,0) after tilt + phi
+    const ay2 = ay * cg - az * sg, az2 = ay * sg + az * cg, by2 = by * cg - bz * sg, bz2 = by * sg + bz * cg;
+    const back = new Path2D(), fr = new Path2D();
+    let px0 = 0, py0 = 0, f0 = false;
+    for (let k = 0; k <= n; k++) {
+      const c = U[k][0], s1 = U[k][1], pz = az2 * c + bz2 * s1, sc = rr * 3.2 / (3.2 + pz);
+      const sx = x + (ax * c + bx * s1) * sc, sy = y + (ay2 * c + by2 * s1) * sc, f = pz <= 0, path = f ? fr : back;
+      if (k === 0) path.moveTo(sx, sy);
+      else if (f === f0) path.lineTo(sx, sy);
+      else { path.moveTo(px0, py0); path.lineTo(sx, sy); }
+      px0 = sx; py0 = sy; f0 = f;
+    }
+    g.lineWidth = 1; g.strokeStyle = rgba(dimC, .2); g.stroke(back);
+    g.lineWidth = i === 0 ? 1.8 : 1.3; g.strokeStyle = rgba(i === 0 ? hot : dimC, .78 + .2 * v); g.stroke(fr);
+  });
+  // HUD ring: ticks that dance when he talks
+  const Rt = R * 1.3 * (1 + .02 * v), rot0 = spin.jarvis * .25, ticks = new Path2D();
+  const nt = Math.round(120 * clamp(b * 1.6 - .5));
+  for (let i = 0; i < nt; i++) {
+    const a = i / 120 * TAU + rot0, big = i % 10 === 0, l = (big ? 7 : 3) + (state === "speaking" ? v * 16 * noise(i, t) : 0);
+    const c = Math.cos(a), s = Math.sin(a);
+    ticks.moveTo(x + c * Rt, y + s * Rt); ticks.lineTo(x + c * (Rt + l), y + s * (Rt + l));
+  }
+  g.lineWidth = 1; g.strokeStyle = rgba(dimC, .5); g.stroke(ticks);
+  // sweeping brackets
+  if (b > .7) {
+    g.lineWidth = 2; g.strokeStyle = rgba(dimC, .55);
+    for (let j = 0; j < 3; j++) { const a0 = -spin.jarvis * .12 + j * TAU / 3; g.beginPath(); g.arc(x, y, R * 1.46, a0, a0 + .7); g.stroke(); }
+    g.lineWidth = 1; g.strokeStyle = rgba(dimC, .16); g.beginPath(); g.arc(x, y, R * 1.12, 0, TAU); g.stroke();
+  }
+  g.restore();
+}
+
+function drawUltron(x, y, R, A, t, b) {
+  const C = COL.ultron, alarm = alarmT, col = mix(C.c, C.alarm, alarm), deep = mix(C.deep, [90, 70, 10], alarm);
+  const dimC = mix(col, C.dim, muteT * .8), v = voiceS * (speaker === "ultron" || !duoOn ? 1 : .2);
+  const ay = spin.ultron, ax = .38 + .08 * Math.sin(t * .4);
+  g.save(); g.globalAlpha = A * (1 - muteT * .5);
+  let gr = g.createRadialGradient(x, y, R * .1, x, y, R * 1.25);
+  gr.addColorStop(0, rgba(dimC, .32 + .2 * v)); gr.addColorStop(.5, rgba(dimC, .07 + .05 * v)); gr.addColorStop(1, rgba(dimC, 0));
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, R * 1.25, 0, TAU); g.fill();
+  const grow = ease(b * 1.4);
+  const list = SHARDS.map((sh, i) => {
+    const d = rot(sh.d, 0, ay, ax), spike = v * Math.pow(.5 + .5 * Math.sin(t * 11 + sh.ph * 3), 2) * .75;
+    const L = R * (sh.len * (.93 + .05 * Math.sin(t * .8 + sh.ph)) + spike) * grow * (state === "listening" ? .94 : 1);
+    return { d, L, w: sh.w * R * (1 + spike * .4), i };
+  }).sort((p, q) => q.d[2] - p.d[2]);
+  const drawShard = (s) => {
+    const [dx, dy, dz] = s.d, b0 = R * .2, s0 = persp(dz * .2), s1 = persp(dz * s.L / R);
+    const bx = x + dx * b0 * s0, by = y + dy * b0 * s0, tx = x + dx * s.L * s1, ty = y + dy * s.L * s1;
+    let vx = tx - bx, vy = ty - by; const len = Math.hypot(vx, vy) || 1, px = -vy / len, py = vx / len, w = s.w * (1 - dz * .25);
+    const mx = bx + vx * .3, my = by + vy * .3, front = dz <= 0;
+    const lg = g.createLinearGradient(bx, by, tx, ty);
+    lg.addColorStop(0, rgba(deep, front ? .95 : .55)); lg.addColorStop(1, rgba(front ? dimC : deep, front ? .95 : .5));
+    g.fillStyle = lg; g.beginPath(); g.moveTo(bx, by); g.lineTo(mx + px * w, my + py * w); g.lineTo(tx, ty); g.lineTo(mx - px * w, my - py * w); g.closePath(); g.fill();
+    if (front) { g.lineWidth = 1; g.strokeStyle = rgba(C.bone, .28 + .3 * v); g.stroke();
+      g.beginPath(); g.moveTo(bx, by); g.lineTo(tx, ty); g.strokeStyle = rgba(C.bone, .22); g.stroke(); }
+  };
+  list.filter((s) => s.d[2] > 0).forEach(drawShard);
+  // the eye: a dark core with a slit that opens when he speaks
+  g.fillStyle = "rgba(14,2,4,.96)"; g.beginPath(); g.arc(x, y, R * .24 * grow, 0, TAU); g.fill();
+  g.lineWidth = 1.6; g.strokeStyle = rgba(dimC, .85); g.stroke();
+  const sw = R * .3 * grow, sh = R * (.02 + .075 * v + (state === "thinking" ? .012 * Math.sin(t * 8) + .012 : 0));
+  gr = g.createRadialGradient(x, y, 0, x, y, sw * 1.2);
+  gr.addColorStop(0, rgba(mix(C.hot, C.alarm, alarm), .55 + .4 * v)); gr.addColorStop(1, rgba(C.hot, 0));
+  g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, sw * 1.2, sh * 3 + R * .03, 0, 0, TAU); g.fill();
+  g.fillStyle = rgba([255, 236, 220], .9); g.beginPath(); g.ellipse(x, y, sw, Math.max(1, sh), 0, 0, TAU); g.fill();
+  list.filter((s) => s.d[2] <= 0).forEach(drawShard);
+  // broken polygon frame + voice spikes
+  if (b > .6) {
+    const Rp = R * 1.36, n = 12, r0 = -spin.ultron * .2;
+    g.lineWidth = 1.4; g.strokeStyle = rgba(dimC, .5); g.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a0 = r0 + i / n * TAU, a1 = r0 + (i + 1) / n * TAU, f = .72;
+      const p0 = [Math.cos(a0) * Rp, Math.sin(a0) * Rp], p1 = [Math.cos(a1) * Rp, Math.sin(a1) * Rp];
+      g.moveTo(x + p0[0], y + p0[1]); g.lineTo(x + p0[0] + (p1[0] - p0[0]) * f, y + p0[1] + (p1[1] - p0[1]) * f);
+    }
+    g.stroke();
+    if (state === "speaking" && v > .02) {
+      const sp = new Path2D();
+      for (let i = 0; i < 48; i++) { const a = i / 48 * TAU + r0 * 2, l = 2 + v * 20 * noise(i, t), c = Math.cos(a), s = Math.sin(a), r1 = R * 1.46;
+        sp.moveTo(x + c * r1, y + s * r1); sp.lineTo(x + c * (r1 + l), y + s * (r1 + l)); }
+      g.lineWidth = 1.5; g.strokeStyle = rgba(dimC, .6); g.stroke(sp);
+    }
+  }
+  g.restore();
+}
+
+function drawFX(x, y, R, key, A, dt, t) {
+  const C = COL[key], col = mix(C.c, C.alarm, alarmT);
+  // listening: your voice ripples out from him
+  g.save(); g.globalAlpha = A;
+  ripples.forEach((r) => {
+    const a = r.a * (1 - (r.r - 1.05) / .95);
+    g.lineWidth = 1.2; g.strokeStyle = rgba(col, a * .6); g.beginPath();
+    if (key === "ultron") { for (let i = 0; i <= 6; i++) { const ang = i / 6 * TAU + r.r; const px = x + Math.cos(ang) * R * r.r, py = y + Math.sin(ang) * R * r.r; i ? g.lineTo(px, py) : g.moveTo(px, py); } }
+    else g.arc(x, y, R * r.r, 0, TAU);
+    g.stroke();
+  });
+  // thinking: light streams into the core
+  const hot = key === "ultron" ? C.hot : C.hot;
+  g.lineWidth = 1.3;
+  PARTS.forEach((p) => {
+    if (!p.live) return;
+    const c = Math.cos(p.a), s = Math.sin(p.a), r0 = p.r * R, r1 = (p.r + .1 + .1 * p.v) * R, a = clamp((2.5 - p.r) / 1.2) * clamp(p.r * 2);
+    g.strokeStyle = rgba(hot, a * .8); g.beginPath(); g.moveTo(x + c * r1, y + s * r1); g.lineTo(x + c * r0, y + s * r0); g.stroke();
+  });
+  // approval: a ring drains as time runs out
+  if (awaitFrac != null) {
+    const ra = R * 1.62, pulse = .75 + .25 * Math.sin(t * 6);
+    g.lineWidth = 1; g.strokeStyle = rgba(C.alarm, .18); g.beginPath(); g.arc(x, y, ra, 0, TAU); g.stroke();
+    g.lineWidth = 3; g.strokeStyle = rgba(C.alarm, .9 * pulse); g.beginPath(); g.arc(x, y, ra, -Math.PI / 2, -Math.PI / 2 + TAU * awaitFrac); g.stroke();
+    const e = -Math.PI / 2 + TAU * awaitFrac; g.fillStyle = rgba(C.alarm, 1); g.beginPath(); g.arc(x + Math.cos(e) * ra, y + Math.sin(e) * ra, 3.2, 0, TAU); g.fill();
+  }
+  g.restore();
+}
+
+function envLevel(now) {
+  if (!venv) return null;
+  const p = (now - venv.start) / venv.step;
+  if (p < 0) return 0;
+  const i = Math.floor(p);
+  if (i >= venv.env.length - 1) { if (i > venv.env.length + 5) venv = null; return 0; }
+  return venv.env[i] + (venv.env[i + 1] - venv.env[i]) * (p - i);
+}
+function frame(now) {
+  raf = 0;
+  if (!visible) return;
+  // learn the display's refresh interval, then draw on an even multiple of it (no judder on 120/144 Hz screens)
+  if (lastRaf && now - lastRaf < 40) vsync = vsync * .95 + (now - lastRaf) * .05;
+  lastRaf = now; tick++;
+  const busy = state !== "idle" || voiceS > .01 || venv || ripples.length || PARTS.some((p) => p.live) || (performance.now() - bootStart) < 2600
+    || Math.abs(look.jarvis.a - look.jarvis.ta) > .01 || Math.abs(look.ultron.x - look.ultron.tx) > .01 || awaitFrac != null || muteT % 1 > .01;
+  // ~60 fps while something's happening, ~30 at rest, evenly spaced. If this PC can't keep up, settle at ~30.
+  const target = busy && !slowPC ? 16.7 : 33.3, every = Math.max(1, Math.round(target / vsync));
+  if (tick % every !== 0) { raf = requestAnimationFrame(frame); return; }
+  const dt = Math.min(.2, (now - (last || now)) / 1000) || .016;
+  if (busy && last && every === Math.max(1, Math.round(16.7 / vsync))) {
+    frameAvg = frameAvg * .97 + (now - last) / every * .03 * Math.max(1, Math.round(16.7 / vsync));
+    if (frameAvg > 26 && !slowPC && now - bootStart > 5000) slowPC = true;
+  }
+  last = now;
+  const t = now / 1000, b = reduced ? 1 : clamp((now - bootStart) / 1900);
+  // smooth inputs
+  const ev = envLevel(now);
+  if (ev != null) voiceLevel = ev;
+  else if (performance.now() - voiceAt > 160) voiceLevel *= .6;
+  // quick to react when a syllable hits, slower to fall back: reads as a voice, not a meter
+  voiceS += (voiceLevel - voiceS) * (1 - Math.exp(-dt * (voiceLevel > voiceS ? 32 : 10)));
+  micS += ((state === "listening" || state === "transcribing" ? micLevel : 0) - micS) * (1 - Math.exp(-dt * 10));
+  speedS += ((SPEED[state] ?? .4) - speedS) * (1 - Math.exp(-dt * 2));
+  spin.jarvis += dt * speedS * .9; spin.ultron += dt * speedS * .55;
+  alarmT += ((state === "awaiting" ? 1 : 0) - alarmT) * (1 - Math.exp(-dt * 6));
+  muteT += ((muted && (state === "idle" || state === "listening") ? 1 : 0) - muteT) * (1 - Math.exp(-dt * 4));
+  awaitFrac = askT0 ? clamp(1 - (performance.now() - askT0) / 1000 / askSecs) : null;
+  targets(); step(look.jarvis, dt); step(look.ultron, dt);
+  if (!reduced && micS > .12 && t - lastRipple > .2 && ripples.length < 7) { ripples.push({ r: 1.05, a: clamp(micS * 1.6) }); lastRipple = t; }
+  ripples.forEach((r) => r.r += dt * .85); ripples = ripples.filter((r) => r.r < 2);
+  PARTS.forEach((p) => {
+    if (!p.live) { if (state === "thinking" && Math.random() < dt * 3) { p.live = true; p.r = 2.2 + Math.random() * .5; p.a = Math.random() * TAU; } return; }
+    p.r -= dt * p.v * 1.1; p.a += dt * .7 / Math.max(.3, p.r); if (p.r < .22) p.live = false;
+  });
+
+  g.clearRect(0, 0, W, H);
+  if (!presenceBox || tick % 15 === 0) presenceBox = $("#presence").getBoundingClientRect();
+  const box = presenceBox;
+  const cx = box.left + box.width / 2, cy = box.top + box.height / 2;
+  const dd = duoOn || look.ultron.x > .01 ? Math.min(box.width * .26, 230) : 0;
+  const Rsolo = box.height * .3, R = duoOn ? Math.min(box.height * .27, dd * .62) : Rsolo;
+  // faint dust drifting through the projection
+  if (DUST.length) {
+    g.fillStyle = rgba(COL[aiKey || "jarvis"].c, .16);
+    DUST.forEach((d) => { d.y -= d.v * dt; if (d.y < -.02) { d.y = 1.02; d.x = Math.random(); } g.fillRect(d.x * W, d.y * H, d.s, d.s); });
+  }
+  for (const k of ["ultron", "jarvis"].sort((p) => (p === speaker ? 1 : -1))) {
+    const L = look[k]; if (L.a < .01) continue;
+    const x = cx + L.x * dd, r = R * L.s;
+    if (k === "jarvis") drawJarvis(x, cy, r, L.a, t, b); else drawUltron(x, cy, r, L.a, t, b);
+    if (k === (duoOn ? speaker : aiKey || "jarvis")) drawFX(x, cy, r, k, L.a, dt, t);
+  }
+  raf = requestAnimationFrame(frame);
+}
+function kick() { if (!raf && visible) raf = requestAnimationFrame(frame); }
+// Re-measure where he sits only when something around him actually changes size (not every frame).
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(() => { presenceBox = null; kick(); if (holo.panels.length) holoLayout(); });
+  ["#presence", "#you", "#subs", "#ask", "#stage"].forEach((q) => ro.observe($(q)));
+}
+document.addEventListener("visibilitychange", () => { visible = !document.hidden; if (visible) { last = 0; kick(); } });
+addEventListener("resize", resize);
+
+// ================================================================ helpers for the page
+const LABEL = { booting: "Initializing", idle: "Standby", listening: "Listening", transcribing: "Hearing you", dictating: "Dictating",
+  thinking: "Thinking", speaking: "Speaking", awaiting: "Your call" };
+const FOCUS = new Set(["listening", "transcribing", "thinking", "speaking", "awaiting", "dictating"]);
+let idleTimer = null, turnClock = null, turnT0 = 0;
+function setState(s) {
+  const prev = state;
+  if (s !== prev) {
+    if (s === "listening" && prev !== "speaking" && prev !== "transcribing" && prev !== "thinking") sfx.play("wake");
+    if (s === "thinking" && prev !== "thinking") sfx.play("think");
+    if (s === "awaiting") sfx.play("ask");
+    sfx.hum(s === "thinking");
+  }
+  state = s;
+  document.body.className = document.body.className.replace(/\bst-\S+/g, "").trim() + " st-" + s;
+  document.body.classList.toggle("focus", FOCUS.has(s));
+  $("#st-word").textContent = muted && (s === "idle" || s === "listening") ? "Mic off" : (LABEL[s] || s);
+  clearTimeout(idleTimer);
+  if (s === "idle") idleTimer = setTimeout(() => { if (state === "idle") { $("#sub").classList.add("gone"); $("#you").classList.add("gone"); $("#chips").classList.add("gone"); } }, 9000);
+  else { $("#chips").classList.remove("gone"); }
+  kick();
+}
+function you(text, faint = false) {
+  const y = $("#you"); y.querySelector("span").textContent = text; y.classList.toggle("faint", faint); y.classList.remove("gone");
+}
+let youTimer = null;
+let subText = "";
+function sub(text, kind = "line") {
+  const s = $("#sub"); text = (text || "").trim(); if (!text) return;
+  const changed = kind !== (s.classList.contains("thought") ? "thought" : "line") || !text.startsWith(subText.slice(0, 12));
+  s.textContent = text; subText = text;
+  s.classList.toggle("thought", kind === "thought"); s.classList.remove("gone");
+  if (changed && !reduced) { s.classList.remove("in"); void s.offsetWidth; s.classList.add("in"); }
+}
+function saidBy(who) { const k = (who || "jarvis").toLowerCase(); $("#said-by").textContent = who || ""; $("#said-by").style.color = k === "ultron" ? "#ff3046" : "#7fe7ff"; }
+function lastSentences(text, max = 190) {
+  text = text.trim(); if (text.length <= max) return text;
+  const cut = text.slice(-max), i = cut.search(/[.!?]\s+\S/); return (i >= 0 ? cut.slice(i + 1) : "…" + cut).trim();
+}
+
+// ================================================================ conversation drawer
+const log = $("#log"), wrap = $("#log-wrap");
+const scrollLog = () => { wrap.scrollTop = wrap.scrollHeight; };
+const hhmm = () => { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+function add(cls, html) {
+  $("#empty")?.remove();
+  const d = document.createElement("div"); d.className = "m " + cls;
+  d.innerHTML = html; log.appendChild(d);
+  while (log.children.length > 240) log.firstChild.remove();
+  scrollLog(); return d;
+}
+const toolName = (n) => n.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+const STEP_LABEL = { web_search: "Searching the web", screen: "Looking at your screen", look_at_screen: "Looking at your screen", look_at_camera: "Looking at you",
+  run_command: "Running PowerShell", open: "Opening", close_app: "Closing", self_control: "Window", window_control: "Windows", keyboard_input: "Typing",
+  clipboard: "Clipboard", mouse: "Mouse", display: "Display", media_control: "Media", set_volume: "Volume", system_power: "Power",
+  system_info: "Checking the system", files: "Files", memory: "Memory", reminders: "Reminders", spotify: "Spotify", youtube: "YouTube", blender: "Blender" };
+const stepLabel = (n) => STEP_LABEL[n] || toolName(n);
+function shortDetail(name, a) {
+  if (!a) return "";
+  if (name === "web_search") return a.query ? `"${a.query}"` : "";
+  if (name === "run_command") return a.command || "";
+  if (name === "blender") return (a.action || "") + (a.name ? ": " + a.name : "");
+  if (name === "mouse") return (a.action || "").replace(/_/g, " ") + (a.what ? ": " + a.what : "");
+  const v = Object.entries(a).filter(([k, x]) => typeof x !== "object" && typeof x !== "boolean" && !["content", "code", "steps", "question"].includes(k)).map(([, x]) => x).join(", ");
+  return v.length > 70 ? v.slice(0, 70) + "…" : v;
+}
+const turns = {};
+let live = null;
+function turnStart(id, who) {
+  who = who || aiName;
+  const node = add("turn live", `<div class="turn-head"><span><i class="chev"></i><span class="th">Working</span></span><span class="tt"></span></div>
+    <div class="steps"></div><div class="reply" hidden><span class="ts">${hhmm()}</span><span class="who ai-${esc(who.toLowerCase())}">${esc(who)}</span><div class="txt"></div></div>`);
+  node.querySelector(".turn-head").onclick = () => { if (node.classList.contains("done")) node.classList.toggle("open"); };
+  const T = { id, who, el: node, t0: performance.now(), steps: [], pending: {}, thinking: null, text: "", capt: false, firstDelta: 0 };
+  turns[id] = live = T;
+  // In Both mode the second one starts thinking while the first is still talking, so a turn starting
+  // says nothing about who's speaking. Captions and the hand-off decide that instead.
+  if (!duoOn) { speaker = who.toLowerCase() === "ultron" ? "ultron" : "jarvis"; saidBy(who); }
+  if (!duoOn || !Object.values(turns).some((x) => x !== T && x.el.classList.contains("live"))) { $("#chips").innerHTML = ""; subText = ""; }
+  turnT0 = performance.now(); clearInterval(turnClock);
+  turnClock = setInterval(() => { if (live) $("#st-time").textContent = ((performance.now() - turnT0) / 1000).toFixed(1) + "s"; }, 100);
+  return T;
+}
+function chip(label, detail) {
+  const c = document.createElement("span"); c.className = "chip pending";
+  c.innerHTML = `<i></i>${esc(label)}${detail ? ` <span>${esc(detail)}</span>` : ""}`;
+  const box = $("#chips"); box.appendChild(c); while (box.children.length > 4) box.firstChild.remove();
+  return c;
+}
+function addStep(T, label, detail) {
+  const node = document.createElement("div"); node.className = "step pending";
+  node.innerHTML = `<i class="ic"></i><span><b>${esc(label)}</b> <span class="det">${esc(detail || "")}</span></span><span class="st"></span>`;
+  T.el.querySelector(".steps").appendChild(node); T.el.classList.add("has-steps");
+  const st = { el: node, label, t0: performance.now(), chip: label === "Thinking" ? null : chip(label, detail) };
+  T.steps.push(st); scrollLog(); return st;
+}
+function finishStep(st, ok = true, detail = null) {
+  if (!st || !st.el.classList.contains("pending")) return;
+  st.el.classList.remove("pending"); st.el.classList.add(ok ? "ok" : "fail");
+  st.el.querySelector(".st").textContent = ((performance.now() - st.t0) / 1000).toFixed(1) + "s";
+  if (detail != null) st.el.querySelector(".det").textContent = detail;
+  if (st.chip) { st.chip.classList.remove("pending"); if (!ok) st.chip.classList.add("fail"); }
+}
+function closeThinking(T) { if (T.thinking) { finishStep(T.thinking); T.thinking = null; } }
+function onActivity(e) {
+  const T = turns[e.id] || turnStart(e.id), d = e.data || {};
+  switch (e.kind) {
+    case "thinking_start": closeThinking(T); T.thinking = addStep(T, "Thinking", ""); break;
+    case "thinking": {
+      if (!T.thinking) T.thinking = addStep(T, "Thinking", "");
+      let r = T.thinking.el.querySelector(".reason");
+      if (!r) { r = document.createElement("div"); r.className = "reason"; T.thinking.el.appendChild(r); }
+      r.textContent += d;
+      if (!T.text) { const line = r.textContent.trim().split(/(?<=[.!?])\s+/).pop(); if (line.length > 8) sub(line, "thought"); }
+      if (r.textContent.length > 60) holoThinking(d);
+      break;
+    }
+    case "tool_pending": { closeThinking(T); const st = addStep(T, stepLabel(d.name), ""); (T.pending[d.name] = T.pending[d.name] || []).push(st);
+      if (d.name === "web_search") holoStart(d.name, {});      // web searches run on Claude's side: no separate start event
+      break; }
+    case "tool_start": {
+      const st = (T.pending[d.name] || []).find((x) => !x.started) || addStep(T, stepLabel(d.name), "");
+      st.started = true; const det = shortDetail(d.name, d.args);
+      holoStart(d.name, d.args);
+      st.el.querySelector(".det").textContent = det;
+      if (st.chip) st.chip.innerHTML = `<i></i>${esc(st.label)}${det ? ` <span>${esc(det)}</span>` : ""}`;
+      break;
+    }
+    case "image": {
+      const st = (T.pending[d.name] || []).find((x) => x.started) || T.steps[T.steps.length - 1]; if (!st) break;
+      const img = document.createElement("img"); img.className = "seen"; img.src = d.src; img.alt = "What " + aiName + " saw";
+      img.onclick = () => window.open(d.src); img.onload = scrollLog; st.el.appendChild(img); holoImage(d.name, d.src); break;
+    }
+    case "tool_done": {
+      const st = (T.pending[d.name] || []).shift() || addStep(T, stepLabel(d.name), "");
+      const det = shortDetail(d.name, d.args);
+      finishStep(st, d.ok !== false, d.ok === false ? `${det}${det ? ". " : ""}${d.result || ""}` : det);
+      holoFinish(d.name, d.ok !== false, d.result, d.args); break;
+    }
+  }
+}
+function onReplyDelta(e) {
+  const T = turns[e.id] || turnStart(e.id);
+  closeThinking(T);
+  if (holo.think) holoDone(holo.think, true, 1500);
+  const r = T.el.querySelector(".reply"); r.hidden = false; T.text += e.text;
+  r.querySelector(".txt").textContent = T.text.trim(); scrollLog();
+  if (!T.firstDelta) T.firstDelta = performance.now();
+  // Subtitles follow his voice (captions). Without a voice, follow the text instead.
+  if (!T.capt && textMode(T) && performance.now() - T.firstDelta > 1600) sub(lastSentences(T.text));
+}
+let lastCapAt = -1e9;
+// Show his reply as text only when there's no voice to follow (voice off, or nothing said for a while),
+// and in Both mode only for whoever has the floor.
+const textMode = (T) => (!voiceOK || performance.now() - lastCapAt > 2500) && (!duoOn || T.who.toLowerCase() === speaker);
+function turnEnd(e) {
+  const T = turns[e.id]; if (!T) return;
+  closeThinking(T); T.steps.forEach((st) => finishStep(st, !e.interrupted));
+  T.el.classList.remove("live"); T.el.classList.add("done");
+  if (live === T) { live = null; clearInterval(turnClock); $("#st-time").textContent = ""; }
+  const n = T.steps.filter((s) => s.label !== "Thinking").length;
+  if (e.interrupted) { T.el.querySelector(".th").textContent = "Interrupted"; if (!T.text.trim()) T.el.querySelector(".reply").hidden = true; return; }
+  if (e.text && !T.text.trim()) { T.text = e.text; T.el.querySelector(".reply").hidden = false; T.el.querySelector(".reply .txt").textContent = e.text; }
+  if (!T.capt && T.text && textMode(T)) sub(lastSentences(T.text));
+  T.el.querySelector(".th").textContent = n ? `${n} step${n > 1 ? "s" : ""}, ${e.secs}s` : `${e.secs}s`;
+  if (!T.steps.length) T.el.querySelector(".turn-head").style.display = "none";
+}
+
+// ================================================================ system drawer
+const rate = (k) => k >= 1024 ? (k / 1024).toFixed(1) + " MB/s" : Math.round(k) + " KB/s";
+const upFmt = (s) => { const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return `Up ${d ? d + "d " : ""}${h}h ${m}m`; };
+function meter(id, p) { const m = $(id), v = clamp(p, 0, 100); m.querySelector(".bar i").style.width = v + "%"; m.querySelector(".n").textContent = Math.round(v) + "%"; m.classList.toggle("hot", v >= 85); }
+const spark = $("#spark"), sg = spark.getContext("2d"), netHist = [];
+function sizeSpark() { const r = spark.getBoundingClientRect(); spark.width = Math.max(1, r.width * DPR); spark.height = Math.max(1, r.height * DPR); drawSpark(); }
+function drawSpark() {
+  const w = spark.width, h = spark.height; sg.clearRect(0, 0, w, h); if (netHist.length < 2) return;
+  const max = Math.max(256, ...netHist), c = COL[aiKey || "jarvis"].c;
+  sg.beginPath(); netHist.forEach((v, i) => { const x = i / 59 * w, y = h - 2 - (v / max) * (h - 4); i ? sg.lineTo(x, y) : sg.moveTo(x, y); });
+  sg.strokeStyle = rgba(c, .8); sg.lineWidth = 1.2 * DPR; sg.stroke();
+  sg.lineTo((netHist.length - 1) / 59 * w, h); sg.lineTo(0, h); sg.closePath(); sg.fillStyle = rgba(c, .08); sg.fill();
+}
+let dragging = false;
+const fill = (i) => i.style.setProperty("--p", i.value + "%");
+function telemetry(t) {
+  meter("#m-cpu", t.cpu); meter("#m-ram", t.ram); meter("#m-disk", t.disk);
+  $("#r-ram").textContent = `${t.ram_used} of ${t.ram_total} GB`; $("#r-disk").textContent = `${t.disk_free} GB free`;
+  $("#r-bat").textContent = t.battery == null ? "Plugged in" : `${Math.round(t.battery)}%${t.plugged ? ", charging" : ""}`;
+  $("#r-down").textContent = rate(t.down_kbps); $("#r-up").textContent = rate(t.up_kbps); $("#r-procs").textContent = t.procs;
+  $("#uptime").textContent = upFmt(t.uptime);
+  if (t.spend) {
+    const s = t.spend, near = s.budget > 0 && s.today >= .8 * s.budget;
+    $("#r-spend").textContent = `≈ $${s.today.toFixed(2)}${s.budget > 0 ? ` of $${s.budget.toFixed(2)}` : ""}`;
+    $("#r-spend").style.color = near ? "var(--alarm)" : ""; $("#r-month").textContent = `≈ $${s.month.toFixed(2)}`;
+  }
+  netHist.push(t.down_kbps); if (netHist.length > 60) netHist.shift(); drawSpark();
+  if (t.volume != null && !dragging) { const v = $("#vol"); v.value = t.volume; $("#vol-out").textContent = t.volume; fill(v); }
+  if (t.muted != null) $("#mute").classList.toggle("on", t.muted);
+}
+let reminders = [];
+function rel(due) {
+  const m = Math.round((new Date(due) - Date.now()) / 60000);
+  if (m < 1) return "now"; if (m < 60) return `in ${m} min`;
+  const d = new Date(due), today = new Date().toDateString() === d.toDateString();
+  return (today ? "" : d.toLocaleDateString([], { weekday: "short" }) + " ") + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+function renderRem() {
+  $("#rem-n").textContent = reminders.length || "";
+  $("#rem").innerHTML = reminders.length ? reminders.map((r) => `<li class="${new Date(r.due) - Date.now() < 600000 ? "soon" : ""}"><span>${esc(r.message)}</span><span>${rel(r.due)}</span></li>`).join("")
+    : `<li class="note">Nothing scheduled. Try “remind me to stretch in 30 minutes”.</li>`;
+}
+setInterval(renderRem, 15000);
+function renderMemory(items) {
+  $("#mem-n").textContent = items.length || "";
+  $("#mem").innerHTML = items.length ? items.slice().reverse().map((m) => `<li><span>${esc(m.text)}</span></li>`).join("")
+    : `<li class="note">Nothing yet. Try “remember my sister's birthday is May 3rd”.</li>`;
+}
+function renderRoutines(items) {
+  $("#rtn-n").textContent = items.length || "";
+  $("#rtn").innerHTML = items.length ? items.map((r) => `<li class="col"><span>${esc(r.name)}</span><span class="note">${esc(r.steps)}</span></li>`).join("")
+    : `<li class="note">None yet. Try “when I say gaming mode, open Steam and set volume to 30”.</li>`;
+}
+document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+  ["rem", "mem", "rtn"].forEach((id) => $("#" + id).hidden = id !== b.dataset.tab);
+});
+function renderJobs(items) {
+  if (!items.length) return;
+  $("#jobs").innerHTML = items.map((j) => {
+    const st = j.status === "running" ? `<span style="color:var(--c)">${j.steps} step${j.steps === 1 ? "" : "s"}, ${j.secs}s</span>`
+      : j.status === "done" ? `<button class="link" style="margin:0" data-job="${j.id}">Open result</button>` : `<span>${esc(j.status)}</span>`;
+    return `<li class="col"><span style="display:flex;justify-content:space-between;gap:8px"><span>${esc(j.goal)}</span>${st}</span>
+      <span class="note">${esc(j.status === "running" ? j.step : (j.summary || ""))}</span></li>`;
+  }).join("");
+  $("#jobs").querySelectorAll("[data-job]").forEach((b) => b.onclick = () => call("action", "open_job", Number(b.dataset.job)));
+}
+function renderConnectors(e) {
+  const items = e.items || [];
+  if (!e.available) { $("#conn").innerHTML = `<p class="fine" style="margin-top:0">Not installed. Run setup.bat once to add the part connectors need.</p>`; return; }
+  $("#conn").innerHTML = items.length ? `<ul class="list">${items.map((c) => `<li title="${esc(c.error || "")}"><span>${esc(c.name)}</span><span${c.status === "failed" ? ' style="color:var(--alarm)"' : ""}>${
+      c.status === "connected" ? `${c.tools} tool${c.tools === 1 ? "" : "s"}` : c.status === "failed" ? "couldn't connect" : "connecting"}</span></li>`).join("")}</ul>`
+    : `<p class="fine" style="margin-top:0">None yet. Plug him into other apps (calendar, email, notes, smart home...) through MCP: add them to the connectors file.</p>`;
+}
+function renderPerms(items) {
+  $("#perms").innerHTML = items.map((p) => `<div class="perm"><b>${esc(p.label)}</b><button class="sw" role="switch" aria-checked="${p.on}" data-k="${esc(p.key)}" aria-label="${esc(p.label)}: always allow"></button><span>${esc(p.detail)}</span></div>`).join("");
+  $("#perms").querySelectorAll(".sw").forEach((s) => s.onclick = () => { const on = s.getAttribute("aria-checked") !== "true"; s.setAttribute("aria-checked", String(on)); call("set_permission", s.dataset.k, on); });
+}
+$("#perm-reset").onclick = () => { call("set_permission", "*", false); document.querySelectorAll("#perms .sw").forEach((s) => s.setAttribute("aria-checked", "false")); };
+
+// ================================================================ approval: instant, keyboard-first
+let ask = null, askTimer = null;
+const keyName = (k) => (k || "").split("+").map((x) => x.length <= 3 ? x[0].toUpperCase() + x.slice(1) : x[0].toUpperCase() + x.slice(1)).join("+");
+function showAsk(e) {
+  ask = e; askT0 = performance.now(); askSecs = e.timeout || 45;
+  $("#a-title").textContent = e.title; $("#a-detail").textContent = e.detail || "";
+  $("#a-always").hidden = !e.can_always;
+  const k = e.keys || {};
+  $("#a-hint").textContent = (e.can_always && e.always_label ? `Always allow stops him asking about ${e.always_label} (undo it in the System panel). ` : "")
+    + (e.can_always ? "Or say yes, no or “yes, always”." : "Or say yes or no.") + (k.yes ? ` ${keyName(k.yes)} and ${keyName(k.no)} answer from any app.` : "");
+  $("#ask").hidden = false; document.body.classList.add("asking");
+  if (document.activeElement === $("#input") && !$("#input").value) $("#input").blur();
+  $("#a-yes").focus({ preventScroll: true });
+  clearInterval(askTimer);
+  const tick = () => { const left = Math.max(0, askSecs - (performance.now() - askT0) / 1000); $("#a-left").textContent = `${Math.ceil(left)}s`; };
+  tick(); askTimer = setInterval(tick, 250); kick();
+}
+function hideAsk() { ask = null; askT0 = 0; clearInterval(askTimer); $("#ask").hidden = true; document.body.classList.remove("asking"); }
+function answer(ok, always = false) { if (!ask) return; sfx.play(ok ? "yes" : "no"); call("confirm", ask.id, ok, always); hideAsk(); $("#input").focus(); }
+$("#a-yes").onclick = () => answer(true); $("#a-no").onclick = () => answer(false); $("#a-always").onclick = () => answer(true, true);
+
+// ================================================================ mic, persona, chips
+let micTimer;
+function setMic(e) {
+  muted = !!e.muted;
+  const m = $("#mic"); m.classList.toggle("muted", muted); m.setAttribute("aria-pressed", String(muted));
+  m.setAttribute("aria-label", muted ? "Turn the microphone on" : "Turn the microphone off");
+  m.querySelector(".slash").setAttribute("opacity", muted ? "1" : "0");
+  $("#mic-chip").hidden = !muted;
+  clearInterval(micTimer); $("#mic-left").textContent = "";
+  if (muted && e.until) {
+    const tick = () => { const left = Math.max(0, e.until * 1000 - Date.now()); $("#mic-left").textContent = ` ${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, "0")}`; };
+    tick(); micTimer = setInterval(tick, 1000);
+  }
+  if (e.hotkey) $("#hk-mute").textContent = `${keyName(e.hotkey)} mutes the mic`;
+  setState(state);
+}
+function placeholder() {
+  $("#input").placeholder = duoOn ? "Speak, or type to both of them" : `Speak, or type to ${aiName}`;
+  document.querySelectorAll(".ai-name").forEach((n) => n.textContent = aiName);
+}
+function markWho() {
+  const cur = duoOn ? "both" : aiKey;
+  document.querySelectorAll("#who button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.ai === cur)));
+  document.body.classList.toggle("duo", duoOn); placeholder(); kick();
+  if (typeof holo !== "undefined" && holo.panels.length) setTimeout(holoLayout, 50);
+}
+function setPersona(e) {
+  const first = aiKey === null;
+  aiKey = e.key; aiName = e.name;
+  speaker = e.key;                       // solo: him. Both: whoever just took the floor.
+  if (duoOn) saidBy(e.name);
+  document.documentElement.dataset.ai = e.key;
+  $("#wordmark").textContent = e.wordmark; document.title = e.wordmark;
+  markWho(); drawSpark();
+  if (!first) sfx.play("swap");
+  if (!first && !reduced && !duoOn) { document.body.classList.remove("swap"); void document.body.offsetWidth; document.body.classList.add("swap"); setTimeout(() => document.body.classList.remove("swap"), 650); }
+}
+document.querySelectorAll("#who button").forEach((b) => b.onclick = () => { if (b.dataset.ai !== (duoOn ? "both" : aiKey)) call("switch", b.dataset.ai); });
+function setDictation(e) {
+  const c = $("#dict-chip"); c.hidden = !e.on;
+  c.querySelector("span").textContent = e.on ? "Dictating" + (e.window ? " into " + (e.window.split(" - ").pop() || e.window) : "") : "";
+  c.title = e.on ? "Click to stop dictating" : "";
+}
+$("#dict-chip").onclick = () => call("stop_dictation");
+$("#mic-chip").onclick = () => call("toggle_mute");
+let alertTimer;
+function alertMsg(text) { $("#alert-text").textContent = text; $("#alert").hidden = false; clearTimeout(alertTimer); alertTimer = setTimeout(() => $("#alert").hidden = true, 14000); }
+$("#alert").onclick = () => $("#alert").hidden = true;
+function toast(text) { const d = document.createElement("div"); d.className = "toast"; d.textContent = text; $("#toasts").appendChild(d); setTimeout(() => d.remove(), 4500); }
+function heard(e) {
+  if (live && live.text) return;
+  clearTimeout(youTimer);
+  you(e.text, !e.addressed);
+  if (!e.addressed) youTimer = setTimeout(() => { if ($("#you").classList.contains("faint")) $("#you").classList.add("gone"); }, 3500);
+}
+
+
+
+// ================================================================ sound design
+// Every sound is synthesised on the spot (no audio files). Jarvis: clean glassy sines. Ultron: the same
+// cues, darker and filtered saw. Quiet on purpose, and rate-limited so a busy turn never turns into noise.
+const sfx = (() => {
+  let ac = null, master = null, humNodes = null, humTimer = null;
+  let on = store.get("sfx", true), vol = store.get("sfxVol", 60) / 100;
+  const last = {};
+  function ctx() {
+    if (!ac) {
+      try {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        master = ac.createGain(); master.gain.value = vol * .55; master.connect(ac.destination);
+      } catch (e) { return null; }
+    }
+    if (ac.state === "suspended") ac.resume().catch(() => {});
+    return ac;
+  }
+  const U = () => aiKey === "ultron";
+  function tone(f, dur, o = {}) {
+    const a = ctx(); if (!a) return;
+    const t = a.currentTime + (o.at || 0), osc = a.createOscillator(), g = a.createGain();
+    osc.type = o.type || "sine"; osc.frequency.setValueAtTime(f, t);
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + dur);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(o.gain || .15, t + (o.attack || .006));
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    let node = osc;
+    if (o.lp) { const f2 = a.createBiquadFilter(); f2.type = "lowpass"; f2.frequency.value = o.lp; osc.connect(f2); node = f2; }
+    node.connect(g); g.connect(master); osc.start(t); osc.stop(t + dur + .05);
+  }
+  let noiseBuf = null;
+  function whoosh(dur, o = {}) {
+    const a = ctx(); if (!a) return;
+    if (!noiseBuf) { noiseBuf = a.createBuffer(1, a.sampleRate * .5, a.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    const t = a.currentTime + (o.at || 0), src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain();
+    src.buffer = noiseBuf; bp.type = "bandpass"; bp.Q.value = 3;
+    bp.frequency.setValueAtTime(o.from || 700, t); bp.frequency.exponentialRampToValueAtTime(o.to || 3200, t + dur);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(o.gain || .05, t + dur * .3); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    src.connect(bp); bp.connect(g); g.connect(master); src.start(t); src.stop(t + dur + .05);
+  }
+  const CUES = {
+    wake: () => U() ? (tone(196, .22, { type: "sawtooth", lp: 900, gain: .09 }), tone(294, .26, { type: "sawtooth", lp: 1100, gain: .08, at: .09 }))
+                    : (tone(880, .18, { gain: .08 }), tone(1318, .26, { gain: .06, at: .08 })),
+    think: () => U() ? tone(147, .3, { type: "sawtooth", lp: 600, gain: .06, to: 110 }) : tone(660, .14, { gain: .045, to: 990 }),
+    panel: () => (whoosh(.22, { gain: U() ? .05 : .04, from: U() ? 300 : 900, to: U() ? 1200 : 4200 }),
+                  tone(U() ? 392 : 1760, .07, { gain: .03, at: .12, type: U() ? "square" : "sine", lp: U() ? 1400 : 0 })),
+    done: () => U() ? tone(110, .16, { type: "square", lp: 500, gain: .06 }) : tone(1568, .1, { gain: .035 }),
+    fail: () => tone(U() ? 82 : 140, .32, { type: "square", lp: 700, gain: .07, to: U() ? 70 : 110 }),
+    ask: () => { for (const k of [0, .22]) { tone(U() ? 523 : 784, .14, { gain: .08, at: k, type: U() ? "triangle" : "sine" }); tone(U() ? 415 : 622, .16, { gain: .07, at: k + .1, type: U() ? "triangle" : "sine" }); } },
+    yes: () => (tone(U() ? 330 : 988, .12, { gain: .06 }), tone(U() ? 494 : 1480, .2, { gain: .05, at: .07 })),
+    no: () => (tone(U() ? 247 : 740, .12, { gain: .06 }), tone(U() ? 165 : 494, .22, { gain: .05, at: .07 })),
+    ping: () => (tone(1175, .1, { gain: .05 }), tone(1568, .16, { gain: .045, at: .08 })),
+    swap: () => U() ? (whoosh(.5, { from: 3000, to: 200, gain: .07 }), tone(220, .5, { type: "sawtooth", lp: 800, to: 55, gain: .08 }))
+                    : (whoosh(.5, { from: 300, to: 4000, gain: .06 }), tone(440, .45, { to: 1320, gain: .05 })),
+    boot: () => { const n = U() ? [98, 147, 196, 294] : [523, 659, 784, 1047];
+      n.forEach((f, i) => tone(f, .5, { at: i * .11, gain: .05, type: U() ? "sawtooth" : "sine", lp: U() ? 1000 : 0 })); whoosh(.9, { from: 200, to: 5000, gain: .04 }); },
+  };
+  const GAP = { done: 280, panel: 160, ping: 600 };
+  return {
+    play(name) {
+      if (!on || reduced || !CUES[name]) return;
+      const now = performance.now(); if (now - (last[name] || 0) < (GAP[name] || 120)) return;
+      last[name] = now; try { CUES[name](); } catch (e) {}
+    },
+    hum(onNow) {                                                // a low presence while he thinks
+      clearTimeout(humTimer);
+      if (onNow && on && !reduced) {
+        humTimer = setTimeout(() => {
+          const a = ctx(); if (!a || humNodes) return;
+          const g = a.createGain(), f = a.createBiquadFilter(), o1 = a.createOscillator(), o2 = a.createOscillator(), lfo = a.createOscillator(), lg = a.createGain();
+          f.type = "lowpass"; f.frequency.value = U() ? 380 : 900;
+          o1.type = U() ? "sawtooth" : "sine"; o2.type = o1.type;
+          o1.frequency.value = U() ? 55 : 110; o2.frequency.value = U() ? 55.6 : 165.4;
+          lfo.frequency.value = .35; lg.gain.value = .006; lfo.connect(lg); lg.connect(g.gain);
+          g.gain.value = .0001; g.gain.linearRampToValueAtTime(.018, a.currentTime + .8);
+          o1.connect(f); o2.connect(f); f.connect(g); g.connect(master);
+          [o1, o2, lfo].forEach((o) => o.start());
+          humNodes = { g, osc: [o1, o2, lfo] };
+        }, 650);
+      } else if (humNodes) {
+        const a = ctx(), h = humNodes; humNodes = null;
+        h.g.gain.cancelScheduledValues(a.currentTime); h.g.gain.setValueAtTime(h.g.gain.value, a.currentTime);
+        h.g.gain.linearRampToValueAtTime(.0001, a.currentTime + .5);
+        setTimeout(() => h.osc.forEach((o) => { try { o.stop(); } catch (e) {} }), 650);
+      }
+    },
+    set(v) { on = v; store.set("sfx", v); if (!v) this.hum(false); },
+    setVol(v) { vol = v; store.set("sfxVol", Math.round(v * 100)); if (master) master.gain.value = v * .55; },
+    get on() { return on; }, get vol() { return vol; },
+    unlock() { ctx(); },
+  };
+})();
+addEventListener("pointerdown", () => sfx.unlock(), { once: true });
+$("#sfx-sw").setAttribute("aria-checked", String(sfx.on));
+$("#sfx-sw").onclick = () => { const v = !sfx.on; sfx.set(v); $("#sfx-sw").setAttribute("aria-checked", String(v)); if (v) sfx.play("done"); };
+(() => { const r = $("#sfx-vol"); r.value = Math.round(sfx.vol * 100); $("#sfx-vol-out").textContent = r.value; fill(r);
+  r.addEventListener("input", () => { $("#sfx-vol-out").textContent = r.value; fill(r); sfx.setVol(r.value / 100); });
+  r.addEventListener("change", () => sfx.play("done")); })();
+
+// ================================================================ holographic panels
+// While he works, panels materialise beside him showing what he's doing (a terminal for commands, a radar for
+// web searches, the frame he's looking at, what's playing...). They dissolve a few seconds after each step.
+const holoBox = $("#holo");
+const HK = { web_search: "search", screen: "scan", look_at_screen: "scan", look_at_camera: "scan", run_command: "term",
+  files: "list", open: "launch", close_app: "launch", self_control: "launch", youtube: "media", spotify: "media", media_control: "media",
+  set_volume: "level", display: "level", system_info: "gauges", memory: "note", reminders: "note", clipboard: "note",
+  blender: "cube", mouse: "target", keyboard_input: "target", window_control: "target" };
+const HTITLE = { search: "Web search", scan: "Visual analysis", term: "PowerShell", list: "File system", launch: "Launch sequence",
+  media: "Now playing", level: "Levels", gauges: "Diagnostics", note: "Memory", cube: "Blender", target: "Targeting",
+  think: "Analysis", discord: "Discord", generic: "Working" };
+const holo = { on: store.get("holo", true), panels: [], byName: {}, results: {}, think: null, tele: null };
+const ytId = (t) => (String(t || "").match(/youtu\.be\/([A-Za-z0-9_-]{11})/) || [])[1];
+const eqBars = () => `<div class="eq">${Array.from({ length: 18 }, (_, i) => `<i style="animation-delay:${(-(i * 137) % 900) / 1000}s;animation-duration:${.55 + (i * 53 % 50) / 100}s"></i>`).join("")}</div>`;
+function holoBody(kind, name, a) {
+  a = a || {};
+  const q = esc(a.query || a.target || a.name || a.action || "");
+  switch (kind) {
+    case "search": return `<div class="row"><svg class="radar" viewBox="0 0 100 100" style="color:var(--c)"><circle cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="30"/>
+      <circle cx="50" cy="50" r="14"/><line x1="4" y1="50" x2="96" y2="50"/><line x1="50" y1="4" x2="50" y2="96"/>
+      <g class="sw"><path d="M50 50 L50 4 A46 46 0 0 1 89 26 Z"/></g><circle class="bl" cx="68" cy="30" r="2.2"/>
+      <circle class="bl" cx="30" cy="66" r="2.2" style="animation-delay:.8s"/><circle class="bl" cx="74" cy="64" r="2.2" style="animation-delay:1.2s"/></svg>
+      <div style="min-width:0"><div class="sub">Query</div><div class="big">${q || "…"}</div></div></div>`;
+    case "scan": return `<div class="shot"><div class="ph">${name === "look_at_camera" ? "Opening camera…" : "Capturing screen…"}</div></div>`;
+    case "term": return `<pre class="term"><b>PS&gt;</b> ${esc(a.command || "")}\n<span class="cur"></span></pre>`;
+    case "list": return `<div class="sub">${esc([a.action, a.query || a.path || a.folder].filter(Boolean).join(": "))}</div><ul class="hl"></ul>`;
+    case "launch": return `<div class="big">${esc(a.target || a.name || a.action || "")}</div><div class="seg">${"<i></i>".repeat(14)}</div>`;
+    case "media": return `<div class="sub">${esc(name === "media_control" ? (a.action || "").replace(/_/g, " ") : (name === "youtube" ? "YouTube" : "Spotify"))}</div>
+      <div class="big">${esc(a.query || "")}</div>${eqBars()}`;
+    case "level": { const v = a.level ?? a.value ?? a.brightness; return `<div class="sub">${esc(name === "display" ? "Display" : "Volume")}</div>
+      <div class="lvl">${v != null ? esc(v) : (a.mute ? "Muted" : "…")}</div><div class="lvlbar"><i style="width:${Number(v) || 0}%"></i></div>`; }
+    case "gauges": { const t = holo.tele || {}; const g = (l, v) => `<span>${l}</span><i><b style="width:${Math.round(v || 0)}%"></b></i><span>${Math.round(v || 0)}%</span>`;
+      return `<div class="gs">${g("Processor", t.cpu)}${g("Memory", t.ram)}${g("Drive", t.disk)}</div>`; }
+    case "note": return `<div class="sub">${esc((a.action || name).replace(/_/g, " "))}</div><div class="big" style="font-size:14px">${esc(a.text || a.message || a.content || a.name || "")}</div>`;
+    case "cube": return `<div class="cube3"><div>${"<span></span>".repeat(6)}</div></div><div class="sub" style="text-align:center">${esc((a.action || "") + (a.name ? ": " + a.name : ""))}</div>`;
+    case "target": return `<div class="row"><svg class="tgt" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22"/><g class="rot"><line x1="32" y1="2" x2="32" y2="14"/>
+      <line x1="32" y1="50" x2="32" y2="62"/><line x1="2" y1="32" x2="14" y2="32"/><line x1="50" y1="32" x2="62" y2="32"/></g><circle cx="32" cy="32" r="2.5" style="fill:var(--c)"/></svg>
+      <div style="min-width:0"><div class="big" style="font-size:14px">${esc((a.action || "").replace(/_/g, " "))}</div>
+      <div class="sub">${esc(a.what || a.window || (a.x != null ? `x ${a.x}  y ${a.y}` : (a.keys || []).join("+") || a.text || ""))}</div></div></div>`;
+    case "think": return `<div class="think"></div>`;
+    case "discord": return `<div class="sub">${esc(a.from || "")}${a.channel ? " in #" + esc(a.channel) : ""}</div><div class="big" style="font-size:14px;-webkit-line-clamp:3">${esc(a.text || "")}</div>`;
+    default: return `<div class="big" style="font-size:14px">${esc(stepLabel(name))}</div><div class="sub">${esc(shortDetail(name, a))}</div><div class="seg">${"<i></i>".repeat(14)}</div>`;
+  }
+}
+function holoAdd(kind, name, args) {
+  if (!holo.on) return null;
+  const el = document.createElement("div");
+  el.className = "hp k-" + kind;
+  el.innerHTML = `<div class="hh"><i></i>${esc(HTITLE[kind] || HTITLE.generic)}<span>0.0s</span></div><div class="bd">${holoBody(kind, name, args)}</div>`;
+  el.querySelectorAll(".seg i").forEach((x, i) => x.style.animationDelay = (i * .07) + "s");
+  holoBox.appendChild(el);
+  const P = { el, kind, name, t0: performance.now(), done: false, slot: -1 };
+  holo.panels.push(P);
+  if (kind !== "think") sfx.play("panel");
+  while (holo.panels.length > 4) holoDrop(holo.panels.find((p) => p.done) || holo.panels[0], true);
+  holoLayout();
+  return P;
+}
+function holoDrop(P, now = false) {
+  if (!P || P.gone) return;
+  P.gone = true; holo.panels = holo.panels.filter((x) => x !== P);
+  if (holo.think === P) holo.think = null;
+  P.el.classList.add("out"); setTimeout(() => P.el.remove(), now ? 300 : 750);
+  holoLayout();
+}
+function holoDone(P, ok = true, linger = 6000) {
+  if (!P || P.done) return;
+  P.done = true; P.el.classList.add("done"); if (!ok) P.el.classList.add("fail");
+  if (P.kind !== "think" && P.name !== "briefing" && P.kind !== "discord") sfx.play(ok ? "done" : "fail");
+  P.el.querySelector(".hh span").textContent = ok ? `${((performance.now() - P.t0) / 1000).toFixed(1)}s` : "Failed";
+  setTimeout(() => holoDrop(P), linger);
+}
+function holoLayout() {
+  if (!holo.panels.length) return;
+  const b = $("#presence").getBoundingClientRect(), cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+  const R = duoOn ? Math.min(b.height * .27, Math.min(b.width * .26, 230) * .62) : b.height * .3;
+  const excl = (duoOn ? Math.min(b.width * .26, 230) : 0) + R * 1.7;
+  const avail = Math.min(cx - excl - 20, innerWidth - cx - excl - 20);
+  holoBox.style.display = avail < 190 ? "none" : "";
+  const w = Math.min(290, avail);
+  const SLOTS = [[1, 0], [-1, 0], [1, 1], [-1, 1]];
+  const used = new Set(holo.panels.map((p) => p.slot).filter((s) => s >= 0));
+  holo.panels.forEach((p) => { if (p.slot < 0) { p.slot = [0, 1, 2, 3].find((s) => !used.has(s)) ?? 0; used.add(p.slot); } });
+  // top row starts under your words (never covers them); each row gets the room it has
+  const youR = $("#you").getBoundingClientRect(), top0 = Math.max(60, youR.bottom + 10, cy - 200);
+  holo.panels.forEach((p) => {
+    const [side, row] = SLOTS[p.slot];
+    p.el.style.setProperty("--w", w + "px");
+    p.el.style.left = (side > 0 ? cx + excl : cx - excl - w) + "px";
+    p.el.style.top = (row ? cy + 8 : top0) + "px";
+    p.el.style.maxHeight = Math.max(90, row ? 196 : Math.min(196, cy - 2 - top0)) + "px";
+  });
+}
+setInterval(() => holo.panels.forEach((p) => { if (!p.done) p.el.querySelector(".hh span").textContent = ((performance.now() - p.t0) / 1000).toFixed(1) + "s"; }), 200);
+addEventListener("resize", holoLayout);
+function holoStart(name, args) {
+  if (holo.think) holoDone(holo.think, true, 1500);
+  const kind = HK[name] || "generic";
+  const P = holoAdd(kind, name, args); if (!P) return;
+  (holo.byName[name] = holo.byName[name] || []).push(P);
+}
+function holoFinish(name, ok, result, args) {
+  const P = (holo.byName[name] || []).shift(); if (!P) return;
+  const full = holo.results[name] ?? result ?? ""; delete holo.results[name];
+  const bd = P.el.querySelector(".bd");
+  if (P.kind === "term") {
+    const pre = bd.querySelector(".term"), lines = String(full).replace(/^Exit code \d+\.\s*/, "").split("\n").filter((l) => l.trim()).slice(0, 8);
+    pre.querySelector(".cur")?.remove();
+    lines.forEach((l, i) => setTimeout(() => { pre.append(l.slice(0, 120) + "\n"); }, 60 * i));
+  } else if (P.kind === "list") {
+    const ul = bd.querySelector(".hl");
+    String(full).split(/\n|;\s+(?=\S)/).map((x) => x.trim()).filter(Boolean).slice(0, 6)
+      .forEach((l, i) => { const li = document.createElement("li"); li.textContent = l; li.style.animationDelay = (i * .07) + "s"; ul.appendChild(li); });
+  } else if (P.kind === "media") {
+    const id = ytId(full), title = (String(full).match(/^Playing (.+?)(?: by | on |\.)/) || [])[1];
+    if (title) bd.querySelector(".big").textContent = title;
+    if (id && !bd.querySelector(".thumb")) {
+      const img = new Image(); img.className = "thumb"; img.alt = ""; img.src = `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+      img.onerror = () => img.remove(); bd.insertBefore(img, bd.firstChild);
+    }
+  } else if (P.kind === "launch") {
+    const big = bd.querySelector(".big"); if (ok && big) big.textContent += name === "close_app" ? " closed" : " online";
+  } else if (P.kind === "search" && args && args.query) {
+    const big = bd.querySelector(".big"); if (big) big.textContent = args.query;
+  } else if (P.kind === "gauges" && holo.tele) {
+    bd.innerHTML = holoBody("gauges", name, args);
+  }
+  holoDone(P, ok, P.kind === "media" || P.kind === "scan" ? 9000 : 6000);
+}
+function holoImage(name, src) {
+  const P = (holo.byName[name] || [])[0] || holo.panels.slice().reverse().find((p) => p.kind === "scan" || p.kind === "cube");
+  if (!P) return;
+  const box = P.el.querySelector(".shot") || P.el.querySelector(".bd");
+  box.classList.add("shot");
+  box.innerHTML = ""; const img = new Image(); img.src = src; img.alt = ""; box.appendChild(img);
+}
+function holoThinking(text) {
+  if (!holo.on) return;
+  if (!holo.think) { holo.think = holoAdd("think", "thinking", {}); if (!holo.think) return; }
+  const t = holo.think.el.querySelector(".think");
+  holo.think.text = ((holo.think.text || "") + text).slice(-420);
+  t.textContent = holo.think.text;
+}
+function holoInstant(e) {
+  const log = String(e.log || ""), id = ytId(log);
+  if (id || /^Playing /.test(log)) { holoStart(id ? "youtube" : "spotify", { query: e.text }); holoFinish(id ? "youtube" : "spotify", true, log); return; }
+  const v = log.match(/^Volume (\d+)/);
+  if (v) { holoStart("set_volume", { level: Number(v[1]) }); holoFinish("set_volume", true, log); return; }
+  if (/^Opened /.test(log)) { holoStart("open", { target: log.replace(/^Opened (settings: )?/, "").split(".")[0] }); holoFinish("open", true, log); }
+}
+$("#dbot-sw").onclick = () => { const on = $("#dbot-sw").getAttribute("aria-checked") !== "true";
+  $("#dbot-sw").setAttribute("aria-checked", String(on)); call("set_discord_send", on); };
+$("#auto-sw").onclick = () => { const on = $("#auto-sw").getAttribute("aria-checked") !== "true";
+  $("#auto-sw").setAttribute("aria-checked", String(on)); call("set_autostart", on); };
+$("#holo-sw").setAttribute("aria-checked", String(holo.on));
+$("#holo-sw").onclick = () => { holo.on = !holo.on; store.set("holo", holo.on); $("#holo-sw").setAttribute("aria-checked", String(holo.on));
+  if (!holo.on) holo.panels.slice().forEach((p) => holoDrop(p, true)); };
+
+
+// ================================================================ briefing panels
+const WXI = (code) => {
+  const sun = '<circle cx="24" cy="24" r="8"/><path d="M24 6v5M24 37v5M6 24h5M37 24h5M11 11l3.5 3.5M33.5 33.5L37 37M37 11l-3.5 3.5M14.5 33.5L11 37"/>';
+  const cloud = '<path d="M14 34h20a8 8 0 0 0 0-16 11 11 0 0 0-21 3 6.5 6.5 0 0 0 1 13z"/>';
+  if (code == null) return cloud;
+  if (code <= 1) return sun;
+  if (code === 2) return '<circle cx="17" cy="17" r="6"/><path d="M17 5v3M5 17h3M8.5 8.5l2 2M25.5 8.5l-2 2"/>' + '<path d="M18 36h18a7 7 0 0 0 0-14 9.5 9.5 0 0 0-18 2.5 5.8 5.8 0 0 0 0 11.5z"/>';
+  if (code >= 95) return cloud + '<path d="M24 36l-4 6h6l-3 5"/>';
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return cloud + '<path d="M17 40v.1M24 43v.1M31 40v.1M20 46v.1M28 46v.1"/>';
+  if (code >= 51) return cloud + '<path d="M17 39l-2 5M24 39l-2 5M31 39l-2 5"/>';
+  if (code === 45 || code === 48) return '<path d="M8 18h32M6 25h36M10 32h28M14 39h20"/>';
+  return cloud;
+};
+function briefingPanels(e) {
+  if (!holo.on) return;
+  const add = (title, html, linger = 15000) => {
+    const P = holoAdd("generic", "briefing", {}); if (!P) return;
+    P.el.querySelector(".hh").childNodes[1].textContent = title;
+    P.el.querySelector(".bd").innerHTML = html;
+    holoDone(P, true, linger); P.el.querySelector(".hh span").textContent = "";
+  };
+  const w = e.weather;
+  if (w) add(w.place || "Weather", `<div class="wx"><svg viewBox="0 0 48 48">${WXI(w.code)}</svg><div class="t">${esc(w.now)}<span class="u">${esc(w.unit)}</span></div>
+    <div class="l">${esc(w.label || "")}${w.feels !== w.now ? `, feels like ${esc(w.feels)}°` : ""}</div>
+    <div class="r">${w.high != null ? `<span>High <b>${esc(w.high)}°</b></span><span>Low <b>${esc(w.low)}°</b></span>` : ""}${w.rain >= 20 ? `<span>Precip <b>${esc(w.rain)}%</b></span>` : ""}</div></div>`);
+  const rem = e.reminders || [];
+  add("Today", rem.length ? `<ul class="hl">${rem.slice(0, 5).map((r, i) => `<li style="animation-delay:${i * .08}s"><b>${esc(r.time)}</b>${esc(r.text)}</li>`).join("")}</ul>`
+                          : `<div class="sub" style="white-space:normal">Nothing else on your reminders today.</div>`);
+  const dc = e.discord || [];
+  if (dc.length) add("Discord", `<ul class="hl">${dc.slice(-4).map((m, i) => `<li style="animation-delay:${i * .08}s"><b>${esc(m.from)}</b>${esc(m.text)}</li>`).join("")}</ul>`);
+  const hl = e.headlines || [];
+  if (hl.length) add("Headlines", `<ul class="hl plain">${hl.slice(0, 3).map((h, i) => `<li style="animation-delay:${i * .08}s;white-space:normal">${esc(h)}</li>`).join("")}</ul>`);
+}
+
+// ================================================================ events from Python
+function bootLine(line) {
+  const d = document.createElement("div");
+  d.textContent = line.charAt(0) + line.slice(1).toLowerCase().replace(/\[(.*?)\]/g, (m, x) => "(" + x + ")");
+  if (/FAILED|OFFLINE|UNAVAILABLE/.test(line)) d.className = "bad";
+  const b = $("#bootlog"); b.appendChild(d); while (b.children.length > 4) b.firstChild.remove();
+}
+window.J = {
+  batch(list) { for (const e of list) { try { this.on(e); } catch (err) { console.error(err); } } },
+  on(e) {
+    switch (e.type) {
+      case "boot": bootLine(e.line); break;
+      case "ready":
+        voiceOK = e.voice !== false;
+        setTimeout(() => { document.body.classList.remove("booting"); sfx.play("boot"); }, Math.max(0, 1500 - (performance.now() - bootStart)));
+        $("#model").textContent = (e.model || "").replace(/^claude-/, "");
+        $("#mic").classList.toggle("off", !e.voice); break;
+      case "state": setState(e.state); break;
+      case "level": micLevel = e.v; if (state === "listening") kick(); break;
+      case "voice": if (!venv) { voiceLevel = e.v; voiceAt = performance.now(); kick(); } break;
+      case "voice_env":       // the whole sentence's loudness, played back in sync with the audio
+        venv = e.env && e.env.length ? { env: e.env, step: (e.step || .02) * 1000, start: performance.now() + (e.delay || 0) * 1000 } : null;
+        if (!venv) voiceLevel = 0;
+        kick(); break;
+      case "caption": {
+        const text = e.text || "";
+        if (/\s…$/.test(text)) { clearTimeout(youTimer); you(text); break; }   // what you're saying, still listening
+        lastCapAt = performance.now();
+        if (duoOn && e.who) {
+          const k = e.who.toLowerCase() === "ultron" ? "ultron" : "jarvis";
+          if (k !== speaker) { speaker = k; kick(); }
+          saidBy(e.who);
+        }
+        const T = e.who ? Object.values(turns).find((x) => x.who === e.who && x.el.classList.contains("live")) : live;
+        if (T) T.capt = true;
+        sub(text); break;
+      }
+      case "msg":
+        if (e.role === "system") add("system", esc(e.text));
+        else if (e.role === "user") { add("user", `<span class="ts">${hhmm()}</span><span class="who">You</span><div class="txt">${esc(e.text)}</div>`); clearTimeout(youTimer); you(e.text); }
+        else {
+          add(e.role, `<span class="ts">${hhmm()}</span><span class="who ai-${esc(aiKey || "jarvis")}">${esc(aiName)}</span><div class="txt">${esc(e.text)}</div>`);
+          saidBy(aiName); setTimeout(() => { if (!live) sub(lastSentences(e.text)); }, voiceOK ? 2500 : 0);
+        }
+        break;
+      case "turn_start": turnStart(e.id, e.who); break;
+      case "duo": duoOn = !!e.on; markWho(); break;
+      case "reply_delta": onReplyDelta(e); break;
+      case "turn_end": turnEnd(e); break;
+      case "persona": setPersona(e); break;
+      case "mic": setMic(e); break;
+      case "memory": renderMemory(e.items || []); break;
+      case "routines": renderRoutines(e.items || []); break;
+      case "permissions": renderPerms(e.items || []); break;
+      case "dictation": setDictation(e); break;
+      case "heard": heard(e); break;
+      case "telemetry": telemetry(e); holo.tele = e; break;
+      case "tool": holo.results[e.name] = typeof e.result === "string" ? e.result : ""; break;
+      case "instant": holoInstant(e); break;
+      case "briefing": briefingPanels(e); break;
+      case "connectors": renderConnectors(e); break;
+      case "jobs": renderJobs(e.items || []); break;
+      case "job_done": sfx.play(e.ok ? "yes" : "fail"); toast(e.ok ? `Background job done: ${e.goal}` : `Background job failed: ${e.goal}`); break;
+      case "discord": {
+        sfx.play("ping");
+        const P = holo.on ? holoAdd("discord", "discord", e) : null;
+        if (P) holoDone(P, true, 9000); else toast(`Discord, ${e.from}: ${e.text}`);
+        break;
+      }
+      case "setup": showKeys(e); break;
+      case "keys_result":
+        $("#k-save").disabled = !!e.ok;
+        $("#k-msg").textContent = e.ok ? "Saved. Restarting..." : e.error;
+        if (e.ok) $("#k-ant").value = $("#k-groq").value = "";
+        break;
+      case "download": if (e.what === "voice") { const t = $("#st-time"); if (t && e.pct < 100) t.textContent = `voice ${e.pct}%`; } break;
+      case "update_ready": toast(`Version ${e.version} is ready. Say "update yourself" to switch now.`); break;
+      case "discord_bot": {
+        $("#dbot-sw").setAttribute("aria-checked", String(!!e.send));
+        const st = !e.configured ? "Bot not set up yet (README, Discord bot). Sending stays off until it is."
+          : e.status === "online" ? `Posting as ${e.name}. You still approve each message.`
+          : e.status === "failed" ? `Bot couldn't connect: ${e.error || "unknown error"}`
+          : e.status === "off" ? "Bot not started (restart me after adding the token)."
+          : `Bot connecting... ${e.error || ""}`;
+        $("#dbot-t").textContent = st; break; }
+      case "autostart": $("#auto-row").hidden = !e.available; $("#auto-sw").setAttribute("aria-checked", String(!!e.on)); break;
+      case "reminders": reminders = e.items || []; renderRem(); break;
+      case "confirm": showAsk(e); break;
+      case "confirm_done": if (ask && ask.id === e.id) { sfx.play(e.approved ? "yes" : "no"); hideAsk(); if (e.always) toast("Won't ask about that again. Change it in the System panel."); } break;
+      case "alert": alertMsg(e.text); break;
+      case "toast": toast(e.text); break;
+      case "window": visible = e.visible && !document.hidden; if (visible) { last = 0; kick(); } break;
+      case "quit": document.body.classList.add("booting"); setState("booting"); break;
+    }
+  }
+};
+
+// ================================================================ input
+function send() { const i = $("#input"), v = i.value.trim(); if (!v) return; i.value = ""; call("send", v); }
+$("#send").onclick = send;
+$("#input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); send(); } });
+$("#mic").onclick = () => call("toggle_mute");
+$("#presence").onclick = () => call("ptt");
+document.addEventListener("keydown", (e) => {
+  if (ask && !e.ctrlKey && !e.altKey && !e.metaKey && document.activeElement !== $("#input")) {
+    const k = e.key.toLowerCase();
+    if (k === "y" || k === "enter") { e.preventDefault(); answer(true); return; }
+    if (k === "n" || k === "escape") { e.preventDefault(); answer(false); return; }
+    if (k === "a" && ask.can_always) { e.preventDefault(); answer(true, true); return; }
+  }
+  if (e.ctrlKey && e.code === "Space") { e.preventDefault(); call("ptt"); return; }
+  if (e.key === "Escape") { if (ask) answer(false); else call("stop"); return; }
+  // start typing anywhere and it goes to the command line
+  const t = document.activeElement;
+  if (!ask && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey && !(t && (t.tagName === "INPUT" || t.isContentEditable))) $("#input").focus();
+});
+function showKeys(e) {
+  e = e || {};
+  $("#k-ant").placeholder = e.has_anthropic ? "Saved. Paste a new one to replace it" : "sk-ant-...";
+  $("#k-groq").placeholder = e.has_groq ? "Saved. Paste a new one to replace it" : "gsk_... (optional)";
+  $("#k-msg").textContent = e.reason || "";
+  $("#k-save").disabled = false;
+  $("#keys").hidden = false; document.body.classList.add("asking");
+  setTimeout(() => $("#k-ant").focus(), 60);
+}
+function hideKeys() { $("#keys").hidden = true; $("#k-ant").value = $("#k-groq").value = ""; if (!ask) document.body.classList.remove("asking"); }
+$("#k-later").onclick = hideKeys;
+$("#keys-btn").onclick = () => call("key_status");
+$("#k-save").onclick = () => {
+  const a = $("#k-ant").value.trim(), g = $("#k-groq").value.trim();
+  if (!a && !g) { $("#k-msg").textContent = "Paste a key first."; return; }
+  $("#k-save").disabled = true; $("#k-msg").textContent = "Checking the key with Anthropic...";
+  call("save_keys", a, g);
+};
+[$("#k-ant"), $("#k-groq")].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#k-save").click(); } if (e.key === "Escape") hideKeys(); }));
+document.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => call("action", b.dataset.act, null));
+function slider(id, outId, act) {
+  const s = $(id); let tm; fill(s);
+  s.addEventListener("pointerdown", () => dragging = true);
+  s.addEventListener("pointerup", () => setTimeout(() => dragging = false, 800));
+  s.addEventListener("input", () => { $(outId).textContent = s.value; fill(s); clearTimeout(tm); tm = setTimeout(() => call("action", act, Number(s.value)), 120); });
+}
+slider("#vol", "#vol-out", "volume"); slider("#bri", "#bri-out", "brightness");
+$("#b-min").onclick = () => call("minimize"); $("#b-max").onclick = () => call("toggle_max"); $("#b-close").onclick = () => call("close");
+function drawer(side, open) {
+  document.body.classList.toggle("no-" + side, !open);
+  $("#t-" + side).setAttribute("aria-pressed", String(open)); store.set("open-" + side, open);
+  setTimeout(sizeSpark, 750); kick();
+}
+$("#t-left").onclick = () => drawer("left", document.body.classList.contains("no-left"));
+$("#t-right").onclick = () => drawer("right", document.body.classList.contains("no-right"));
+drawer("left", store.get("open-left", innerWidth >= 1180)); drawer("right", store.get("open-right", innerWidth >= 1180));
+function clock() {
+  const d = new Date();
+  $("#time").textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  $("#date").textContent = d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+}
+setInterval(clock, 1000); clock();
+
+// ================================================================ startup
+resize(); renderRem(); renderMemory([]); renderRoutines([]); placeholder(); kick();
+window.addEventListener("pywebviewready", async () => {
+  api = window.pywebview.api;
+  try { await api.ready(); } catch (e) { console.error(e); }
+  $("#input").focus();
+});
+if (document.fonts) document.fonts.ready.then(() => { sizeSpark(); kick(); });
+
+// Demo mode: opened in a normal browser with no Python behind it (used for screenshots).
+setTimeout(() => { if (!api && !window.pywebview) demo(); }, 1200);
+function demo() {
+  const P = new URLSearchParams(location.search);
+  const NAMES = { jarvis: ["Jarvis", "J.A.R.V.I.S."], ultron: ["Ultron", "U.L.T.R.O.N."] };
+  const persona = (k) => J.on({ type: "persona", key: k, name: NAMES[k][0], wordmark: NAMES[k][1] });
+  const PERMS = [["powershell", "PowerShell commands", "Commands that change settings or install things. Read-only ones never ask."],
+    ["files", "Edit files anywhere", "Create, edit, move and copy files outside the Jarvis folder."], ["delete", "Recycle Bin", "Move files and folders to the Recycle Bin (you can restore them)."],
+    ["force_close", "Force-close apps", "Kill apps that won't close. Unsaved work in them is lost."], ["clicks", "Clicks that send or submit", "Mouse clicks that send, post, submit or install."],
+    ["blender", "Blender scripting", "Blender code that touches files, and clearing the scene."], ["addon", "Blender add-on install", "Installing the Jarvis Bridge add-on into Blender."]];
+  const permState = { files: true };
+  const emitPerms = () => J.on({ type: "permissions", items: PERMS.map(([key, label, detail]) => ({ key, label, detail, on: !!permState[key] })) });
+  api = { send: (t) => { J.on({ type: "msg", role: "user", text: t }); J.on({ type: "state", state: "thinking" });
+            setTimeout(() => { J.on({ type: "msg", role: "jarvis", text: "Demo mode. Run jarvis.py for the real thing." }); J.on({ type: "state", state: "idle" }); }, 1800); },
+          ptt: () => J.on({ type: "state", state: "listening" }), action: (a) => J.on({ type: "toast", text: "Demo: " + a }),
+          confirm: (id, ok, always) => { const c = ask && ask.category; J.on({ type: "confirm_done", id, approved: ok, always }); if (ok && always && c) { permState[c] = true; emitPerms(); } }, stop() {}, minimize() {}, toggle_max() {}, close() {},
+          set_autostart: (on) => J.on({ type: "autostart", available: true, on }),
+          key_status: () => J.on({ type: "setup", has_anthropic: true, has_groq: false }),
+          save_keys: (a) => setTimeout(() => J.on(a.startsWith("sk-ant-") ? { type: "keys_result", ok: true } : { type: "keys_result", ok: false, error: "That doesn't look like an Anthropic key. They start with sk-ant-." }), 700),
+          set_discord_send: (on) => J.on({ type: "discord_bot", configured: true, status: "online", name: "Jarvis#4412", send: on }),
+          set_permission: (k, on) => { if (k === "*") for (const x in permState) delete permState[x]; else permState[k] = on; emitPerms(); },
+          toggle_mute: () => J.on({ type: "mic", muted: !muted, until: !muted ? Date.now() / 1000 + 600 : null, hotkey: "ctrl+alt+m" }),
+          switch: (k) => { if (k === "both") { J.on({ type: "duo", on: true }); return; } J.on({ type: "duo", on: false }); persona(k || (aiKey === "jarvis" ? "ultron" : "jarvis")); },
+          stop_dictation: () => J.on({ type: "dictation", on: false }) };
+  const k0 = P.has("ultron") ? "ultron" : "jarvis", u = k0 === "ultron";
+  persona(k0); emitPerms();
+  ["INITIALIZING CORE SYSTEMS", "NEURAL LINK ESTABLISHED  [claude-sonnet-5-5]", "VOICE SYNTHESIS ONLINE  [KOKORO]", "SPEECH RECOGNITION ONLINE  [GROQ]", "ALWAYS LISTENING"]
+    .forEach((l, i) => setTimeout(() => J.on({ type: "boot", line: l }), i * 220));
+  const tele = () => J.on({ type: "telemetry", cpu: 22 + Math.random() * 25, ram: 63 + Math.random() * 4, ram_used: 10.1, ram_total: 16, disk: 72, disk_free: 214,
+    battery: null, plugged: true, spend: { today: 0.42, month: 6.1, budget: 5 }, up_kbps: Math.random() * 90, down_kbps: 200 + Math.random() * 2600 * (Math.random() < .2 ? 2 : 1), uptime: 273600, procs: 247, volume: 42, muted: false });
+  setTimeout(() => {
+    J.on({ type: "ready", model: "claude-sonnet-5-5", voice: true }); J.on({ type: "state", state: "idle" });
+    J.on({ type: "mic", muted: false, hotkey: "ctrl+alt+m" });
+    for (let i = 0; i < 40; i++) tele();
+    const now = Date.now(), iso = (m) => { const d = new Date(now + m * 60000); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19); };
+    J.on({ type: "reminders", items: [{ message: "Take the pizza out", due: iso(7) }, { message: "Call mom", due: iso(95) }, { message: "Dentist appointment", due: iso(60 * 26) }] });
+    J.on({ type: "memory", items: [{ text: "Sister Maya's birthday is May 3" }, { text: "Prefers Celsius" }] });
+    J.on({ type: "routines", items: [{ name: "gaming mode", steps: "open Steam and Discord, volume 30" }] });
+    J.on({ type: "autostart", available: true, on: false });
+    J.on({ type: "discord_bot", configured: true, status: "online", name: "Jarvis#4412", send: false });
+    J.on({ type: "jobs", items: [{ id: 2, goal: "Research budget USB mics under $100 and make a shortlist", status: "running", step: "web search: best usb microphone under 100 2026", steps: 4, secs: 38 },
+      { id: 1, goal: "Summarise the PDFs in Downloads/School", status: "done", summary: "Three PDFs, mostly about the French Revolution.", steps: 7, secs: 95 }] });
+    J.on({ type: "connectors", available: true, items: [{ name: "google-calendar", status: "connected", tools: 6 }, { name: "home-assistant", status: "failed", tools: 0, error: "ConnectError" }] });
+    const ev = (o, ms) => setTimeout(() => J.on(o), ms);
+    if (P.has("convo") || P.has("speaking")) {
+      [{ type: "msg", role: "user", text: "open spotify and skip this song" },
+       { type: "msg", role: "jarvis", text: u ? "Spotify is open. Your taste remains a mystery I have no interest in solving." : "Spotify's up and that song has been dispatched. Your taste is improving, marginally." }].forEach((e) => J.on(e));
+      const id = "t1", reply = u ? "Clear skies, eight degrees. Wear a jacket, human. I won't be nursing you back from a cold." : "Clear tomorrow, a high of eight and a low of minus two. A jacket, sir, not the parka.";
+      J.on({ type: "msg", role: "user", text: "what's the weather tomorrow" });
+      J.on({ type: "turn_start", id, who: NAMES[k0][0] });
+      J.on({ type: "activity", id, kind: "tool_pending", data: { name: "web_search" } });
+      J.on({ type: "activity", id, kind: "tool_start", data: { name: "web_search", args: { query: "weather tomorrow Toronto" } } });
+      J.on({ type: "activity", id, kind: "tool_done", data: { name: "web_search", args: { query: "weather tomorrow Toronto" }, ok: true } });
+      J.on({ type: "reply_delta", id, text: reply });
+      J.on({ type: "caption", text: reply }); J.on({ type: "state", state: "speaking" });
+      if (!P.has("speaking")) ev({ type: "turn_end", id, text: reply, secs: 2.4 }, 50);
+      if (!P.has("speaking")) ev({ type: "state", state: "idle" }, 60);
+    }
+    if (P.has("turn") || P.has("panels")) {
+      const id = "d1";
+      J.on({ type: "msg", role: "user", text: "check what's eating my CPU, look at my screen and put the Dune trailer on" });
+      ev({ type: "turn_start", id, who: NAMES[k0][0] }, 0); ev({ type: "state", state: "thinking" }, 0);
+      ev({ type: "activity", id, kind: "thinking_start" }, 100);
+      "The user wants three things. First I'll check which processes are using the CPU with a read-only PowerShell command, then take a look at the screen, then find the trailer on YouTube and play it."
+        .split(" ").forEach((w, i) => ev({ type: "activity", id, kind: "thinking", data: w + " " }, 150 + i * 30));
+      const step = (name, args, result, at, dur, img) => {
+        ev({ type: "activity", id, kind: "tool_pending", data: { name } }, at);
+        ev({ type: "activity", id, kind: "tool_start", data: { name, args } }, at + 80);
+        if (img) ev({ type: "activity", id, kind: "image", data: { name, src: img } }, at + 600);
+        if (dur) { ev({ type: "tool", name, args, result }, at + dur - 20); ev({ type: "activity", id, kind: "tool_done", data: { name, args, result, ok: true } }, at + dur); }
+      };
+      const shot = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#1b2430"/><rect width="320" height="16" fill="#2c3a4a"/><rect x="12" y="28" width="140" height="90" fill="#24506b"/><rect x="164" y="28" width="144" height="40" fill="#3a3f47"/><rect x="164" y="76" width="144" height="42" fill="#3a3f47"/><rect x="12" y="128" width="296" height="40" fill="#2a2f36"/></svg>');
+      step("run_command", { command: "Get-Process | Sort-Object CPU -Descending | Select-Object -First 4 Name, CPU" },
+        "Exit code 0.\nName      CPU\n----      ---\nchrome    812.4\nDiscord   233.9\nsteamwebhelper 120.2\nJarvis    54.1", 1400, 1300);
+      step("screen", { target: "all" }, "[took a picture]", 1700, P.has("panels") ? 2600 : 0, shot);
+      step("youtube", { action: "play", query: "dune part two official trailer" },
+        "Playing Dune: Part Two | Official Trailer 3 by Warner Bros. Pictures (3:06) on YouTube [youtu.be/Way9Dexny3w].", 2200, P.has("panels") ? 1400 : 0);
+      step("web_search", { query: "dune part two box office total" }, "searched: dune part two box office total", 2500, 0);
+    }
+    if (P.has("listening")) { J.on({ type: "state", state: "listening" }); J.on({ type: "caption", text: (u ? "Ultron, " : "Jarvis, ") + "turn the volume down and …" });
+      setInterval(() => J.on({ type: "level", v: .25 + Math.random() * .6 }), 90); }
+    if (P.has("duo")) {                 // mirrors the real order: the second one starts thinking early
+      J.on({ type: "duo", on: true });
+      J.on({ type: "msg", role: "user", text: "is pineapple on pizza acceptable?" });
+      const j = "Acceptable, sir. Sweet against salty is a perfectly respectable culinary argument.";
+      const u = "Respectable. Jarvis would defend anything with a sauce. It's fruit on bread, human. Choose better.";
+      ev({ type: "persona", key: "jarvis", name: "Jarvis", wordmark: "J.A.R.V.I.S." }, 0);
+      ev({ type: "turn_start", id: "a", who: "Jarvis" }, 0);
+      ev({ type: "turn_start", id: "b", who: "Ultron" }, 150);
+      j.split(" ").forEach((w, i) => ev({ type: "reply_delta", id: "a", text: w + " " }, 100 + i * 30));
+      u.split(" ").forEach((w, i) => ev({ type: "reply_delta", id: "b", text: w + " " }, 400 + i * 30));
+      ev({ type: "state", state: "speaking" }, 300);
+      ev({ type: "caption", text: "Acceptable, sir.", who: "Jarvis" }, 300);
+      ev({ type: "caption", text: "Sweet against salty is a perfectly respectable culinary argument.", who: "Jarvis" }, 1300);
+      ev({ type: "turn_end", id: "a", text: j, secs: 2.1 }, 1500);
+      const hand = P.has("duo_late") ? 4200 : 3000;
+      ev({ type: "persona", key: "ultron", name: "Ultron", wordmark: "U.L.T.R.O.N." }, hand);
+      ev({ type: "caption", text: "Respectable. Jarvis would defend anything with a sauce.", who: "Ultron" }, hand + 20);
+      ev({ type: "caption", text: "It's fruit on bread, human. Choose better.", who: "Ultron" }, hand + 1200);
+    }
+    if (P.has("state")) J.on({ type: "state", state: P.get("state") });
+    if (P.has("muted")) J.on({ type: "mic", muted: true, until: Date.now() / 1000 + 600, hotkey: "ctrl+alt+m" });
+    if (P.has("confirm")) {
+      J.on({ type: "msg", role: "user", text: "clear out my temp folder" });
+      J.on({ type: "turn_start", id: "c1", who: NAMES[k0][0] });
+      J.on({ type: "activity", id: "c1", kind: "tool_pending", data: { name: "run_command" } });
+      J.on({ type: "activity", id: "c1", kind: "tool_start", data: { name: "run_command", args: { command: "winget upgrade --id Discord.Discord" } } });
+      J.on({ type: "caption", text: u ? "Updating Discord. Authorize?" : "I'll update Discord for you. Approve?" });
+      J.on({ type: "state", state: "awaiting" });
+      J.on({ type: "confirm", id: "x", title: "Run a PowerShell command", detail: "winget upgrade --id Discord.Discord --silent", timeout: 45, can_always: true,
+        category: "powershell", always_label: "PowerShell commands", keys: { yes: "ctrl+alt+y", no: "ctrl+alt+n" } });
+    }
+    if (P.has("brief")) {
+      J.on({ type: "state", state: "speaking" });
+      J.on({ type: "caption", text: "Evening. It's minus three and snowing lightly in Edmonton, feels like minus nine." });
+      J.on({ type: "briefing", weather: { place: "Edmonton", unit: "°C", now: -3, feels: -9, code: 71, label: "light snow", high: 1, low: -8, rain: 60 },
+        reminders: [{ text: "Dentist", time: "3:30 PM" }, { text: "Call mom", time: "7:00 PM" }],
+        discord: [{ from: "Alex", text: "you on tonight?" }, { from: "Mia", text: "raid at 9, bring snacks" }],
+        headlines: ["Oilers win in overtime", "Snowfall warning issued for Edmonton region"] });
+    }
+    if (P.has("hard")) {
+      J.on({ type: "state", state: "awaiting" });
+      J.on({ type: "confirm", id: "h", title: "Shut down the PC", detail: "Save your work first. Shutdown and restart have a 30 second delay you can cancel.", timeout: 45, can_always: false, keys: { yes: "ctrl+alt+y", no: "ctrl+alt+n" } });
+    }
+  }, 1700);
+  setInterval(tele, 2000);
+  setInterval(() => {
+    if (state === "speaking" && !venv) J.on({ type: "voice_env", step: .02, delay: 0,      // fake syllables for screenshots
+      env: Array.from({ length: 150 }, (_, i) => Math.max(0, Math.sin(i / 6.5) * .55 + Math.sin(i / 2.3) * .15 + .1)) });
+    else if (state === "idle") micLevel = Math.random() * .05;
+  }, 70);
+}
+})();
+</script>
+</body>
+</html>

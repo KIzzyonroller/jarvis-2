@@ -1,0 +1,3 @@
+# Only needed to BUILD the installer (build.ps1 / the GitHub workflow), not to run Jarvis.
+pyinstaller>=6.10
+velopack>=1.2,<2
