@@ -4,7 +4,7 @@ Real Spotify control through Spotify's official Web API.
 "Play Blinding Lights", "play my gym playlist", "queue some Daft Punk",
 "what's playing", "like this song", "shuffle on"...
 
-One-time setup (5 minutes, free):
+One-time setup (5 minutes; since February 2026 the app owner needs Spotify Premium):
   1. developer.spotify.com/dashboard -> Create app. Any name. Redirect URI:
          http://127.0.0.1:8765/callback
      Tick "Web API". Save.
@@ -12,8 +12,8 @@ One-time setup (5 minutes, free):
   3. First time you ask him to play something, your browser opens and asks
      you to allow it. After that it just works (it remembers the login).
 
-Spotify only lets apps CONTROL playback on Premium accounts. On Free, search
-still works and he falls back to opening the song in the Spotify app.
+Spotify only lets apps CONTROL playback on Premium accounts. Without the setup,
+he opens a Spotify search in the app instead.
 No password is ever seen by Jarvis: you log in on Spotify's own page.
 """
 import base64
@@ -145,28 +145,84 @@ class Spotify:
     def devices(self):
         return self.call("GET", "/me/player/devices").get("devices", [])
 
+    @staticmethod
+    def _this_pc(devs):
+        """Spotify on THIS computer (Spotify names it after the PC), else any computer that can be controlled."""
+        import socket
+        me = socket.gethostname().lower()
+        ok = [d for d in devs if not d.get("is_restricted")]
+        return ([d for d in ok if (d.get("name") or "").lower() == me]
+                or [d for d in ok if d.get("type") == "Computer"])
+
     def _device(self, wake):
+        """Where to play. This PC first: a phone or speaker that's merely "active" in the background used to win,
+        so songs went there and nothing played here."""
         devs = self.devices()
-        active = [d for d in devs if d.get("is_active")]
-        if active:
-            return active[0]["id"]
+        mine = self._this_pc(devs)
+        if mine:
+            return mine[0]["id"]
+        active = [d for d in devs if d.get("is_active") and not d.get("is_restricted")]
         if not wake:
-            return devs[0]["id"] if devs else None
-        # nothing playing anywhere: start the desktop app and wait for it to show up
+            return (active or devs or [{}])[0].get("id")
+        # Spotify isn't open on this PC: start it and wait for it to show up
         import tools
-        if not devs:
-            tools.open_thing("spotify", kind="app")
-            for _ in range(20):
-                time.sleep(0.75)
-                devs = self.devices()
-                if devs:
-                    break
-        pc = [d for d in devs if d.get("type") == "Computer"] or devs
-        return pc[0]["id"] if pc else None
+        tools.open_thing("spotify", kind="app")
+        for _ in range(20):
+            time.sleep(0.75)
+            mine = self._this_pc(self.devices())
+            if mine:
+                time.sleep(1.0)                     # it registers a moment before it can actually play
+                return mine[0]["id"]
+        return active[0]["id"] if active else None
+
+    def start(self, dev, item):
+        """Play item on dev and CHECK that it's really playing. Spotify often says OK (204) to a device that
+        just opened or isn't the active one, and then plays nothing. Returns True once it's playing."""
+        body = {"uris": [item["uri"]]} if item.get("type") == "track" else {"context_uri": item["uri"]}
+        state = self.call("GET", "/me/player") or {}
+        if (state.get("device") or {}).get("id") != dev:
+            self.call("PUT", "/me/player", None, {"device_ids": [dev], "play": False})     # make this PC the player
+            time.sleep(0.8)
+        for attempt in range(2):
+            self.call("PUT", "/me/player/play", {"device_id": dev}, body)
+            for _ in range(8):
+                time.sleep(0.4)
+                if self._playing(item):
+                    return True
+            time.sleep(0.8)                         # didn't take: once more (common right after Spotify opens)
+        return False
+
+    def _playing(self, item):
+        s = self.call("GET", "/me/player") or {}
+        if not s.get("is_playing"):
+            return False
+        cur = s.get("item") or {}
+        ctx = (s.get("context") or {}).get("uri")
+        if item.get("type") == "track":
+            return cur.get("uri") == item["uri"] or cur.get("name", "").lower() == item.get("name", "").lower()
+        return ctx == item["uri"] or bool(cur)
 
     def search(self, query, kind="track", limit=5):
         res = self.call("GET", "/search", {"q": query, "type": kind, "limit": limit})
         return (res.get(kind + "s") or {}).get("items", [])
+
+
+def _save_to_library(sp, item):
+    """Like a song. Spotify replaced PUT /me/tracks with PUT /me/library (uris) in February 2026, for new apps
+    first; older apps still have the old one for now. Try the new one, then the old."""
+    uri = item.get("uri") or f"spotify:track:{item['id']}"
+    tries = [("/me/library", None, {"uris": [uri]}), ("/me/library", {"uris": uri}, None),
+             ("/me/tracks", {"ids": item["id"]}, None)]
+    err = None
+    for path, params, body in tries:
+        try:
+            sp.call("PUT", path, params, body)
+            return
+        except SpotifyError as e:
+            err = e
+            if not re.match(r"(400|404|405|410)", str(e)):
+                raise
+    raise err
 
 
 def _desc(item):
@@ -232,6 +288,33 @@ def _open_in_app(uri_or_search, what, why):
     return f"{why}, so I opened {what} in the Spotify app; the user just has to press play. Don't retry or try other services."
 
 
+def status():
+    """'Jarvis, Spotify status': what's set up, and what Spotify can see, in one sentence or two."""
+    sp = client()
+    if not sp.configured:
+        return ("Spotify control isn't set up, so I can only open songs in the app for you to press play. "
+                "It needs Premium and a Client ID in the dot env file; the readme has the steps.")
+    try:
+        me = sp.call("GET", "/me") or {}
+        devs = sp.devices()
+    except SpotifyError as e:
+        return f"Spotify is set up, but it refused me: {e}."
+    except Exception as e:
+        return f"Spotify is set up, but I couldn't reach it: {type(e).__name__}."
+    plan = me.get("product")
+    line = f"Logged in as {me.get('display_name') or 'you'}" + (f", on {plan}" if plan else "") + ". "
+    if plan and plan != "premium":
+        line += "Spotify only lets apps press play on Premium, so I'll open songs for you instead. "
+    here = Spotify._this_pc(devs)
+    if here:
+        line += f"Spotify on this PC is ready ({here[0].get('name')})."
+    elif devs:
+        line += "Spotify isn't open on this PC; I can see " + ", ".join(d.get("name", "?") for d in devs[:4]) + "."
+    else:
+        line += "Spotify isn't open anywhere right now; I'll open it when you ask for a song."
+    return line
+
+
 def control(action, query=None, kind="auto", value=None):
     """The Jarvis tool. Returns a short plain-English result."""
     sp = client()
@@ -270,8 +353,9 @@ def control(action, query=None, kind="auto", value=None):
                     k = "track"
             if k == "liked":
                 dev = sp._device(True)
-                sp.call("PUT", "/me/player/play", {"device_id": dev}, {"context_uri": "spotify:collection:tracks"})
-                return "Playing your Liked Songs."
+                if dev and sp.start(dev, {"type": "playlist", "uri": "spotify:collection:tracks"}):
+                    return "Playing your Liked Songs."
+                return _open_in_app("spotify:collection:tracks", "your Liked Songs", "Spotify didn't start playing")
             if k == "playlist":
                 mine = sp.call("GET", "/me/playlists", {"limit": 50}).get("items", [])
                 pick = next((p for p in mine if p and q.lower() in p["name"].lower()), None)
@@ -293,9 +377,10 @@ def control(action, query=None, kind="auto", value=None):
             dev = sp._device(True)
             if not dev:
                 return _open_in_app(item["uri"], _desc(item), "Spotify wasn't running and didn't start in time")
-            body = {"uris": [item["uri"]]} if item.get("type") == "track" else {"context_uri": item["uri"]}
-            sp.call("PUT", "/me/player/play", {"device_id": dev}, body)
-            return f"Playing {_desc(item)}."
+            if sp.start(dev, item):
+                return f"Playing {_desc(item)}."
+            print(f"[spotify] play accepted but nothing started on {dev}; opening it in the app instead")
+            return _open_in_app(item["uri"], _desc(item), "Spotify accepted the request but didn't start playing")
         if a in ("pause", "resume", "next", "previous"):
             dev = sp._device(a == "resume")
             path = {"pause": ("PUT", "/me/player/pause"), "resume": ("PUT", "/me/player/play"),
@@ -306,7 +391,7 @@ def control(action, query=None, kind="auto", value=None):
             cur = sp.call("GET", "/me/player/currently-playing").get("item")
             if not cur:
                 return "Nothing's playing."
-            sp.call("PUT", "/me/tracks", {"ids": cur["id"]})
+            _save_to_library(sp, cur)
             return f"Liked {_desc(cur)}."
         if a == "shuffle":
             on = str(value).lower() not in ("false", "off", "0", "no")
@@ -324,6 +409,12 @@ def control(action, query=None, kind="auto", value=None):
         return "Unknown Spotify action."
     except SpotifyError as e:
         msg = str(e)
+        if msg.startswith("403") and re.search(r"regist|allowlist|not.*(added|allowed)", msg, re.I):
+            return ("Spotify refused: this Spotify account isn't on the app's user list. In developer.spotify.com, "
+                    "open the app > User Management and add the account's name and email (up to 5 people).")
+        if msg.startswith("403") and re.search(r"owner|developer", msg, re.I):
+            return ("Spotify refused: since February 2026 Spotify's developer apps only work if the account that "
+                    "made the app has Premium. Without it, leave SPOTIFY_CLIENT_ID empty and I'll open songs in the app.")
         if "PREMIUM_REQUIRED" in msg or msg.startswith("403"):
             if a in ("play", "queue") and query:
                 try:

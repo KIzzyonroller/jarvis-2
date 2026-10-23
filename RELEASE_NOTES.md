@@ -1,1 +1,6 @@
-- First installable version: Setup.exe, automatic updates, API keys set up inside the app.
+- Email: "read my emails", read one, search, and optional new-mail announcements (read-only; needs an app password, see README).
+- Netflix: open it on the web or in the app, and "what did I watch on Netflix?"
+- Spotify: plays on this PC instead of your phone, checks the song really started, "Spotify status" explains problems.
+- Follow-ups: he no longer ignores what you say while he's "listening" on slower PCs.
+- Longer answers when a question needs it; decimals read as "four point five".
+- Discord bot with a switch for sending messages; API keys set up inside the app.

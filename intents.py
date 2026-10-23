@@ -211,10 +211,32 @@ def _spotify(m):
     return None
 
 
+NETFLIX_WHERE = r"(?: (on the web|on web|in (?:the |a |my )?browser|on the website|in the app|on the app|in the netflix app))?"
+
+
+def _netflix(m):
+    groups = [g for g in m.groups()]
+    where_txt = groups[-1] or ""
+    q = groups[0].strip() if len(groups) == 2 and groups[0] else ""
+    if q and (q in VAGUE or COMPOUND.search(q)):
+        return None
+    if _DRY.on:
+        return HIT
+    import netflix
+    where = "app" if "app" in where_txt else "web" if where_txt else "auto"
+    out = netflix.open_netflix(q, where)
+    if out.startswith("The Netflix app isn't installed"):
+        return "The Netflix app isn't installed. Want the website?", out
+    return ("Netflix, on the web." if "netflix.com" in out and not q else
+            f"Here's {q} on Netflix." if q else "Opening Netflix."), out
+
+
 NUMWORD = r"(\d+(?:\.\d+)?|" + "|".join(sorted(WORDNUM, key=len, reverse=True)) + r")"
 RULES = [
     (r"^(?:play|put on|pull up|show me|watch|find and play) (.+?) on youtube$", _youtube),
     (r"^(?:play|put on|open|pull up|start) (.+?) on spotify$", _spotify),
+    (r"^(?:open|launch|start|pull up|bring up|go to) netflix" + NETFLIX_WHERE + r"$", _netflix),
+    (r"^(?:play|put on|watch|pull up|find|search for|search|look up) (.+?) on netflix" + NETFLIX_WHERE + r"$", _netflix),
     (rf"^(?:set |turn |put |change )?(?:the )?(?:volume|sound)(?: (?:to|at|down to|up to))? {NUM}(?: ?%| percent)?$", _vol_set),
     (rf"^(?:set |turn |put )?(?:the )?volume (?:up|down) to {NUM}(?: ?%| percent)?$", _vol_set),
     (r"^(?:turn |crank )?(?:the )?(?:volume|sound|music|it) (?:way )?(up|down)(?: a (?:bit|little|lot|notch))?$", _vol_step),

@@ -178,6 +178,14 @@ DAILY_BUDGET = float(os.environ.get("JARVIS_DAILY_BUDGET", "5"))
 HISTORY_DAYS = int(os.environ.get("JARVIS_HISTORY_DAYS", "365"))
 # Read new Discord messages out loud as they arrive (you can also say "stop reading my Discord messages")
 DISCORD_READ = os.environ.get("JARVIS_DISCORD_READ", "true").lower() != "false"
+# Netflix: open it on the "web" or in the "app" by default ("auto" = the app if installed, the web to search)
+NETFLIX_DEFAULT = os.environ.get("JARVIS_NETFLIX", "auto").strip().lower()
+NETFLIX_TRACK = os.environ.get("JARVIS_NETFLIX_TRACK", "true").lower() != "false"     # keep a log of what you watch
+# Email (optional, read-only; README "Email"): your address and an APP password, never your real one
+EMAIL_ADDRESS = os.environ.get("EMAIL_ADDRESS", "").strip()
+EMAIL_APP_PASSWORD = os.environ.get("EMAIL_APP_PASSWORD", "").strip()
+EMAIL_IMAP_HOST = os.environ.get("EMAIL_IMAP_HOST", "").strip()          # worked out from the address if empty
+EMAIL_ANNOUNCE = os.environ.get("JARVIS_EMAIL_ANNOUNCE", "false").lower() == "true"   # say new mail out loud
 # Discord bot (optional, see README "Discord bot"): an official bot account he chats and posts through
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
 DISCORD_OWNER_ID = os.environ.get("DISCORD_OWNER_ID", "").strip()      # your Discord user ID: you skip the rate limits

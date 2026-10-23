@@ -156,6 +156,9 @@ def discord_since(watcher, since):
             f"{' and others' if len(names) > 4 else ''}; latest from {last['sender']}: \"{notifications.speakable(last['text'], 20)}\"")
 
 
+EMAIL_LINE = None             # set by the core when email is set up: () -> "3 unread emails, from ..."
+
+
 def gather(reminder_items, watcher=None, discord_from=None, flags_get=None, flags_set=None, budget=5.0):
     """All the facts, gathered in parallel. Anything slower than `budget` seconds is left out."""
     facts = {}
@@ -176,6 +179,8 @@ def gather(reminder_items, watcher=None, discord_from=None, flags_get=None, flag
     jobs = [threading.Thread(target=run, args=("weather", wx), daemon=True),
             threading.Thread(target=run, args=("headlines", headlines), daemon=True),
             threading.Thread(target=run, args=("pc", pc_health), daemon=True)]
+    if EMAIL_LINE is not None:
+        jobs.append(threading.Thread(target=run, args=("email", EMAIL_LINE), daemon=True))
     for j in jobs:
         j.start()
     run("reminders", reminders_today, reminder_items)
@@ -207,14 +212,15 @@ def prompt(facts, morning=True):
     now = datetime.now()
     when = f"{now.strftime('%A, %B')} {now.day}, {now.strftime('%I:%M %p').lstrip('0')}"
     lines = [f"{k}: {v}" for k, v in (("Weather", facts.get("weather")), ("Reminders today", facts.get("reminders")),
-                                      ("Discord", facts.get("discord")), ("PC", facts.get("pc")),
+                                      ("Discord", facts.get("discord")), ("Email", facts.get("email")),
+                                      ("PC", facts.get("pc")),
                                       ("Headlines", facts.get("headlines"))) if v]
     part = "morning" if 4 <= now.hour < 12 else "afternoon" if 12 <= now.hour < 18 else "evening"
     kind = (f"the user's {part} briefing (first time they're at the PC today)" if morning
             else "a quick catch-up briefing")
     return (f"[Give {kind}. It's {when}. Facts gathered just now:\n" + "\n".join(lines) +
             "\nSay it in your own voice: 4 to 6 short spoken sentences, most useful first (weather, then today's "
-            "reminders, then Discord, then one headline). Natural speech, no lists, no markdown. Use only these "
+            "reminders, then Discord and email (just who, not what), then one headline). Natural speech, no lists, no markdown. Use only these "
             "facts; skip anything missing. Don't call any tools.]")
 
 

@@ -122,6 +122,12 @@ DISCORD_OFF = {"stop reading my discord messages", "don't read my discord messag
 DISCORD_ON = {"read my discord messages out loud", "start reading my discord messages", "read discord messages out loud",
               "read my messages out loud", "announce my discord messages", "discord announcements on",
               "tell me when i get discord messages", "read new discord messages"}
+EMAIL_ANNOUNCE_ON = {"tell me when i get emails", "tell me when i get an email", "read new emails out loud",
+                     "announce my emails", "email announcements on", "tell me about new emails"}
+EMAIL_ANNOUNCE_OFF = {"stop telling me about emails", "stop announcing emails", "email announcements off",
+                      "don't tell me about emails", "dont tell me about emails", "be quiet about emails"}
+SPOTIFY_STATUS = {"spotify status", "check spotify", "is spotify working", "is spotify set up", "what's up with spotify",
+                  "whats up with spotify", "why isn't spotify working", "why isnt spotify working"}
 DISCORD_BOT_STATUS = {"discord bot status", "is your discord bot online", "is the discord bot online",
                       "is the discord bot working", "what's up with the discord bot", "whats up with the discord bot",
                       "check the discord bot", "is the bot online"}
@@ -496,6 +502,8 @@ class Core:
         self._emit_autostart()
         self._start_discord()
         self._start_discord_bot()
+        self._start_email()
+        self._start_netflix()
         threading.Thread(target=self._ensure_voice_model, daemon=True, name="voice-download").start()
         threading.Thread(target=self._start_connectors, daemon=True, name="connectors-start").start()
         self._start_jobs()
@@ -1266,6 +1274,20 @@ class Core:
         if low in ROLLBACK_WORDS:
             self._rollback()
             return
+        if low in EMAIL_ANNOUNCE_ON or low in EMAIL_ANNOUNCE_OFF:
+            on = low in EMAIL_ANNOUNCE_ON
+            mb = getattr(self, "mailbox", None)
+            if on and (mb is None or mb.problem()):
+                self.say_line(mb.problem() if mb else "Email isn't set up yet. The readme has the steps.")
+                return
+            self._state_flag("email_announce", on)
+            self.say_line("I'll tell you when new email arrives. Just who it's from and the subject." if on
+                          else "Okay, I'll keep new email to myself until you ask.")
+            return
+        if low in SPOTIFY_STATUS:
+            import spotify
+            self.say_line(spotify.status())
+            return
         if low in DISCORD_BOT_STATUS:
             b = getattr(self, "discord_bot", None)
             if b is None:
@@ -1706,6 +1728,59 @@ class Core:
         print("[setup] keys saved; restarting")
         time.sleep(1.5)
         self._restart()
+
+    # ================================================================ Netflix log
+    def _start_netflix(self):
+        if not config.NETFLIX_TRACK or not tools.IS_WINDOWS:
+            return
+        import netflix
+
+        def finished(s):
+            if self.history is not None:
+                what = "; ".join(s["titles"]) or "something (title unknown)"
+                self.history.add("Netflix", f"Watched {what} for {s['minutes']} minutes on the {s['via']}")
+        self.netflix = netflix.WatchTracker(on_finished=finished, log=print)
+        self.netflix.start()
+
+    # ================================================================ email
+    def _start_email(self):
+        import email_reader
+        self.mailbox = email_reader.Mailbox(log=print)
+        tools.set_mailbox(self.mailbox)
+        if self.mailbox.problem() and self.mailbox.configured:
+            self._log(f"EMAIL  [{self.mailbox.problem()[:60]}]")
+        if not self.mailbox.problem():
+            briefing.EMAIL_LINE = self.mailbox.briefing_line
+            self._log(f"EMAIL  [{self.mailbox.address}, READ-ONLY]")
+            threading.Thread(target=self._email_watch, daemon=True, name="email-watch").start()
+
+    def _email_announcing(self):
+        flag = self._state_flag("email_announce")
+        return config.EMAIL_ANNOUNCE if flag is None else bool(flag)
+
+    def _email_watch(self):
+        """Every few minutes: anything new? Said out loud only if you've turned announcements on. Costs nothing
+        (no Claude): just who it's from and the subject."""
+        while not self._stop.wait(180):
+            if not self._email_announcing() or self._dictation:
+                continue
+            try:
+                fresh = self.mailbox.new_since_last()
+            except Exception as e:
+                print(f"[email] check failed: {type(e).__name__}: {e}")
+                continue
+            if not fresh:
+                continue
+            for _ in range(40):                       # wait for a quiet moment (up to ~20 s)
+                if self._turn is None and not self._user_talking and self._pending is None:
+                    break
+                time.sleep(0.5)
+            if len(fresh) == 1:
+                line = f"New email from {fresh[0]['from']}: {fresh[0]['subject'][:90]}."
+            else:
+                line = f"{len(fresh)} new emails, from " + ", ".join(dict.fromkeys(f["from"] for f in fresh)) + "."
+            self.emit({"type": "toast", "text": line})
+            self.events.put(("say", line))
 
     # ================================================================ Discord bot
     def _start_discord_bot(self):
