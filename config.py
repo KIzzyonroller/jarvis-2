@@ -57,14 +57,26 @@ SHOW_REASONING = os.environ.get("JARVIS_SHOW_REASONING", "true").lower() != "fal
 # What Jarvis calls you. "sir" is canon, but you do you.
 # Names he will never call anyone (letters only, lowercase; spaces and punctuation are ignored when comparing)
 BLOCKED_NAMES = ("kizzy", "johndeadlock")
+# The creator's own PC: here (and only here) he may call the user "Kizzy". Matched by the computer's name.
+HOME_PC = "DESKTOP-A9TTU06"
+
+
+def on_home_pc():
+    import socket
+    names = {os.environ.get("COMPUTERNAME", ""), socket.gethostname()}
+    return any(n and n.strip().upper() == HOME_PC for n in names)
+
+
+def blocked_names():
+    return tuple(b for b in BLOCKED_NAMES if not (b == "kizzy" and on_home_pc()))
 
 
 def name_allowed(name):
     flat = "".join(ch for ch in str(name or "").lower() if ch.isalnum())
-    return not any(b in flat for b in BLOCKED_NAMES)
+    return not any(b in flat for b in blocked_names())
 
 
-ADDRESS_AS = os.environ.get("JARVIS_ADDRESS_AS", "sir")
+ADDRESS_AS = os.environ.get("JARVIS_ADDRESS_AS", "Kizzy" if on_home_pc() else "sir")
 if not name_allowed(ADDRESS_AS):
     ADDRESS_AS = "sir"
 

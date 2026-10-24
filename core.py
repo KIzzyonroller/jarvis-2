@@ -112,6 +112,10 @@ CONNECTOR_LIST = {"what connectors do you have", "list your connectors", "what a
 UPDATE_WORDS = {"update yourself", "install the update", "update", "check for updates", "is there an update",
                 "upgrade yourself", "update jarvis", "update ultron", "install your update", "install the new version",
                 "are there any updates", "any updates"}
+UPDATE_RE = re.compile(r"^(?:(?:can|could|would|will) you |please |go |)(?:check|look|search)(?: for| if there(?:'s| is| are))? (?:an |any |a |your |your own |new |the )*(?:personal )?updates?\b"
+                       r"|^(?:(?:can|could) you |please |go |)update (?:yourself|jarvis|ultron|you)\b"
+                       r"|^(?:do you have|is there|are there|got) (?:an |any |a )?(?:new )?updates?(?: for you| for yourself)?$"
+                       r"|\byour own (?:personal )?updates?\b")
 ROLLBACK_WORDS = {"undo the update", "roll back", "rollback", "roll back the update", "revert the update",
                   "go back to the old version", "go back to the last version", "undo your update"}
 DISCORD_CHECK = {"read my discord messages", "read my discord", "any new discord messages", "any discord messages",
@@ -1271,8 +1275,8 @@ class Core:
             else:
                 self.say_line("Kept it.")
             return
-        if low in UPDATE_WORDS:
-            self._update()
+        if low in UPDATE_WORDS or (UPDATE_RE.search(low) and not re.search(r"\b(windows|driver|drivers|steam|discord|game|app store|nvidia|graphics)\b", low)):
+            self._update()                       # HIS updates; "Windows update" etc. still go to Claude
             return
         if low in ROLLBACK_WORDS:
             self._rollback()
@@ -1433,8 +1437,15 @@ class Core:
     def _app_update(self):
         import app_update
         if not app_update.available():
-            self.say_line("This copy wasn't installed with the setup program, so it can't update itself. "
-                          "Install it with Setup dot exe from the releases page.")
+            if not app_update.source():
+                why = "this build doesn't know where its updates come from (it was built without an update address)"
+            else:
+                why = "Windows says this copy wasn't installed by the setup program"
+            detail = app_update._STATE.get("error") or ""
+            print(f"[update] can't update: {why}. {detail}")
+            self.emit({"type": "msg", "role": "system", "text": f"Can't update: {why}. {detail}".strip()})
+            self.say_line(f"I can't update myself: {why}. Download the newest Setup dot exe from the releases page "
+                          "and run it; that updates me in place and keeps everything.")
             return
         v = app_update.pending_version()
         if not v:

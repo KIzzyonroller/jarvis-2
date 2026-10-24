@@ -8,8 +8,8 @@ Each release starts with a "## version" line.
 - **Shuffle:** "shuffle my gym playlist on Spotify", "turn on shuffle", in Spotify and Apple Music.
 - **Playlists from your library and from friends:** "play my gym playlist" searches everything you've made or saved; "play Alex's chill playlist" checks playlists of Alex's you've saved, then Alex's public ones.
 - **Send from your own Discord:** "send Alex 'running late' from my Discord" types it into your Discord app as you. Off until you switch it on in Settings > Discord bot, and you approve every message (who it goes to and the exact text). If Discord's switcher lands on the wrong chat, he stops without sending.
-- He won't call anyone "Kizzy" or "John Deadlock", whatever the settings or anyone says.
-- Updates: if he can't update himself, he now says exactly why.
+- He won't call anyone "John Deadlock", and only calls people "Kizzy" on the creator's own PC.
+- Updates: "check for an update" now checks HIS updates (it used to open Windows Update), and if he can't update he says exactly why.
 
 ## 2026.10.23.13
 - **Settings inside the app.** Click Settings (System panel) to set your Claude and Groq keys, email, Discord bot, Spotify, Netflix and Apple Music, your name and city. Passwords and keys are hidden as you type, never shown again after saving, and stored encrypted on this PC.
