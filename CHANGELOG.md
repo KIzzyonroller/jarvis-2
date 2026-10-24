@@ -1,7 +1,10 @@
 # What's new
 
 Newest first. After an update, Jarvis shows everything added since the version you had before.
-Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.7, 1.0.8...).
+Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.9, 1.0.10...).
+
+## 1.0.9
+- **The What's new pop-up now shows after every update, titled with the version you're actually on.** (1.0.8 still named it after the old notes.)
 
 ## 1.0.7
 - **Studio: Blender and Unreal modes.** Each runs on its own AI key (Claude, OpenRouter or OpenAI, whichever you paste), so its spending is separate from your Jarvis key. They're locked until you add a key: on the first-run card, in Studio (the new cube button at the top), or in Settings. Unlocked, they check the real API of the version you have open before writing code, then work in the editor and check the result. Unreal mode is new: it works in your open Unreal Editor (one-time setup is shown in Studio), and everything it does is one Ctrl+Z.

@@ -1421,19 +1421,33 @@ class Core:
                                     "Say update yourself when you're ready."))
 
     def _whats_new_after_update(self):
-        """Once per new version: pop up everything added since the version you had before."""
+        """Once per update: pop up what's new. Goes by the version he's actually running (1.0.7 -> 1.0.8), not just
+        the changelog's top heading, so it still fires if a release went out without a new heading."""
+        import app_update
         import changelog
         latest = changelog.latest_version()
         if not latest:
             return
-        seen = self._state_flag("changelog_seen")
-        existing = seen is not None or self._state_flag("last_seen") is not None or self._state_flag("briefed") is not None
+        try:
+            cur = str(app_update.current_version() or "")
+        except Exception:
+            cur = ""
+        seen = self._state_flag("changelog_seen")            # newest heading shown last time
+        seen_ver = self._state_flag("version_seen")          # version he was last time (newer builds only)
+        existing = (seen is not None or seen_ver is not None or self._state_flag("last_seen") is not None
+                    or self._state_flag("briefed") is not None)
         self._state_flag("changelog_seen", latest)
-        if not existing or seen == latest:
-            return                                    # brand-new install, or nothing new
-        picked = changelog.since(seen) if seen else changelog.sections()[:1]
+        if cur:
+            self._state_flag("version_seen", cur)
+        if not existing:
+            return                                    # brand-new install: everything is new, no pop-up
+        same_version = seen_ver is not None and seen_ver == cur
+        if same_version and seen == latest:
+            return                                    # just a restart
+        picked = changelog.since(seen) if seen and seen != latest else changelog.sections()[:1]
         if picked:
-            self.emit({"type": "whats_new", "version": latest if len(picked) == 1 else "",
+            print(f"[whats new] {seen_ver or seen} -> {cur or latest}: showing {', '.join(v for v, _ in picked)}")
+            self.emit({"type": "whats_new", "version": cur or latest,       # the title: the version he's on now
                        "notes": changelog.as_markdown(picked)})
 
     def whats_new(self):
