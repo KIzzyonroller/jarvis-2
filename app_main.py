@@ -59,13 +59,13 @@ SELFTEST_MODULES = [
     "config", "core", "brain", "tools", "speech", "voice", "vad", "aec", "intents", "personas", "permissions",
     "spotify", "youtube", "notifications", "briefing", "history", "connectors", "usage", "jobs", "discord_bot",
     "app_update", "autostart", "phone", "mini", "health", "cloud_stt", "download_models", "email_reader", "netflix",
-    "settings", "secretbox", "voice_settings", "changelog", "apple_music",
+    "settings", "secretbox", "voice_settings", "changelog", "apple_music", "media_buttons", "discord_typing",
     "anthropic", "numpy", "onnxruntime", "faster_whisper", "ctranslate2", "kokoro_onnx", "sounddevice", "webview",
     "edge_tts", "pygame", "requests", "psutil", "PIL", "cv2", "yt_dlp", "mcp", "discord", "velopack",
     "espeakng_loader", "phonemizer",
 ]
 SELFTEST_WINDOWS = ["pyautogui", "pygetwindow", "pyperclip", "pycaw.pycaw", "comtypes", "pyttsx3", "pyttsx3.drivers.sapi5",
-                    "screen_brightness_control", "send2trash", "winreg", "winrt.windows.media.control"]
+                    "screen_brightness_control", "send2trash", "winreg", "winrt.windows.media.control", "uiautomation"]
 
 
 def _selftest(out_path):

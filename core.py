@@ -1416,10 +1416,12 @@ class Core:
         time.sleep(20)                                   # don't compete with startup
         while not self._stop.is_set():
             try:
+                print(f"[update] checking {app_update.source()} (on {app_update.current_version()})")
                 v = app_update.check_and_download()
+                print(f"[update] {'downloaded ' + v if v else 'up to date'}")
             except Exception as e:
                 v = None
-                print(f"[update] check failed: {type(e).__name__}: {e}")
+                print(f"[update] check failed: {app_update.explain(e)}")
             if v and self._state_flag("update_announced") != v:
                 self._state_flag("update_announced", v)
                 self.emit({"type": "update_ready", "version": v, "notes": app_update.pending_notes()[:600]})
@@ -1440,7 +1442,9 @@ class Core:
             try:
                 v = app_update.check_and_download()
             except Exception as e:
-                self.say_line(f"I couldn't reach the update server: {type(e).__name__}.")
+                why = app_update.explain(e)
+                print(f"[update] check failed: {why}")
+                self.say_line(f"I couldn't check for updates: {why}")
                 return
         if not v:
             self.say_line(f"You're on the newest version, {app_update.current_version()}.")

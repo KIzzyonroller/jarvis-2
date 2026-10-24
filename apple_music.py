@@ -97,7 +97,18 @@ def _desc(item):
     return f"{item['name']}" + (f" by {item['artist']}" if item.get("artist") else "")
 
 
-def play(query, kind="auto", where="auto"):
+def _press(app, item, shuffle):
+    """Open page -> press its Play button (and Shuffle first if asked), like a screen reader would."""
+    import media_buttons
+    import time
+    time.sleep(3.0)                                         # let the page load
+    done, how = media_buttons.press_play(app, hint=item.get("name", ""), shuffle=shuffle)
+    if done:
+        return f" and {how}"
+    return f", but {how}." + media_buttons.mouse_fallback(app)
+
+
+def play(query, kind="auto", where="auto", shuffle=None):
     """The tool's main action: find it, open it where the user wants. Returns a sentence for Claude."""
     import tools
     w = (where or "auto").lower()
@@ -113,12 +124,13 @@ def play(query, kind="auto", where="auto"):
             return "The Apple Music app isn't installed (it's free in the Microsoft Store). Say 'on the web' to use the website."
         if _app_takes_links() and url:
             tools.open_url("music://" + url.split("://", 1)[-1], front=True)
-            return f"Opened {_desc(item)} in the Apple Music app; the user presses play. Don't retry or switch services."
+            return f"Opened {_desc(item)} in the Apple Music app{_press('apple music', item, shuffle)} Don't retry or switch services."
         tools.open_app("apple music", front=True)
         return (f"Opened the Apple Music app, but it doesn't accept links on this PC, so it can't jump to {_desc(item)}: "
                 "tell the user to search for it there, or offer the website.")
     tools.open_url(url, front=True)
-    return f"Opened {_desc(item)} on music.apple.com; the user presses play (signed in to Apple Music). Don't retry or switch services."
+    return (f"Opened {_desc(item)} on music.apple.com{_press('web apple music', item, shuffle)} (The website needs "
+            "them signed in to Apple Music to play whole songs.) Don't retry or switch services.")
 
 
 def now_playing():

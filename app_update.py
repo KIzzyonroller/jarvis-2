@@ -46,6 +46,7 @@ def _manager():
         _STATE["um"] = velopack.UpdateManager(src)
     except Exception as e:                       # e.g. run straight from the build folder, not installed
         _STATE["error"] = f"{type(e).__name__}: {e}"
+        print(f"[update] updates unavailable: {_STATE['error'][:200]}")
         return None
     return _STATE["um"]
 
@@ -65,6 +66,17 @@ def current_version():
         return (config.RES_DIR / "VERSION").read_text(encoding="utf-8").strip() or "0"
     except OSError:
         return "0"
+
+
+def explain(e):
+    """A sentence about why checking for updates failed, for the log and for 'update yourself'."""
+    msg = f"{type(e).__name__}: {e}"
+    if "404" in msg or "Not Found" in msg:
+        return (f"the releases page at {source()} wasn't found. If that GitHub repo is private, installed copies "
+                "can't see it: make it public, or publish releases to a public repo (RELEASING.md).")
+    if "403" in msg or "rate limit" in msg.lower():
+        return "GitHub is rate-limiting update checks from this network for the moment; it'll work again within the hour."
+    return f"couldn't check {source()} ({msg[:160]})"
 
 
 def pending_version():

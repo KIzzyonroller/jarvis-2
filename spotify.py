@@ -202,8 +202,8 @@ class Spotify:
             return cur.get("uri") == item["uri"] or cur.get("name", "").lower() == item.get("name", "").lower()
         return ctx == item["uri"] or bool(cur)
 
-    def search(self, query, kind="track", limit=5):
-        res = self.call("GET", "/search", {"q": query, "type": kind, "limit": limit})
+    def search(self, query, kind="track", limit=5, offset=0):
+        res = self.call("GET", "/search", {"q": query, "type": kind, "limit": min(int(limit), 10), "offset": offset})
         return (res.get(kind + "s") or {}).get("items", [])
 
 
@@ -232,7 +232,8 @@ def _desc(item):
     if t == "track":
         return f"{item['name']} by {', '.join(a['name'] for a in item.get('artists', []))}"
     if t == "playlist":
-        return f"the playlist {item['name']}"
+        owner = (item.get("owner") or {}).get("display_name")
+        return f"the playlist {item['name']}" + (f" by {owner}" if owner else "")
     if t == "album":
         return f"the album {item['name']} by {', '.join(a['name'] for a in item.get('artists', []))}"
     return item.get("name", "")
@@ -279,13 +280,19 @@ def _what(query):
     return "your Liked Songs" if app_link(query) == "spotify:collection:tracks" else f"a search for '{_clean_query(query)}'"
 
 
-def _open_in_app(uri_or_search, what, why):
-    """Spotify can't press play for us: open exactly that thing in the Spotify app instead. Never switches
-    to another service: if you asked for Spotify, you get Spotify."""
+def _open_in_app(uri_or_search, what, why, hint="", shuffle=None):
+    """Spotify won't take a play command from us: open exactly that thing in the Spotify app, then press its Play
+    button the way a screen reader would (media_buttons.py). Never switches to another service."""
+    import media_buttons
     import tools
     front = not tools.fullscreen_app()
     tools.open_url(uri_or_search, front=front)
-    return f"{why}, so I opened {what} in the Spotify app; the user just has to press play. Don't retry or try other services."
+    time.sleep(2.5)                                         # let Spotify open the page
+    done, how = media_buttons.press_play("spotify", hint=hint, shuffle=shuffle)
+    if done:
+        return f"{why}, so I opened {what} in the Spotify app and {how}. Don't retry or try other services."
+    return (f"{why}, so I opened {what} in the Spotify app, but {how}." + media_buttons.mouse_fallback("spotify")
+            + " Don't try other services.")
 
 
 def status():
@@ -315,13 +322,98 @@ def status():
     return line
 
 
-def control(action, query=None, kind="auto", value=None):
+def parse_playlist(query, owner=None):
+    """'my gym playlist' -> ('gym', 'me'); "Alex's chill playlist" / 'chill playlist by Alex' -> ('chill', 'alex');
+    'the playlist Road Trip' -> ('road trip', None)."""
+    q = re.sub(r"\s+", " ", str(query or "").strip().lower())
+    who = (owner or "").strip().lower() or None
+    m = re.search(r"\s+(?:by|from|made by|of)\s+(.+?)$", q)
+    if m and not who:
+        who, q = m.group(1).strip(), q[:m.start()]
+    m = re.match(r"^(.+?)'s\s+(.+)$", q)
+    if m and not who:
+        who, q = m.group(1).strip(), m.group(2)
+    if re.match(r"^(my|mine)\b", q):
+        who = who or "me"
+        q = re.sub(r"^(my|mine)\s+", "", q)
+    q = re.sub(r"\b(the|a|playlist|play ?list)\b", " ", q)
+    return re.sub(r"\s+", " ", q).strip(), who
+
+
+def _norm(s):
+    return re.sub(r"[^a-z0-9]+", " ", str(s or "").lower()).strip()
+
+
+def _name_score(want, have):
+    import difflib
+    w, h = _norm(want), _norm(have)
+    if not w:
+        return 0.0
+    if w == h:
+        return 1.0
+    if w in h or h in w:
+        return 0.85
+    return difflib.SequenceMatcher(None, w, h).ratio()
+
+
+def _owner_match(who, playlist):
+    o = playlist.get("owner") or {}
+    names = [_norm(o.get("display_name")), _norm(o.get("id"))]
+    w = _norm(who)
+    return any(n and (n == w or w in n or n in w) for n in names)
+
+
+def my_playlists(sp, cap=300):
+    """Everything in the user's library: playlists they made AND ones they follow (paged; Spotify gives 50 at a time)."""
+    out, offset = [], 0
+    while offset < cap:
+        page = sp.call("GET", "/me/playlists", {"limit": 50, "offset": offset}) or {}
+        items = [p for p in page.get("items", []) if p]
+        out += items
+        if len(items) < 50 or not page.get("next"):
+            break
+        offset += 50
+    return out
+
+
+def find_playlist(sp, name, who=None):
+    """Returns (playlist, None) or (None, a sentence saying what wasn't found)."""
+    mine = my_playlists(sp)
+    me_id = None
+    if who in ("me", "my", "mine", None):
+        pool = mine
+    else:
+        pool = [p for p in mine if _owner_match(who, p)]          # theirs, saved in your library
+    best = max(pool, key=lambda p: _name_score(name, p.get("name")), default=None) if name else (pool[0] if pool else None)
+    if best is not None and (not name or _name_score(name, best.get("name")) >= 0.6):
+        return best, None
+    if who in ("me", "my", "mine"):
+        names = ", ".join(p["name"] for p in mine[:12])
+        return None, (f"There's no playlist called {name} in your library." + (f" You have: {names}." if names else ""))
+    # not in the library: public playlists on Spotify (the person's, if one was named)
+    found = []
+    for offset in (0, 10, 20):
+        found += [p for p in sp.search(f"{name} {who}" if (who and offset == 0) else name, "playlist", 10, offset) if p]
+    if who:
+        found = [p for p in found if _owner_match(who, p)]
+    if not found:
+        return None, (f"Couldn't find a playlist called {name}" + (f" by {who}" if who else "") + " on Spotify. "
+                      + ("Their playlist has to be public (or saved in your library) for me to see it." if who else ""))
+    return max(found, key=lambda p: _name_score(name, p.get("name"))), None
+
+
+def control(action, query=None, kind="auto", value=None, shuffle=None, owner=None):
     """The Jarvis tool. Returns a short plain-English result."""
     sp = client()
     if not sp.configured:
         if (action or "").lower() in ("play", "queue") and query:
             return _open_in_app(app_link(query), _what(query),
-                                "Spotify control isn't set up yet (5-minute setup in the README)")
+                                "Spotify control isn't set up (it needs Premium)", hint=_clean_query(query), shuffle=shuffle)
+        if (action or "").lower() == "shuffle":
+            import media_buttons
+            on = str(value).lower() not in ("false", "off", "0", "no")
+            done, how = media_buttons.set_shuffle("spotify", on)
+            return (how[0].upper() + how[1:] + ".") if done else (f"Couldn't switch shuffle: {how}." + media_buttons.mouse_fallback("spotify", "the shuffle button"))
         return ("Spotify control isn't set up (no SPOTIFY_CLIENT_ID in .env; the README explains the 5-minute setup). "
                 "Use media_control for play/pause/next.")
     a = (action or "").lower()
@@ -345,7 +437,7 @@ def control(action, query=None, kind="auto", value=None):
                 low = query.lower()
                 if re.search(r"\b(liked|saved) songs\b|\bmy likes\b", low):
                     k = "liked"
-                elif "playlist" in low:
+                elif "playlist" in low or owner:
                     k, q = "playlist", low.replace("my ", "").replace("playlist", "").strip() or query
                 elif low.startswith("the album ") or " album" in low:
                     k, q = "album", low.replace("the album", "").replace("album", "").strip()
@@ -353,13 +445,20 @@ def control(action, query=None, kind="auto", value=None):
                     k = "track"
             if k == "liked":
                 dev = sp._device(True)
+                if dev and shuffle is not None:
+                    try:
+                        sp.call("PUT", "/me/player/shuffle", {"state": "true" if shuffle else "false", "device_id": dev})
+                    except SpotifyError:
+                        pass
                 if dev and sp.start(dev, {"type": "playlist", "uri": "spotify:collection:tracks"}):
                     return "Playing your Liked Songs."
-                return _open_in_app("spotify:collection:tracks", "your Liked Songs", "Spotify didn't start playing")
+                return _open_in_app("spotify:collection:tracks", "your Liked Songs", "Spotify didn't start playing", shuffle=shuffle)
             if k == "playlist":
-                mine = sp.call("GET", "/me/playlists", {"limit": 50}).get("items", [])
-                pick = next((p for p in mine if p and q.lower() in p["name"].lower()), None)
-                items = [pick] if pick else sp.search(q, "playlist", 5)
+                name, who = parse_playlist(query, owner)
+                pick, why = find_playlist(sp, name, who)
+                if pick is None:
+                    return why
+                items = [pick]
             else:
                 items = sp.search(q, "artist" if k == "artist" else k, 5)
             items = [i for i in items if i]
@@ -373,14 +472,19 @@ def control(action, query=None, kind="auto", value=None):
                 sp.call("POST", "/me/player/queue", {"uri": item["uri"], "device_id": sp._device(True)})
                 return f"Queued {_desc(item)}."
             if sp.tok and sp.tok.get("premium") is False:          # already know this account can't be controlled
-                return _open_in_app(item["uri"], _desc(item), "Spotify only lets apps press play on Premium accounts")
+                return _open_in_app(item["uri"], _desc(item), "Spotify only lets apps press play on Premium accounts", hint=item.get("name", ""), shuffle=shuffle)
             dev = sp._device(True)
             if not dev:
-                return _open_in_app(item["uri"], _desc(item), "Spotify wasn't running and didn't start in time")
+                return _open_in_app(item["uri"], _desc(item), "Spotify wasn't running and didn't start in time", hint=item.get("name", ""), shuffle=shuffle)
+            if shuffle is not None and item.get("type") != "track":
+                try:
+                    sp.call("PUT", "/me/player/shuffle", {"state": "true" if shuffle else "false", "device_id": dev})
+                except SpotifyError:
+                    pass
             if sp.start(dev, item):
-                return f"Playing {_desc(item)}."
+                return f"Playing {_desc(item)}" + (" on shuffle." if shuffle else ".")
             print(f"[spotify] play accepted but nothing started on {dev}; opening it in the app instead")
-            return _open_in_app(item["uri"], _desc(item), "Spotify accepted the request but didn't start playing")
+            return _open_in_app(item["uri"], _desc(item), "Spotify accepted the request but didn't start playing", hint=item.get("name", ""), shuffle=shuffle)
         if a in ("pause", "resume", "next", "previous"):
             dev = sp._device(a == "resume")
             path = {"pause": ("PUT", "/me/player/pause"), "resume": ("PUT", "/me/player/play"),
@@ -409,6 +513,9 @@ def control(action, query=None, kind="auto", value=None):
         return "Unknown Spotify action."
     except SpotifyError as e:
         msg = str(e)
+        if msg.startswith("403") and a == "play" and query and re.search(r"regist|allowlist|not.*(added|allowed)|owner|developer", msg, re.I):
+            return _open_in_app(app_link(query), _what(query), f"Spotify refused my login ({msg[4:80]})",
+                                hint=_clean_query(query), shuffle=shuffle)
         if msg.startswith("403") and re.search(r"regist|allowlist|not.*(added|allowed)", msg, re.I):
             return ("Spotify refused: this Spotify account isn't on the app's user list. In developer.spotify.com, "
                     "open the app > User Management and add the account's name and email (up to 5 people).")
@@ -424,7 +531,7 @@ def control(action, query=None, kind="auto", value=None):
                     pass
                 item = sp.last_item
                 if item:
-                    return _open_in_app(item["uri"], _desc(item), "Spotify only lets apps press play on Premium accounts")
+                    return _open_in_app(item["uri"], _desc(item), "Spotify only lets apps press play on Premium accounts", hint=item.get("name", ""), shuffle=shuffle)
                 return _open_in_app(app_link(query), _what(query),
                                     "Spotify only lets apps press play on Premium accounts")
             return "That needs Spotify Premium. Use media_control instead."

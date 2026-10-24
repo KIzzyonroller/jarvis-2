@@ -206,6 +206,8 @@ def _spotify(m):
     out = spotify.control("play", q)
     if out.startswith("Playing"):
         return out.split(" by ")[0].rstrip(".") + ".", out
+    if "in the Spotify app" in out and (" and pressed " in out or " and it's already playing" in out):
+        return "Playing it in Spotify.", out
     if "in the Spotify app" in out:
         return "It's up in Spotify. Hit play.", out
     return None
@@ -231,6 +233,19 @@ def _netflix(m):
             f"Here's {q} on Netflix." if q else "Opening Netflix."), out
 
 
+def _spotify_shuffle(m):
+    q = m.group(1).strip()
+    if q in VAGUE or COMPOUND.search(q):
+        return None
+    if _DRY.on:
+        return HIT
+    import spotify
+    out = spotify.control("play", q, shuffle=True)
+    if out.startswith("Playing") or " and pressed " in out or " and it's already playing" in out:
+        return "Shuffling.", out
+    return None
+
+
 def _apple_music(m):
     q, where_txt = m.group(1).strip(), m.group(2) or ""
     if q in VAGUE or COMPOUND.search(q):
@@ -239,6 +254,8 @@ def _apple_music(m):
         return HIT
     import apple_music
     out = apple_music.play(q, "auto", "app" if "app" in where_txt else "web" if where_txt else "auto")
+    if out.startswith("Opened") and (" and pressed " in out or " and it's already playing" in out):
+        return "Playing it in Apple Music.", out
     if out.startswith("Opened"):
         return "It's up in Apple Music. Hit play.", out
     return None
@@ -248,6 +265,7 @@ NUMWORD = r"(\d+(?:\.\d+)?|" + "|".join(sorted(WORDNUM, key=len, reverse=True)) 
 RULES = [
     (r"^(?:play|put on|pull up|show me|watch|find and play) (.+?) on youtube$", _youtube),
     (r"^(?:play|put on|open|pull up|start) (.+?) on spotify$", _spotify),
+    (r"^(?:shuffle|shuffle play|play shuffled|put on shuffled) (.+?) on spotify$", _spotify_shuffle),
     (r"^(?:open|launch|start|pull up|bring up|go to) netflix" + NETFLIX_WHERE + r"$", _netflix),
     (r"^(?:play|put on|open|pull up|start|find) (.+?) on apple music" + NETFLIX_WHERE + r"$", _apple_music),
     (r"^(?:play|put on|watch|pull up|find|search for|search|look up) (.+?) on netflix" + NETFLIX_WHERE + r"$", _netflix),

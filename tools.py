@@ -1615,6 +1615,8 @@ def remember(fact):
         return "Nothing to remember."
     if SECRET_HINTS.search(fact):
         return "Not stored: that looks like a password or other secret. Tell the user you don't keep those."
+    if re.search(r"\b(call\w*|name\w*|nick\w*|address\w*|known as|goes by)\b", fact, re.I) and not config.name_allowed(fact):
+        return "Not stored: that's a name you never use for anyone. Keep using your usual form of address."
     with MEMORY.lock:
         items = memories()
         low = fact.lower()
@@ -2147,9 +2149,9 @@ def screen(question="", target="all", save=False, detail="auto"):
     return look_at_screen(question, target, detail)
 
 
-def spotify_tool(action, query=None, kind="auto", value=None):
+def spotify_tool(action, query=None, kind="auto", value=None, shuffle=None, owner=None):
     import spotify
-    return spotify.control(action, query, kind, value)
+    return spotify.control(action, query, kind, value, shuffle=shuffle, owner=owner)
 
 
 _DISCORD = None
@@ -2232,11 +2234,15 @@ def voice_settings_tool(action="list", who=None, voice=None, speed=None, pitch=N
             "Voices: " + ", ".join(f"{x['id']} = {x['label']}" for x in v["voices"]))
 
 
-def apple_music_tool(action="play", query="", kind="auto", where="auto"):
+def apple_music_tool(action="play", query="", kind="auto", where="auto", shuffle=None):
     import apple_music
+    import media_buttons
     if action == "now":
         return apple_music.now_playing()
-    return apple_music.play(query, kind, where)
+    if action == "shuffle":
+        done, how = media_buttons.set_shuffle("apple music", shuffle is not False)
+        return how if done else f"Couldn't switch shuffle: {how}." + media_buttons.mouse_fallback("apple music", "the shuffle button")
+    return apple_music.play(query, kind, where, shuffle=shuffle)
 
 
 def netflix_tool(action="open", query="", where="auto", days=7):
@@ -2271,6 +2277,10 @@ def set_discord_bot(b):
 
 def discord_tool(action="recent", who=None, hours=24, channel=None, text=None, limit=15):
     import notifications
+    if action == "send_as_me":
+        import discord_typing
+        out = discord_typing.send(channel or who, text, lambda title, detail: _confirm(title, detail, None))
+        return DENIED if out == "DENIED" else out
     if action in ("send", "read_channel", "servers"):
         if _DISCORD_BOT is None:
             return "The Discord bot isn't set up (DISCORD_BOT_TOKEN in .env; the README has the 5-minute setup)."
@@ -2391,11 +2401,15 @@ TOOL_SPECS = [
     _spec("spotify", "Control Spotify properly (needs one-time setup; if it says it isn't set up, fall back to open with "
                      "'spotify:search:QUERY' and media_control). play (query = song, 'song by artist', 'my gym playlist', "
                      "album or artist; kind narrows it; no query resumes), queue (a song), pause, resume, next, previous, "
-                     "now_playing, like (the current song), shuffle / repeat (value on/off/song), volume (value 0-100).",
+                     "now_playing, like (the current song), shuffle / repeat (value on/off/song), volume (value 0-100). "
+                     "play with shuffle=true for 'shuffle my gym playlist'. Playlists: 'my X playlist' looks through the "
+                     "user's whole library (made and followed); someone else's ('Alex's chill playlist', 'chill playlist "
+                     "by Alex') checks their playlists saved in the library, then their public ones; or pass owner. "
+                     "Without Premium it opens the item in the Spotify app and presses its Play button itself.",
           {"action": {"type": "string", "enum": ["play", "queue", "pause", "resume", "next", "previous", "now_playing",
                                                  "like", "shuffle", "repeat", "volume"]},
            "query": S, "kind": {"type": "string", "enum": ["auto", "track", "playlist", "album", "artist", "liked"]},
-           "value": S}, ["action"]),
+           "value": S, "shuffle": B, "owner": S}, ["action"]),
     _spec("youtube", "Play YouTube videos for real (finds the video and starts it, not a search link). play: query = what "
                      "they asked for, worded like a YouTube search ('dune part two official trailer', 'lofi hip hop'); or "
                      "index = a number from the last search ('the second one' = 2); or video = a YouTube link/id. "
@@ -2421,9 +2435,12 @@ TOOL_SPECS = [
                      "servers (list servers/channels the bot is in), read_channel (channel = '#general' or 'general in Server'; "
                      "limit), send (channel = '#channel', 'channel in Server', or a person's name for a DM, 'me' = the user; "
                      "text). Sends are posted BY THE BOT, not as the user, only work while the user has Discord sending "
-                     "switched on, and show an approval card. Write the message the way the user asked, in their words "
+                     "switched on, and show an approval card. send_as_me: types the message into the user's OWN Discord "
+                     "app so it comes from their account (channel = a channel or person's name as it appears in their "
+                     "Discord; text). Only when they clearly ask to send it as themselves / from their Discord; it must "
+                     "be switched on in Settings and they approve every message. Write the message the way the user asked, in their words "
                      "where possible; don't add your persona's flourishes unless they asked you to speak as yourself.",
-          {"action": {"type": "string", "enum": ["recent", "unread", "servers", "read_channel", "send"]}, "who": S,
+          {"action": {"type": "string", "enum": ["recent", "unread", "servers", "read_channel", "send", "send_as_me"]}, "who": S,
            "hours": {"type": "number"}, "channel": S, "text": S, "limit": {"type": "number"}}, ["action"]),
     _spec("voice_settings", "Change how you (or the other AI) sound, live, no restart. list: current voice and the "
                             "options. set: who (jarvis or ultron; default you), voice (an id from list), speed (0.6 to "
@@ -2434,12 +2451,12 @@ TOOL_SPECS = [
            "speed": {"type": "number"}, "pitch": {"type": "number"}}, ["action"]),
     _spec("apple_music", "Apple Music (only when the user says Apple Music). play: finds the exact song, album or artist "
                          "(query; kind auto/song/album/artist/playlist) and opens it in the Apple Music app or on the "
-                         "web (where: what the user said, else auto). Nothing can press play on a specific song from "
-                         "outside Apple Music, so the user presses play; say so briefly. now: what's playing. For "
-                         "pause/next/volume use media_control.",
-          {"action": {"type": "string", "enum": ["play", "now"]}, "query": S,
+                         "web (where: what the user said, else auto), then presses its Play button itself (shuffle=true "
+                         "turns shuffle on first). now: what's playing. shuffle: turn shuffle on/off (shuffle=false for off). "
+                         "For pause/next/volume use media_control.",
+          {"action": {"type": "string", "enum": ["play", "now", "shuffle"]}, "query": S,
            "kind": {"type": "string", "enum": ["auto", "song", "album", "artist", "playlist"]},
-           "where": {"type": "string", "enum": ["auto", "web", "app"]}}, ["action"]),
+           "where": {"type": "string", "enum": ["auto", "web", "app"]}, "shuffle": B}, ["action"]),
     _spec("netflix", "Netflix. open: query = a show or film to search for (optional), where = web (browser) or app "
                      "(the Windows app) or auto; use what the user says ('on the web', 'in the app'). Netflix can't be "
                      "told to start a specific title from outside: on the web it shows the search results, in the app "

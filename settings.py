@@ -31,6 +31,8 @@ FIELDS = [
      "discord.com/developers > your app > Bot > Reset Token. Treat it like a password.", None),
     ("Discord bot", "DISCORD_OWNER_ID", "Your Discord user ID", "text",
      "Discord > Settings > Advanced > Developer Mode, then right-click your name > Copy User ID.", None),
+    ("Discord bot", "JARVIS_DISCORD_TYPE", "Let him type in my Discord app", "bool",
+     "Sends messages from YOUR account by typing into the Discord app, only when you ask, and you approve each one.", None),
     ("Discord bot", "DISCORD_BOT_REPLY", "Who he answers on Discord", "choice", "",
      [("everyone", "Everyone (rate limited)"), ("owner", "Only me"), ("off", "Nobody (read and send only)")]),
     ("Spotify", "SPOTIFY_CLIENT_ID", "Spotify Client ID", "text",
@@ -44,7 +46,7 @@ FIELDS = [
 SECRETS = {f[1] for f in FIELDS if f[3] == "secret"}
 DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir", "DISCORD_BOT_REPLY": "everyone",
             "JARVIS_NETFLIX": "auto", "JARVIS_NETFLIX_TRACK": "true", "JARVIS_EMAIL_ANNOUNCE": "false",
-            "JARVIS_APPLE_MUSIC": "auto"}
+            "JARVIS_APPLE_MUSIC": "auto", "JARVIS_DISCORD_TYPE": "false"}
 
 
 def _current(key):
@@ -93,6 +95,8 @@ def validate(key, value):
             return "Use a number of dollars, like 5."
     if key == "JARVIS_ADDRESS_AS" and len(v) > 30:
         return "Keep it short."
+    if key == "JARVIS_ADDRESS_AS" and not config.name_allowed(v):
+        return "He won't call anyone that. Pick another name."
     return None
 
 

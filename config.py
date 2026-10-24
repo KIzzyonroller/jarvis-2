@@ -55,7 +55,18 @@ HISTORY_MESSAGES = 30            # how much conversation Jarvis remembers
 SHOW_REASONING = os.environ.get("JARVIS_SHOW_REASONING", "true").lower() != "false"
 
 # What Jarvis calls you. "sir" is canon, but you do you.
+# Names he will never call anyone (letters only, lowercase; spaces and punctuation are ignored when comparing)
+BLOCKED_NAMES = ("kizzy", "johndeadlock")
+
+
+def name_allowed(name):
+    flat = "".join(ch for ch in str(name or "").lower() if ch.isalnum())
+    return not any(b in flat for b in BLOCKED_NAMES)
+
+
 ADDRESS_AS = os.environ.get("JARVIS_ADDRESS_AS", "sir")
+if not name_allowed(ADDRESS_AS):
+    ADDRESS_AS = "sir"
 
 # Optional: makes "what's the weather" work without saying the city.
 CITY = os.environ.get("JARVIS_CITY", "")
@@ -193,6 +204,8 @@ EMAIL_APP_PASSWORD = os.environ.get("EMAIL_APP_PASSWORD", "").strip()
 EMAIL_IMAP_HOST = os.environ.get("EMAIL_IMAP_HOST", "").strip()          # worked out from the address if empty
 EMAIL_ANNOUNCE = os.environ.get("JARVIS_EMAIL_ANNOUNCE", "false").lower() == "true"   # say new mail out loud
 # Discord bot (optional, see README "Discord bot"): an official bot account he chats and posts through
+# Let him type messages into YOUR Discord app, as you (each one needs your OK). Off unless you switch it on.
+DISCORD_TYPE = os.environ.get("JARVIS_DISCORD_TYPE", "false").lower() == "true"
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
 DISCORD_OWNER_ID = os.environ.get("DISCORD_OWNER_ID", "").strip()      # your Discord user ID: you skip the rate limits
 DISCORD_BOT_REPLY = os.environ.get("DISCORD_BOT_REPLY", "everyone").strip().lower()   # everyone, owner or off
