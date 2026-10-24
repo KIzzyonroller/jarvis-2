@@ -283,12 +283,18 @@ def _what(query):
 def _open_in_app(uri_or_search, what, why, hint="", shuffle=None):
     """Spotify won't take a play command from us: open exactly that thing in the Spotify app, then press its Play
     button the way a screen reader would (media_buttons.py). Never switches to another service."""
+    import app_ready
     import media_buttons
     import tools
     front = not tools.fullscreen_app()
+    # Closed? Open Spotify and let it finish loading BEFORE giving it the link: a cold-started Spotify often
+    # drops the link, and pressing Play while it's still on its loading screen did nothing.
+    _, state, _ = app_ready.ensure("spotify", front=front)
+    if state in ("failed", "no window"):
+        return f"{why}, and the Spotify app wouldn't open on this PC, so nothing is playing. Don't try other services."
+    before = media_buttons.snapshot("spotify")             # so we can tell when it has moved on to the new page
     tools.open_url(uri_or_search, front=front)
-    time.sleep(2.5)                                         # let Spotify open the page
-    done, how = media_buttons.press_play("spotify", hint=hint, shuffle=shuffle)
+    done, how = media_buttons.press_play("spotify", hint=hint, shuffle=shuffle, before=before)
     if done:
         return f"{why}, so I opened {what} in the Spotify app and {how}. Don't retry or try other services."
     return (f"{why}, so I opened {what} in the Spotify app, but {how}." + media_buttons.mouse_fallback("spotify")

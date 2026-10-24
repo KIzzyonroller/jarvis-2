@@ -94,9 +94,12 @@ def _open(m):
         return None
     if _DRY.on:
         return HIT
-    out = tools.open_thing(target)
+    out = tools.open_thing(target, wait=False)            # just opening it: no need to wait for it to load
     if out.startswith(("Couldn't", "Open what", "Unknown")) or "doesn't exist" in out or "outside the folders" in out:
         return None                                        # let Claude figure it out
+    m = re.match(r"^(.+?) is already open", out)
+    if m:
+        return f"{m.group(1)}'s already open.", out
     nice = re.sub(r"^Opened (settings: )?", "", out.split(".")[0]).strip() or target
     return f"Opening {nice}.", out
 

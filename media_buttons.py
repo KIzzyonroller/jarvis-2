@@ -110,12 +110,49 @@ def find_play(buttons, hint=""):
     return max(plays, key=_area)
 
 
-def _wait_buttons(app, timeout):
-    end = time.time() + timeout
+def snapshot(app):
+    """The buttons on screen now, to tell later when the app has moved on to the page we asked for."""
+    if not available():
+        return None
+    try:
+        return frozenset(b.Name.strip() for w in _windows(app) for b in _buttons(w))
+    except Exception:
+        return None
+
+
+def _named_play(btns, hint):
+    words = [w for w in re.findall(r"[a-z0-9']+", (hint or "").lower()) if len(w) > 2]
+    if not words:
+        return None
+    named = [b for b in btns if PLAY_RE.match(b.Name.strip())
+             and sum(w in b.Name.lower() for w in words) >= max(1, len(words) // 2)]
+    return max(named, key=_area) if named else None
+
+
+def _wait_buttons(app, timeout, hint="", before=None):
+    """Wait for the app's page to be ready: its window is up, it has moved on from the page it showed before
+    (before = snapshot() taken before opening the link), and either a Play button naming what we asked for is
+    there or the buttons have stopped changing. A fixed sleep used to press buttons on a half-loaded page."""
+    start = time.time()
+    end = start + timeout
+    last, steady = None, 0
+    wins, btns = [], []
     while True:
         wins = _windows(app)
         btns = [b for w in wins for b in _buttons(w)]
-        if btns or time.time() > end:
+        names = frozenset(b.Name.strip() for b in btns)
+        moved = before is None or len(names ^ before) >= 3
+        if btns and hint and _named_play(btns, hint) is not None:
+            return wins, btns                        # the thing we asked for is right there
+        if btns and moved:
+            if last is not None and abs(len(names) - last) <= max(1, int(last * 0.05)):
+                steady += 1
+            else:
+                steady = 0
+            if steady >= 2 and time.time() - start >= 1.0:
+                return wins, btns
+            last = len(names)
+        if time.time() > end:
             return wins, btns
         time.sleep(0.5)
 
@@ -132,11 +169,12 @@ def playing(app_words=("spotify", "applemusic", "itunes", "chrome", "msedge", "f
     return None                     # unknown (media info unavailable)
 
 
-def press_play(app, hint="", shuffle=None, timeout=8.0):
-    """Returns (done, message). shuffle: True/False to set it first, None to leave it."""
+def press_play(app, hint="", shuffle=None, timeout=12.0, before=None):
+    """Returns (done, message). shuffle: True/False to set it first, None to leave it.
+    before: snapshot() from just before the link was opened, so it waits for the new page."""
     if not available():
         return False, "button pressing isn't available on this PC"
-    wins, btns = _wait_buttons(app, timeout)
+    wins, btns = _wait_buttons(app, timeout, hint, before)
     if not wins:
         return False, f"the {app} window isn't open"
     if not btns:
@@ -179,8 +217,10 @@ def set_shuffle(app, on=True, timeout=6.0):
     if not available():
         return False, "button pressing isn't available on this PC"
     wins, btns = _wait_buttons(app, timeout)
-    if not btns:
+    if not wins:
         return False, f"the {app} window isn't open"
+    if not btns:
+        return False, f"couldn't see any buttons in {app} (it may still be loading)"
     return _set_shuffle_in(btns, on)
 
 

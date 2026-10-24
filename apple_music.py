@@ -97,12 +97,19 @@ def _desc(item):
     return f"{item['name']}" + (f" by {item['artist']}" if item.get("artist") else "")
 
 
-def _press(app, item, shuffle):
-    """Open page -> press its Play button (and Shuffle first if asked), like a screen reader would."""
+def _open_then_press(app, url, item, shuffle):
+    """Open the page -> wait for it -> press its Play button (and Shuffle first if asked), like a screen reader would.
+    For the app: if it's closed, open it and let it load first, then hand it the link."""
+    import app_ready
     import media_buttons
-    import time
-    time.sleep(3.0)                                         # let the page load
-    done, how = media_buttons.press_play(app, hint=item.get("name", ""), shuffle=shuffle)
+    import tools
+    if app == "apple music":
+        _, state, _ = app_ready.ensure("apple music", front=True)
+        if state in ("failed", "no window"):
+            return None
+    before = media_buttons.snapshot(app)
+    tools.open_url(url, front=True)
+    done, how = media_buttons.press_play(app, hint=item.get("name", ""), shuffle=shuffle, before=before)
     if done:
         return f" and {how}"
     return f", but {how}." + media_buttons.mouse_fallback(app)
@@ -123,13 +130,14 @@ def play(query, kind="auto", where="auto", shuffle=None):
         if not app_installed():
             return "The Apple Music app isn't installed (it's free in the Microsoft Store). Say 'on the web' to use the website."
         if _app_takes_links() and url:
-            tools.open_url("music://" + url.split("://", 1)[-1], front=True)
-            return f"Opened {_desc(item)} in the Apple Music app{_press('apple music', item, shuffle)} Don't retry or switch services."
+            how = _open_then_press("apple music", "music://" + url.split("://", 1)[-1], item, shuffle)
+            if how is None:
+                return "The Apple Music app wouldn't open on this PC. Say 'on the web' to use the website instead."
+            return f"Opened {_desc(item)} in the Apple Music app{how} Don't retry or switch services."
         tools.open_app("apple music", front=True)
         return (f"Opened the Apple Music app, but it doesn't accept links on this PC, so it can't jump to {_desc(item)}: "
                 "tell the user to search for it there, or offer the website.")
-    tools.open_url(url, front=True)
-    return (f"Opened {_desc(item)} on music.apple.com{_press('web apple music', item, shuffle)} (The website needs "
+    return (f"Opened {_desc(item)} on music.apple.com{_open_then_press('web apple music', url, item, shuffle)} (The website needs "
             "them signed in to Apple Music to play whole songs.) Don't retry or switch services.")
 
 

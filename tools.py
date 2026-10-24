@@ -531,9 +531,34 @@ def _launch(launch, front=False):
     return ""
 
 
-def open_app(name, front=False):
+def open_app(name, front=False, wait=True, new_window=False):
+    """Open an app, checking first whether it's already open. With wait (the default), only returns once the
+    app has finished loading, so whatever comes next (typing, pressing Play, a link) lands in a ready app
+    instead of a splash screen."""
     if not IS_WINDOWS:
         return "Opening apps only works on Windows."
+    import app_ready
+    if not new_window:
+        try:
+            wins = app_ready.windows_for(name)
+        except Exception:
+            wins = []
+        if wins:
+            show = front or not (config.KEEP_FOCUS and _is_user_app(_fg()))   # same rule as launching
+            if show:
+                _GUARD["id"] += 1
+                _activate(wins[0])
+            return (f"{name.strip().title() if name.islower() else name.strip()} is already open"
+                    + (" (brought it to the front)." if show else ".")
+                    + " It's ready; no need to open it again (new_window=true opens another window).")
+    if not wait:
+        return _open_app_now(name, front)
+    _, state, sentence = app_ready.ensure(name, front=front)
+    return _open_app_now(name, front) if state == "unknown" else sentence
+
+
+def _open_app_now(name, front=False):
+    """Launch it, no checks or waiting."""
     key = name.lower().strip().removesuffix(".exe")
     if key in APP_ALIASES:
         note = _launch(lambda show: _startfile(APP_ALIASES[key], show), front)
@@ -634,7 +659,27 @@ def open_url(url, front=False):
         _RECENT_OPENS.pop(k, None)
     if IS_WINDOWS:
         # default browser for web links; spotify:, ms-settings:, mailto:, steam: go to their apps
+        import app_ready
+        app = None
+        try:
+            app = app_ready.app_for_link(url)
+            app = app if app and app_ready.has_window(app) is False else None
+        except Exception:
+            app = None
+        if app and not url.lower().startswith(("http://", "https://")):
+            # the app is closed: open it and let it finish loading first. A cold-started Spotify often drops the
+            # link it was started with, and anything done right after would hit its loading screen.
+            app_ready.ensure(app, front=front)
+            note = _launch(lambda show: _startfile(url, show), front)
+            time.sleep(0.8)                                # let it switch to the page
+            return f"Opened {url} ({app} wasn't open, so I opened it first and waited for it to load).{note}"
+        before = app_ready.window_handles() if app else set()
         note = _launch(lambda show: _startfile(url, show), front)
+        if app:                                            # the browser was closed: wait until it has the page up
+            _, state = app_ready.wait_ready(app, before, timeout=20)
+            if state != "ready":
+                return f"Opened {url}, but {app} was still starting; check the screen before doing anything in it.{note}"
+            return f"Opened {url} ({app} wasn't open; it's loaded now).{note}"
     elif url.lower().startswith(("http://", "https://")):
         webbrowser.open(url)
         note = ""
@@ -754,6 +799,11 @@ def window_control(action, title=None):
         pyautogui.hotkey("alt", "tab")
         return "Switched window."
     w = _find_window(title)
+    if w is None and title and action == "focus":
+        w, note = _window_or_open(title)
+        if w is None:
+            return note or f"Couldn't find a window matching '{title}'."
+        return note + f"It's in front: {w.title}."
     if w is None:
         return f"Couldn't find a window matching '{title}'." if title else "Tell me which window."
     if action == "focus":
@@ -814,10 +864,11 @@ def keyboard_input(action, text=None, keys=None, times=1, window=None):
     import pyautogui
     _GUARD["id"] += 1                   # we're moving focus on purpose: stop any focus guard from pulling it back
     target = None
+    opened = ""
     if window:
-        target = _find_window(window)
+        target, opened = _window_or_open(window)
         if target is None:
-            return f"Couldn't find a window matching '{window}'. Open it first, or check window_control list."
+            return opened or f"Couldn't find a window matching '{window}'. Open it first, or check window_control list."
         _activate(target)
         if not _wait_front(target):
             return f"Couldn't bring {target.title} to the front, so I didn't type anything (it would have gone somewhere else)."
@@ -834,18 +885,48 @@ def keyboard_input(action, text=None, keys=None, times=1, window=None):
         else:
             _paste(text)
         if fg and _fg() != fg:
-            return f"Typed {len(text)} characters, but focus moved while typing, so some may have gone to another window."
-        return f"Typed {len(text)} characters."
+            return opened + f"Typed {len(text)} characters, but focus moved while typing, so some may have gone to another window."
+        return opened + f"Typed {len(text)} characters."
     if action == "hotkey":
         if not keys:
             return "No keys given."
         pyautogui.hotkey(*[k.lower() for k in keys])
-        return f"Pressed {'+'.join(keys)}."
+        return opened + f"Pressed {'+'.join(keys)}."
     if action == "press":
         key = (keys or [text or ""])[0].lower()
         pyautogui.press(key, presses=max(1, min(int(times), 50)))
-        return f"Pressed {key}" + (f" x{times}" if int(times) > 1 else "") + "."
+        return opened + f"Pressed {key}" + (f" x{times}" if int(times) > 1 else "") + "."
     return f"Unknown action {action}."
+
+
+def _window_or_open(window):
+    """The window to act in. If it isn't there: maybe it's still appearing (opened a moment ago), so wait a few
+    seconds; if the app isn't running at all, open it and wait until it has loaded. Returns (window or None, note)."""
+    target = _find_window(window)
+    if target is not None:
+        return target, ""
+    import app_ready
+    try:
+        if app_ready.running(window):                 # starting up or sitting in the tray: give it a moment
+            end = time.time() + 4
+            while time.time() < end:
+                wins = app_ready.windows_for(window)
+                if wins:
+                    app_ready.settle(wins[0], time.time() + 10)
+                    return wins[0], ""
+                time.sleep(0.3)
+        w, state, sentence = app_ready.ensure(window, front=True)
+    except Exception as e:
+        return None, f"Couldn't find a window matching '{window}' and couldn't open it ({type(e).__name__})."
+    if state == "unknown":
+        return None, ""
+    if state == "failed":
+        return None, f"Couldn't find a window matching '{window}', and {sentence[0].lower() + sentence[1:]}"
+    if w is None or state == "no window":
+        return None, sentence + " Nothing was typed."
+    if state == "loading":
+        return None, sentence + " Nothing was typed yet."
+    return w, f"{window} wasn't open, so I opened it and waited for it to load. "
 
 
 def clipboard(action, text=None):
@@ -2034,7 +2115,7 @@ def fullscreen_app():
 _URI_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:(?!\\)")
 
 
-def open_thing(target, kind="auto", front=False):
+def open_thing(target, kind="auto", front=False, new_window=False, wait=True):
     """kind: app, url, file, settings, or auto."""
     t = (target or "").strip()
     if not t:
@@ -2057,7 +2138,7 @@ def open_thing(target, kind="auto", front=False):
         return open_url(t, front=front)
     if k == "file":
         return open_path(t, front=front)
-    return open_app(t, front=front)
+    return open_app(t, front=front, wait=wait, new_window=bool(new_window))
 
 
 def self_control(action, minutes=None, window=None):
@@ -2332,9 +2413,13 @@ TOOL_SPECS = [
     _spec("open", "Open an app (spotify, chrome, discord, steam, vscode... searches the Start menu), a website or app link "
                   "(URLs; 'spotify:search:song name' with plain spaces, 'spotify:collection:tracks' for Liked Songs; 'steam://...'; Google search URLs; for a YouTube VIDEO use the youtube tool, which plays it), a file or folder "
                   "('downloads', 'desktop/report.pdf'), or a Windows Settings page ('settings bluetooth'; pages: "
-                  + ", ".join(SETTINGS_PAGES) + "). kind is usually auto-detected.",
+                  + ", ".join(SETTINGS_PAGES) + "). kind is usually auto-detected. It checks first whether the app is already "
+                  "open, and when it has to open it, it waits until the app has finished loading before returning, so you "
+                  "can act in it straight after (same for app links like spotify: when the app was closed).",
           {"target": S, "kind": {"type": "string", "enum": ["auto", "app", "url", "file", "settings"]},
-           "front": {"type": "boolean", "description": FRONT}}, ["target"]),
+           "front": {"type": "boolean", "description": FRONT},
+           "new_window": {"type": "boolean", "description": "Open another window even if the app is already open "
+                                                            "(only when the user asks for a new one)."}}, ["target"]),
     _spec("close_app", "Close a running app by process name (chrome, spotify, discord). Graceful by default; force=true kills it (approval prompt).",
           {"name": S, "force": B}, ["name"]),
     _spec("self_control", "Control yourself. hide/show: minimize or restore YOUR OWN window (when told to close, exit, go away "
@@ -2346,7 +2431,7 @@ TOOL_SPECS = [
           {"action": {"type": "string", "enum": ["list", "focus", "minimize", "maximize", "restore", "close", "snap_left",
                                                  "snap_right", "show_desktop", "minimize_all", "restore_all", "switch"]},
            "title": S}, ["action"]),
-    _spec("keyboard_input", "Type text or press keys in an app. ALWAYS set window to part of the target window's title (e.g. 'Discord', 'Notepad', 'Chrome') so it gets focused first. action: type (text), hotkey (keys like ['ctrl','s']), press (one key like 'enter', with times). Only press enter to send a message if the user asked you to send it.",
+    _spec("keyboard_input", "Type text or press keys in an app. ALWAYS set window to part of the target window's title (e.g. 'Discord', 'Notepad', 'Chrome') so it gets focused first. If that app isn't open, it opens it and waits for it to load before typing, so you don't need to open it first. action: type (text), hotkey (keys like ['ctrl','s']), press (one key like 'enter', with times). Only press enter to send a message if the user asked you to send it.",
           {"action": {"type": "string", "enum": ["type", "hotkey", "press"]}, "text": S,
            "keys": {"type": "array", "items": S}, "times": {"type": "integer"}, "window": S}, ["action"]),
     _spec("clipboard", "Read (get) or write (set) the clipboard.",

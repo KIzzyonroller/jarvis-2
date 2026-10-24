@@ -15,6 +15,7 @@ frown on automating user accounts, so it's deliberately one message at a time, o
 import re
 import time
 
+import app_ready
 import config
 
 EXES = ("discord.exe", "discordptb.exe", "discordcanary.exe")
@@ -33,6 +34,8 @@ def _discord_window():
     import psutil
     import tools
     for w in tools._windows():
+        if app_ready.SPLASH_RE.match((w.title or "").strip()):
+            continue                                        # the updater, not Discord itself
         try:
             if psutil.Process(tools._wpid(w._hWnd)).name().lower() in EXES:
                 return w
@@ -57,14 +60,14 @@ def send(target, text, confirm):
         return "Discord messages max out at 2000 characters; shorten it."
     w = _discord_window()
     if w is None:
-        tools.open_app("discord", front=True)
-        for _ in range(30):
-            time.sleep(0.5)
-            w = _discord_window()
-            if w is not None:
-                break
-        if w is None:
+        # closed (or only its updater is showing): open it and wait until it has really loaded, past the
+        # "Checking for updates" window, before touching anything
+        _, state, _ = app_ready.ensure("discord", front=True, timeout=45)
+        w = _discord_window()
+        if w is None or state in ("failed", "no window"):
             return "The Discord app isn't open and didn't start, so nothing was sent."
+        if state == "loading":
+            return "Discord was still loading after 45 seconds, so nothing was sent. Try again in a moment."
     game = tools.fullscreen_app()
     detail = (f"To: {target}\n\n{text}\n\nThis is sent from YOUR Discord account, as you."
               + (f"\nDiscord will come to the front over {game} for a second." if game else ""))
