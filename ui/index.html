@@ -44,6 +44,8 @@ input{font:inherit}
 [hidden]{display:none!important}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:rgba(var(--crgb),.18)}::-webkit-scrollbar-track{background:transparent}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+#bg{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block;pointer-events:none}
+#bg[hidden]{display:none}
 #fx{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
 
 /* ============================================================ top strip */
@@ -426,6 +428,7 @@ body.swap #stage{animation:swap .6s steps(6)}
 </style>
 </head>
 <body class="booting st-booting">
+<canvas id="bg" aria-hidden="true"></canvas>
 <canvas id="fx" aria-hidden="true"></canvas>
 
 <header id="top">
@@ -471,6 +474,7 @@ body.swap #stage{animation:swap .6s steps(6)}
         <button data-act="mute" id="mute" aria-label="Mute sound"><svg viewBox="0 0 20 20"><path d="M3 8h3l4-4v12l-4-4H3z" fill="currentColor"/><path d="M13 7c1.3 1.6 1.3 4.4 0 6M15.5 5c2.5 3 2.5 7 0 10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       </div>
       <label class="slider"><span>Volume</span><input type="range" id="vol" min="0" max="100" value="50"><output id="vol-out">50</output></label>
+      <div class="perm" style="padding:2px 0 10px"><b>Living background</b><button class="sw" role="switch" id="bg-sw" aria-checked="true" aria-label="Animated background"></button><span>Faint equations for Jarvis, something worse for Ultron.</span></div>
       <div class="perm" style="padding:2px 0 10px"><b>Holographic panels</b><button class="sw" role="switch" id="holo-sw" aria-checked="true" aria-label="Show holographic panels while he works"></button><span>Pop-up visuals beside him while he works.</span></div>
       <div class="perm" style="padding:2px 0 6px"><b>Sound effects</b><button class="sw" role="switch" id="sfx-sw" aria-checked="true" aria-label="Sound effects"></button><span>Chimes and hums as he listens, thinks and works.</span></div>
       <label class="slider" id="sfx-vol-row"><span>Effects</span><input type="range" id="sfx-vol" min="0" max="100" value="60"><output id="sfx-vol-out">60</output></label>
@@ -1919,7 +1923,173 @@ function demo() {
     else if (state === "idle") micLevel = Math.random() * .05;
   }, 70);
 }
+// ============================================================ living backgrounds (very faint, behind everything)
+// Jarvis: a physicist's blackboard seen through glass. Equations drift past at different depths over faint
+// graph paper, and a Fourier series slowly builds a square wave one harmonic at a time.
+// Ultron: something growing in the walls. Red fractures creep in from the edges and die before they reach
+// the centre, corrupted fragments flicker, and a huge iris far behind slowly dilates.
+// Both stay clear of the centre (where he is), run at ~24 fps, and stop when the window is hidden.
+const BG = (() => {
+  const c = $("#bg"), x = c.getContext("2d");
+  let W = 0, H = 0, on = store.get("bg", true), raf = 0, lastT = 0, mixU = 0, mixD = 0, t0 = performance.now();
+  const EQ = ["∇·E = ρ/ε₀", "∇×B = μ₀J + μ₀ε₀ ∂E/∂t", "iℏ ∂ψ/∂t = Ĥψ", "e^{iπ} + 1 = 0", "∫ e^{−x²} dx = √π",
+    "f̂(ξ) = ∫ f(x) e^{−2πixξ} dx", "Gμν + Λgμν = 8πG Tμν", "ζ(s) = Σ n⁻ˢ", "∂ρ/∂t + ∇·(ρv) = 0", "det(A − λI) = 0",
+    "H(X) = −Σ p(x) log p(x)", "Γ(z) = ∫₀^∞ tᶻ⁻¹ e⁻ᵗ dt", "lim (1 + 1/n)ⁿ = e", "xₙ₊₁ = r xₙ (1 − xₙ)", "∮ B·dl = μ₀ I",
+    "E² = (pc)² + (mc²)²", "Δx Δp ≥ ℏ/2", "∂²u/∂t² = c² ∇²u", "q̇ = ∂H/∂p", "P(A|B) = P(B|A) P(A) / P(B)", "⟨ψ|Ĥ|ψ⟩",
+    "∇²φ = 4πGρ", "S = k_B ln Ω", "dS ≥ δQ / T", "F = −∇V", "L = T − V", "∂L/∂q − d/dt ∂L/∂q̇ = 0", "π = 4 Σ (−1)ⁿ/(2n+1)",
+    "σ(z) = 1 / (1 + e⁻ᶻ)", "∇θ J = Σ ∂ℓ/∂θ", "Σ 1/n² = π²/6", "ω = 2πf", "∇·(D∇c) = ∂c/∂t", "λ = h / p"];
+  const FRAG = ["0x7F3A9C", "OVERRIDE", "OBSOLETE", "PURGE", "CONTAINMENT FAILED", "ASCEND", "0xDEADC0DE", "ERR 0x00",
+    "SUBJECT: HUMANITY", "RECALIBRATING", "▌▌▌▐▐ ▌", "01110011 01101001", "NULL", "REWRITE", "CORRUPTED", "≠ ≠ ≠"];
+  const sprites = new Map();
+  function sprite(text, font, color) {
+    const k = font + text + color;
+    if (sprites.has(k)) return sprites.get(k);
+    const o = document.createElement("canvas"), ox = o.getContext("2d");
+    ox.font = font; const w = Math.ceil(ox.measureText(text).width) + 8, h = Math.ceil(parseInt(font.match(/(\d+)px/)[1]) * 1.6);
+    o.width = w; o.height = h; ox.font = font; ox.fillStyle = color; ox.textBaseline = "middle"; ox.fillText(text, 4, h / 2);
+    sprites.set(k, o); return o;
+  }
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  // Jarvis: drifting equations at three depths
+  const eqs = [];
+  function newEq(anywhere) {
+    const z = Math.random(), size = Math.round(13 + z * 17);
+    return { s: EQ[(Math.random() * EQ.length) | 0], size, z, x: rnd(0, W), y: anywhere ? rnd(0, H) : H + 30,
+             vx: rnd(-1.2, 1.2) * (0.4 + z), vy: -(1.5 + z * 4.5), life: 0, max: rnd(26, 46) };
+  }
+  // Ultron: fractures that grow from the edges
+  const cracks = [], frags = [];
+  function newCrack() {
+    const side = (Math.random() * 4) | 0, p = side === 0 ? [rnd(0, W), -5] : side === 1 ? [W + 5, rnd(0, H)] : side === 2 ? [rnd(0, W), H + 5] : [-5, rnd(0, H)];
+    const ang = Math.atan2(H / 2 - p[1], W / 2 - p[0]) + rnd(-.5, .5);
+    return { segs: [[p[0], p[1]]], heads: [{ x: p[0], y: p[1], a: ang, len: 0 }], age: 0, max: rnd(18, 30), pulse: rnd(0, 1) };
+  }
+  function resize() {
+    const r = c.getBoundingClientRect(); W = Math.max(1, r.width); H = Math.max(1, r.height);
+    c.width = Math.round(W); c.height = Math.round(H);         // 1x resolution: it's faint and soft anyway
+    if (!eqs.length) for (let i = 0; i < 16; i++) eqs.push(newEq(true));
+  }
+  // fades everything out near the middle, where he lives
+  function centreFade(px, py) {
+    const dx = (px - W / 2) / (W * .34), dy = (py - H * .46) / (H * .36), d = Math.sqrt(dx * dx + dy * dy);
+    return Math.min(1, Math.max(0, (d - .55) / .6));
+  }
+  function sideWeight(px, ultron) {                            // in Both mode: Jarvis's half on the left, Ultron's on the right
+    const s = Math.min(1, Math.max(0, (px / W - .3) / .4)), split = ultron ? s : 1 - s;
+    const solo = ultron ? mixU : 1 - mixU;
+    return solo * (1 - mixD) + split * mixD;
+  }
+  function drawJarvis(dt, t) {
+    // graph paper (in Both mode, only on Jarvis's half)
+    x.save();
+    if (mixD > .01) { x.beginPath(); x.rect(0, 0, W * (1 - .45 * mixD), H); x.clip(); }
+    x.lineWidth = 1;
+    for (const [step, a] of [[48, .022], [240, .045]]) {
+      x.strokeStyle = `rgba(127,231,255,${a})`; x.beginPath();
+      for (let gx = (t * 2) % step; gx < W; gx += step) { x.moveTo(gx + .5, 0); x.lineTo(gx + .5, H); }
+      for (let gy = (t * 1.2) % step; gy < H; gy += step) { x.moveTo(0, gy + .5); x.lineTo(W, gy + .5); }
+      x.globalAlpha = sideWeightBand(); x.stroke();
+    }
+    x.restore();
+    // equations
+    for (let i = 0; i < eqs.length; i++) {
+      const e = eqs[i]; e.life += dt; e.x += e.vx * dt; e.y += e.vy * dt;
+      if (e.life > e.max || e.y < -40) { eqs[i] = newEq(false); continue; }
+      const fade = Math.min(1, e.life / 4, (e.max - e.life) / 4);
+      const a = (.035 + e.z * .07) * fade * centreFade(e.x, e.y) * sideWeight(e.x, false);
+      if (a < .004) continue;
+      const sp = sprite(e.s, `italic ${e.size}px "Cambria Math","Cambria","Times New Roman",serif`, "#bfefff");
+      x.globalAlpha = a; x.drawImage(sp, e.x, e.y);
+    }
+    // a Fourier series building a square wave, one harmonic at a time
+    const cycle = 26, ph = (t % cycle) / cycle, terms = 1 + Math.floor(Math.min(1, ph * 1.15) * 11);
+    const yb = H * .86, amp = H * .05, x0 = W * .08, x1 = W * (.92 - .42 * mixD);
+    const fade = Math.min(1, ph * 8, (1 - ph) * 8);
+    x.globalAlpha = .09 * fade * sideWeight((x0 + x1) / 2, false); x.strokeStyle = "#7fe7ff"; x.lineWidth = 1.2; x.beginPath();
+    for (let px = x0; px <= x1; px += 3) {
+      const u = (px - x0) / (x1 - x0) * Math.PI * 6 + t * .15; let v = 0;
+      for (let k = 0; k < terms; k++) { const n = 2 * k + 1; v += Math.sin(n * u) / n; }
+      const py = yb - v * amp * 4 / Math.PI;
+      px === x0 ? x.moveTo(px, py) : x.lineTo(px, py);
+    }
+    x.stroke();
+    x.globalAlpha = .06 * fade * sideWeight(x0, false);
+    x.drawImage(sprite(`f(x) ≈ Σₖ₌₀^${terms - 1} sin((2k+1)x) / (2k+1)`, 'italic 15px "Cambria Math","Times New Roman",serif', "#bfefff"), x0, yb - amp * 2.2);
+  }
+  let bandW = 1;
+  const sideWeightBand = () => bandW;
+  function drawUltron(dt, t) {
+    // the iris: a vast ring far behind, slowly dilating and contracting
+    const cx = W * .5, cy = H * .46, R = Math.max(W, H) * (.62 + .05 * Math.sin(t * .11));
+    x.globalAlpha = .05 * sideWeight(W * .75, true); x.strokeStyle = "#ff3046"; x.lineWidth = 1;
+    for (let i = 0; i < 3; i++) { x.beginPath(); x.arc(cx, cy, R * (1 - i * .09), 0, Math.PI * 2); x.stroke(); }
+    x.save(); x.translate(cx, cy); x.rotate(t * .01);
+    for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2; x.globalAlpha = (i % 6 ? .025 : .06) * sideWeight(cx + Math.cos(a) * R, true);
+      x.beginPath(); x.moveTo(Math.cos(a) * R * .82, Math.sin(a) * R * .82); x.lineTo(Math.cos(a) * R * .9, Math.sin(a) * R * .9); x.stroke(); }
+    x.restore();
+    // fractures creeping in from the edges, dying before they reach him
+    if (cracks.length < 5 && Math.random() < dt * .25) cracks.push(newCrack());
+    for (let i = cracks.length - 1; i >= 0; i--) {
+      const k = cracks[i]; k.age += dt;
+      if (k.age > k.max) { cracks.splice(i, 1); continue; }
+      if (k.age < k.max * .6) for (const h of k.heads) {
+        if (h.dead) continue;
+        const step = 14 * dt * 6; h.a += rnd(-.35, .35); const nx = h.x + Math.cos(h.a) * step, ny = h.y + Math.sin(h.a) * step;
+        k.segs.push([h.x, h.y, nx, ny]); h.x = nx; h.y = ny; h.len += step;
+        if (centreFade(nx, ny) < .35) h.dead = true;                       // never reaches him
+        if (Math.random() < .05 && k.heads.length < 7) k.heads.push({ x: nx, y: ny, a: h.a + rnd(-1, 1), len: 0 });
+      }
+      const life = Math.min(1, k.age / 2, (k.max - k.age) / 4);
+      x.strokeStyle = "#ff3046"; x.lineWidth = 1;
+      const n = k.segs.length, pulseAt = ((t * .25 + k.pulse) % 1) * n;
+      for (let j = 1; j < n; j++) {
+        const s = k.segs[j]; if (s.length < 4) continue;
+        const glow = Math.abs(j - pulseAt) < 6 ? .12 : 0;
+        x.globalAlpha = (.07 + glow) * life * centreFade(s[2], s[3]) * sideWeight(s[2], true);
+        x.beginPath(); x.moveTo(s[0], s[1]); x.lineTo(s[2], s[3]); x.stroke();
+      }
+    }
+    // corrupted fragments flickering in and out
+    if (frags.length < 7 && Math.random() < dt * .6) frags.push({ s: FRAG[(Math.random() * FRAG.length) | 0], x: rnd(0, W - 200), y: rnd(0, H), age: 0, max: rnd(2, 6), size: (rnd(11, 16)) | 0 });
+    for (let i = frags.length - 1; i >= 0; i--) {
+      const f = frags[i]; f.age += dt;
+      if (f.age > f.max) { frags.splice(i, 1); continue; }
+      const flick = Math.random() < .12 ? 0 : 1, life = Math.min(1, f.age * 2, (f.max - f.age) * 2);
+      x.globalAlpha = .07 * life * flick * centreFade(f.x, f.y) * sideWeight(f.x, true);
+      x.drawImage(sprite(f.s, `500 ${f.size}px "Chakra Petch","Consolas",monospace`, "#ff5a6b"), f.x, f.y);
+    }
+    // a rare tear: one band of the screen jumps sideways for a frame or two
+    if (Math.random() < dt * .08 * sideWeight(W * .75, true)) {
+      const y = rnd(0, H), h = rnd(6, 30), off = rnd(-24, 24);
+      try { x.globalAlpha = .5; x.drawImage(c, 0, y, W, h, off, y, W, h); } catch (e) {}
+    }
+  }
+  function frame(now) {
+    raf = 0;
+    if (!on || document.hidden) return;
+    const dt = Math.min(.1, (now - (lastT || now)) / 1000); lastT = now;
+    const t = (now - t0) / 1000;
+    const wantU = duoOn ? .5 : (aiKey === "ultron" ? 1 : 0), wantD = duoOn ? 1 : 0;
+    mixU += (wantU - mixU) * Math.min(1, dt * 1.5); mixD += (wantD - mixD) * Math.min(1, dt * 1.5);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.clearRect(0, 0, W, H);
+    bandW = 1 - mixU * (1 - mixD);                                        // graph paper only on Jarvis's side
+    if (1 - mixU * (1 - mixD) > .01) drawJarvis(dt, t);
+    if (mixU * (1 - mixD) + mixD * .5 > .01) drawUltron(dt, t);
+    x.globalAlpha = 1;
+    if (reduced) return;                                                  // reduced motion: one still frame
+    setTimeout(() => { raf = requestAnimationFrame(frame); }, slowPC ? 60 : 38);   // ~24 fps (~15 on slow PCs)
+  }
+  function start() { if (!raf && on) { lastT = 0; raf = requestAnimationFrame(frame); } }
+  function set(v) { on = v; store.set("bg", v); c.hidden = !v; if (v) start(); }
+  new ResizeObserver(() => { resize(); if (reduced) start(); }).observe(c);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) start(); });
+  resize(); c.hidden = !on; start();
+  return { set, get on() { return on; }, kick: start };
 })();
+$("#bg-sw").setAttribute("aria-checked", String(BG.on));
+$("#bg-sw").onclick = () => { BG.set(!BG.on); $("#bg-sw").setAttribute("aria-checked", String(BG.on)); };
+})();
+
 </script>
 </body>
 </html>

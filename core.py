@@ -257,6 +257,32 @@ def looks_complete(text):
     return len(content) >= 3 and w[0] in QUESTION_START and s.endswith("?")
 
 
+RECAP_RE = re.compile(
+    r"^\s*(done|all done|all set|there you go|there we go|okay,? done|sorted|finished|complete|it'?s done)\b"
+    r"|^\s*(i'?ve|i have|i)\s+(just\s+)?(opened|started|launched|set|turned|put|closed|paused|resumed|skipped|played|queued|"
+    r"switched|muted|unmuted|changed|made|created|sent|saved|minimized|maximized|locked|pulled up|brought up)\b"
+    r"|^\s*[\w' ]{1,40}\b(is|are|'s)\s+(now\s+)?(open|opened|playing|running|up|on|off|set|closed|paused|muted|done)\s*[.!]*\s*$", re.I)
+NEWS_RE = re.compile(r"\b(but|couldn'?t|can'?t|failed|error|didn'?t|unable|however|instead|wasn'?t|isn'?t|not)\b", re.I)
+
+
+def is_recap(sentence, said_before):
+    """After he's already said what he's doing ("Opening Spotify."), is this sentence just the same news again
+    ("Done." / "I've opened Spotify." / "Spotify's open.")? Failures, numbers and anything new are never dropped,
+    and if he said nothing before acting, the confirmation is kept (it's the only thing you'd hear)."""
+    s = (sentence or "").strip()
+    before = (said_before or "").strip()
+    if not s or not before or len(s.split()) > 16 or NEWS_RE.search(s):
+        return False
+    if set(re.findall(r"\d+", s)) - set(re.findall(r"\d+", before)):
+        return False                                        # a number he hadn't said yet is news
+    if RECAP_RE.search(s):
+        return True
+    stem = lambda w: re.sub(r"(ing|ed|es|s)$", "", w) if len(w) > 4 else w
+    words = lambda t: {stem(w) for w in re.findall(r"[a-z']{3,}", t.lower())} - {"the", "your", "you", "for", "now", "and", "just", "it's"}
+    a, b = words(s), words(before)
+    return bool(a) and len(a & b) / len(a) >= .6
+
+
 from settings import write_env  # noqa: E402  (kept here for older callers)
 
 
@@ -2337,15 +2363,39 @@ class Core:
         self.set_state("thinking")
         self.emit({"type": "turn_start", "id": tid, "who": who or self.persona["name"]})
 
+        turn.update(tools_used=False, pre="", post_buf="")
+
+        def speak(delta):
+            """Before any action: straight to the voice. After one: sentence by sentence, dropping the
+            "Done, I've opened Spotify" recap when he already said "Opening Spotify" as he did it."""
+            if not turn["tools_used"]:
+                stream.feed(delta)
+                return
+            turn["post_buf"] += delta
+            while True:
+                m = re.search(r"[.!?…][\"')\]]*\s+", turn["post_buf"])
+                if not m:
+                    return
+                sent, turn["post_buf"] = turn["post_buf"][:m.end()], turn["post_buf"][m.end():]
+                if not is_recap(sent, turn["pre"]):
+                    stream.feed(sent)
+                else:
+                    print(f"[voice] not repeating: {sent.strip()!r}")
+
         def on_text(delta):
             if turn["cancel"].is_set():
                 return
             turn["text"] += delta
             if delta.strip():
                 self.emit({"type": "reply_delta", "id": tid, "text": delta})
-            stream.feed(delta)
+            speak(delta)
 
         def on_event(kind, data):
+            if kind == "tool_start" and not turn["tools_used"]:
+                turn["tools_used"], turn["pre"] = True, turn["text"]
+                if turn["pre"].strip() and not turn["cancel"].is_set():
+                    stream.flush()
+                    stream.drain(timeout=2.5)       # "Opening Spotify." is heard as it happens, not after
             if not turn["cancel"].is_set():
                 self.emit({"type": "activity", "id": tid, "kind": kind, "data": data,
                            "t": round(time.time() - t0, 1)})
@@ -2363,6 +2413,9 @@ class Core:
                 if not turn["text"].strip():
                     self.emit({"type": "reply_delta", "id": tid, "text": reply})
                     stream.feed(reply)
+                rest, turn["post_buf"] = turn["post_buf"], ""
+                if rest.strip() and not is_recap(rest, turn["pre"]):
+                    stream.feed(rest)
                 stream.finish()
                 self.emit({"type": "turn_end", "id": tid, "text": turn["text"].strip() or reply,
                            "secs": round(time.time() - t0, 1), "interrupted": False})
