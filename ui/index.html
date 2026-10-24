@@ -250,6 +250,52 @@ body.booting #subs,body.booting #chips{display:none}
 #k-save{flex:2;background:var(--c);border-color:var(--c);color:#02121a;font-weight:600} #k-save:hover{filter:brightness(1.1)}
 #k-save:disabled{opacity:.5}
 
+
+/* ============================================================ settings + what's new (overlays) */
+.overlay{position:fixed;inset:0;z-index:8;display:grid;place-items:center;background:rgba(var(--vrgb),.72);
+  backdrop-filter:blur(6px);animation:askIn .18s ease-out}
+.overlay[hidden]{display:none}
+.sheet{width:min(720px,calc(100vw - 32px));max-height:min(86vh,900px);display:flex;flex-direction:column;
+  border:1px solid rgba(var(--crgb),.35);background:rgba(var(--vrgb),.97);box-shadow:0 0 90px rgba(var(--crgb),.08)}
+.sheet>header{display:flex;align-items:baseline;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid rgba(var(--crgb),.14)}
+.sheet>header h2{font:var(--dispw) 13px var(--display);letter-spacing:.22em;color:var(--c)}
+.sheet>header button{width:32px;height:32px;display:grid;place-items:center;color:var(--dim);font-size:20px;line-height:1}
+.sheet>header button:hover{color:var(--ink)}
+.sheet .body{overflow:auto;padding:6px 20px 16px;scrollbar-width:thin}
+.sheet>footer{display:flex;gap:10px;align-items:center;padding:12px 20px 16px;border-top:1px solid rgba(var(--crgb),.14)}
+.sheet>footer p{flex:1;font-size:13.5px;color:var(--you);min-height:1.3em}
+.sheet>footer button{height:40px;padding:0 18px;font-size:14.5px;border:1px solid rgba(var(--crgb),.3);color:var(--ink)}
+.sheet>footer .go{background:var(--c);border-color:var(--c);color:#02121a;font-weight:600}
+.sheet>footer .go:disabled{opacity:.4;cursor:default}
+.set-sec{padding:14px 0 6px;border-bottom:1px solid rgba(var(--crgb),.08)}
+.set-sec:last-child{border-bottom:0}
+.set-sec h3{font:500 15px var(--text);color:var(--ink);margin-bottom:8px}
+.set-sec h3 small{font-size:12.5px;color:var(--dim);font-weight:400;margin-left:8px}
+.fld{display:grid;grid-template-columns:minmax(150px,210px) 1fr;gap:4px 14px;align-items:center;margin-bottom:10px}
+.fld>label{font-size:13.5px;color:var(--ink)}
+.fld .help{grid-column:2;font-size:12.5px;line-height:1.4;color:var(--dim)}
+.fld .help.err{color:var(--alarm)}
+.fld .ctl{display:flex;gap:6px;align-items:center;min-width:0}
+.fld input[type=text],.fld input[type=password],.fld select{flex:1;min-width:0;height:36px;padding:0 10px;font:14px var(--text);color:var(--ink);
+  background:rgba(var(--crgb),.05);border:1px solid rgba(var(--crgb),.22);outline:none}
+.fld input[type=password],.fld input.mono{font-family:"Cascadia Mono",Consolas,monospace;font-size:13px}
+.fld input:focus-visible,.fld select:focus-visible{border-color:var(--c)}
+.fld select option{background:#06121b;color:var(--ink)}
+.fld .mini{height:36px;padding:0 10px;font-size:12.5px;color:var(--dim);border:1px solid rgba(var(--crgb),.18);white-space:nowrap}
+.fld .mini:hover{color:var(--ink);border-color:rgba(var(--crgb),.45)}
+.fld .state{font-size:12px;color:var(--c);white-space:nowrap}
+.fld.dirty>label::after{content:" ·";color:var(--you)}
+.fld .sw{grid-row:auto;grid-column:auto}
+.vtabs{display:flex;gap:4px;margin-bottom:12px}
+.vtabs button{height:32px;padding:0 14px;font-size:13.5px;border:1px solid rgba(var(--crgb),.18);color:var(--dim)}
+.vtabs button[aria-pressed=true]{color:var(--ink);border-color:var(--c);background:rgba(var(--crgb),.08)}
+.fld input[type=range]{flex:1}
+.fld output{width:40px;text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+#wn .body{font-size:15px;line-height:1.55}
+#wn .body ul{padding-left:20px} #wn .body li{margin:6px 0}
+#wn .ver{font:var(--dispw) 11px var(--display);letter-spacing:.18em;color:var(--dim);margin:12px 0 2px}
+@media (max-width:560px){.fld{grid-template-columns:1fr}.fld .help{grid-column:1}}
+
 /* ============================================================ command line */
 #cmd{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:4;width:min(640px,calc(100vw - 2 * var(--side) - 48px));
   height:52px;display:flex;align-items:center;gap:6px;transition:opacity .6s .7s,width .7s cubic-bezier(.2,.8,.2,1)}
@@ -437,7 +483,8 @@ body.swap #stage{animation:swap .6s steps(6)}
         <button data-act="desktop"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="16" height="11"/><path d="M7 17h6M10 14v3"/></svg>Show desktop</button>
         <button data-act="dark_mode"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 12.5A6.5 6.5 0 017.5 5a6.5 6.5 0 107.5 7.5z"/></svg>Dark mode</button>
         <button data-act="status"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 10h4l2-5 4 10 2-5h4"/></svg>Diagnostics</button>
-        <button id="keys-btn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="10" r="3.5"/><path d="M10 10h8M15 10v3M17.5 10v2"/></svg>API keys</button>
+        <button id="keys-btn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"/></svg>Settings</button>
+        <button id="wn-btn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2.5l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 7.8l5-.7z"/></svg>What's new</button>
         <button data-act="reset"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10a6 6 0 106-6H6M8 1L5 4l3 3"/></svg>New chat</button>
       </div>
     </section>
@@ -509,6 +556,20 @@ body.swap #stage{animation:swap .6s steps(6)}
 <div id="hints"><span>Ctrl+Space to talk</span><span>Esc stops him</span><span id="hk-mute"></span></div>
 <div id="alert" hidden><b>Heads up</b><span id="alert-text"></span></div>
 <div id="toasts"></div>
+<div class="overlay" id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="set-title">
+  <div class="sheet">
+    <header><h2 id="set-title">Settings</h2><button id="set-x" aria-label="Close settings">×</button></header>
+    <div class="body" id="set-body"></div>
+    <footer><p id="set-msg" role="status"></p><button id="set-cancel">Close</button><button class="go" id="set-save" disabled>Save and restart</button></footer>
+  </div>
+</div>
+<div class="overlay" id="wn" hidden role="dialog" aria-modal="true" aria-labelledby="wn-title">
+  <div class="sheet">
+    <header><h2 id="wn-title">What's new</h2><button id="wn-x" aria-label="Close">×</button></header>
+    <div class="body" id="wn-body"></div>
+    <footer><p></p><button class="go" id="wn-ok">Nice</button></footer>
+  </div>
+</div>
 <div id="holo" aria-hidden="true"><svg width="0" height="0" style="position:absolute"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="0">
   <stop offset="0" stop-color="currentColor" stop-opacity="0"/><stop offset="1" stop-color="currentColor" stop-opacity=".55"/></linearGradient></defs></svg></div>
 
@@ -1481,6 +1542,16 @@ window.J = {
         break;
       }
       case "setup": showKeys(e); break;
+      case "settings": S.fields = e.fields || []; S.voices = e.voices || null; if (!$("#settings").hidden) renderSettings(); break;
+      case "voices": S.voices = { personas: e.personas, voices: e.voices, engine: e.engine, speed: e.speed, pitch: e.pitch };
+        if (!$("#settings").hidden && $("#set-voice")) $("#set-voice").replaceWith(voiceSection());
+        if (e.msg && !$("#settings").hidden) $("#set-msg").textContent = e.msg; break;
+      case "settings_result":
+        if (e.ok) { $("#set-msg").textContent = e.restart ? "Saved. Restarting..." : "Nothing to save."; break; }
+        $("#set-save").disabled = false; $("#set-msg").textContent = "Fix the highlighted fields.";
+        Object.entries(e.errors || {}).forEach(([k, m]) => { const h = $(`#set-body .fld[data-key="${k}"] .help`); if (h) { h.textContent = m; h.classList.add("err"); } });
+        break;
+      case "whats_new": showWhatsNew(e); break;
       case "keys_result":
         $("#k-save").disabled = !!e.ok;
         $("#k-msg").textContent = e.ok ? "Saved. Restarting..." : e.error;
@@ -1515,6 +1586,10 @@ $("#input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.prev
 $("#mic").onclick = () => call("toggle_mute");
 $("#presence").onclick = () => call("ptt");
 document.addEventListener("keydown", (e) => {
+  if (!$("#settings").hidden || !$("#wn").hidden) {           // a pop-up is open: keys belong to it
+    if (e.key === "Escape") { if (!$("#wn").hidden) hideWhatsNew(); else closeSettings(); }
+    return;
+  }
   if (ask && !e.ctrlKey && !e.altKey && !e.metaKey && document.activeElement !== $("#input")) {
     const k = e.key.toLowerCase();
     if (k === "y" || k === "enter") { e.preventDefault(); answer(true); return; }
@@ -1538,7 +1613,8 @@ function showKeys(e) {
 }
 function hideKeys() { $("#keys").hidden = true; $("#k-ant").value = $("#k-groq").value = ""; if (!ask) document.body.classList.remove("asking"); }
 $("#k-later").onclick = hideKeys;
-$("#keys-btn").onclick = () => call("key_status");
+$("#keys-btn").onclick = () => openSettings();
+$("#wn-btn").onclick = () => call("whats_new");
 $("#k-save").onclick = () => {
   const a = $("#k-ant").value.trim(), g = $("#k-groq").value.trim();
   if (!a && !g) { $("#k-msg").textContent = "Paste a key first."; return; }
@@ -1546,6 +1622,127 @@ $("#k-save").onclick = () => {
   call("save_keys", a, g);
 };
 [$("#k-ant"), $("#k-groq")].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#k-save").click(); } if (e.key === "Escape") hideKeys(); }));
+
+// ============================================================ settings (keys never come back from Python)
+const S = { fields: [], voices: null, dirty: {}, clear: new Set(), vkey: null, closeArmed: false };
+function mk(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") n.className = v; else if (k === "text") n.textContent = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else if (v !== undefined && v !== null && v !== false) n.setAttribute(k, v === true ? "" : v);
+  }
+  kids.flat().forEach((c) => c != null && n.appendChild(typeof c === "string" ? document.createTextNode(c) : c));
+  return n;
+}
+function openSettings() {
+  S.dirty = {}; S.clear.clear(); S.closeArmed = false;
+  $("#set-body").textContent = ""; $("#set-msg").textContent = "Loading...";
+  $("#settings").hidden = false; call("settings_view");
+}
+function closeSettings(force) {
+  if (!force && (Object.keys(S.dirty).length || S.clear.size) && !S.closeArmed) {
+    S.closeArmed = true; $("#set-msg").textContent = "You have unsaved changes. Close again to throw them away."; return;
+  }
+  $("#settings").hidden = true; S.dirty = {}; S.clear.clear();
+  $("#set-body").querySelectorAll("input[type=password]").forEach((i) => i.value = "");
+}
+function setDirty(row, key, value) {
+  S.dirty[key] = value; S.closeArmed = false; row.classList.add("dirty");
+  const h = row.querySelector(".help"); if (h) { h.classList.remove("err"); h.textContent = h.dataset.help || ""; }
+  $("#set-save").disabled = false; $("#set-msg").textContent = "";
+}
+function fieldRow(f) {
+  const id = "f-" + f.key, row = mk("div", { class: "fld", "data-key": f.key });
+  row.appendChild(mk("label", { for: id, text: f.label }));
+  const ctl = mk("div", { class: "ctl" });
+  if (f.kind === "secret") {
+    const inp = mk("input", { id, type: "password", autocomplete: "new-password", spellcheck: "false",
+      placeholder: f.saved ? `Saved${f.hint && f.hint !== "saved" ? " (" + f.hint + ")" : ""}. Type to replace` : "Not set" });
+    inp.addEventListener("input", () => setDirty(row, f.key, inp.value));
+    const show = mk("button", { class: "mini", type: "button", text: "Show", "aria-label": "Show what you typed" });
+    show.onclick = () => { const on = inp.type === "password"; inp.type = on ? "text" : "password"; show.textContent = on ? "Hide" : "Show"; };
+    ctl.append(inp, show);
+    if (f.saved && f.key !== "ANTHROPIC_API_KEY") {
+      const rm = mk("button", { class: "mini", type: "button", text: "Remove" });
+      rm.onclick = () => { S.clear.add(f.key); inp.value = ""; inp.placeholder = "Will be removed when you save"; row.classList.add("dirty");
+        $("#set-save").disabled = false; };
+      ctl.append(rm);
+    }
+  } else if (f.kind === "choice") {
+    const sel = mk("select", { id }, (f.options || []).map((o) => mk("option", { value: o.value, text: o.label, selected: o.value === f.value })));
+    sel.onchange = () => setDirty(row, f.key, sel.value); ctl.append(sel);
+  } else if (f.kind === "bool") {
+    const sw = mk("button", { id, class: "sw", role: "switch", type: "button", "aria-checked": String(f.value === "true"), "aria-label": f.label });
+    sw.onclick = () => { const on = sw.getAttribute("aria-checked") !== "true"; sw.setAttribute("aria-checked", String(on)); setDirty(row, f.key, on ? "true" : "false"); };
+    ctl.append(sw);
+  } else {
+    const inp = mk("input", { id, type: "text", value: f.value || "", spellcheck: "false", class: /ID|HOST/.test(f.key) ? "mono" : "",
+      inputmode: f.kind === "number" ? "decimal" : null });
+    inp.addEventListener("input", () => setDirty(row, f.key, inp.value)); ctl.append(inp);
+  }
+  row.appendChild(ctl);
+  row.appendChild(mk("p", { class: "help", text: f.help || "", "data-help": f.help || "" }));
+  return row;
+}
+function voiceSection() {
+  const v = S.voices, wrap = mk("section", { class: "set-sec", id: "set-voice" });
+  wrap.appendChild(mk("h3", {}, "Voice", mk("small", { text: "changes apply instantly" })));
+  S.vkey = S.vkey || (v.personas[0] && v.personas[0].key);
+  const tabs = mk("div", { class: "vtabs" }, v.personas.map((p) => {
+    const b = mk("button", { type: "button", text: p.name, "aria-pressed": String(p.key === S.vkey) });
+    b.onclick = () => { S.vkey = p.key; $("#set-voice").replaceWith(voiceSection()); }; return b; }));
+  wrap.appendChild(tabs);
+  const cur = v.personas.find((p) => p.key === S.vkey) || v.personas[0];
+  const sel = mk("select", { id: "v-voice" }, v.voices.map((o) => mk("option", { value: o.id, text: o.label, selected: o.id === cur.voice })));
+  const push = (extra) => call("set_voice", cur.key, extra.voice || null, extra.speed ?? null, extra.pitch ?? null);
+  sel.onchange = () => push({ voice: sel.value });
+  const slider = (label, key, range, val) => {
+    const out = mk("output", { text: Number(val).toFixed(2) });
+    const r = mk("input", { type: "range", min: range[0], max: range[1], step: "0.01", value: val, "aria-label": label });
+    const paint = () => { r.style.setProperty("--p", ((r.value - range[0]) / (range[1] - range[0]) * 100) + "%"); out.textContent = Number(r.value).toFixed(2); };
+    r.addEventListener("input", paint); r.addEventListener("change", () => push({ [key]: Number(r.value) })); paint();
+    return mk("div", { class: "fld" }, mk("label", { text: label }), mk("div", { class: "ctl" }, r, out),
+      mk("p", { class: "help", text: key === "speed" ? "1 is his normal pace." : "Lower is deeper." }));
+  };
+  wrap.appendChild(mk("div", { class: "fld" }, mk("label", { for: "v-voice", text: "Voice" }), mk("div", { class: "ctl" }, sel,
+    mk("button", { class: "mini", type: "button", text: "Preview", onclick: () => call("preview_voice", cur.key) }),
+    mk("button", { class: "mini", type: "button", text: "Reset", onclick: () => call("reset_voice", cur.key) })),
+    mk("p", { class: "help", text: v.engine === "kokoro" ? "" : "Voice choice applies once his own voice has downloaded; speed and pitch work now." })));
+  wrap.appendChild(slider("Speed", "speed", v.speed, cur.speed));
+  wrap.appendChild(slider("Pitch", "pitch", v.pitch, cur.pitch));
+  return wrap;
+}
+function renderSettings() {
+  const body = $("#set-body"); body.textContent = "";
+  if (S.voices) body.appendChild(voiceSection());
+  const secs = {};
+  S.fields.forEach((f) => (secs[f.section] = secs[f.section] || []).push(f));
+  Object.entries(secs).forEach(([name, fs]) => body.appendChild(mk("section", { class: "set-sec" }, mk("h3", { text: name }), fs.map(fieldRow))));
+  $("#set-save").disabled = true; $("#set-msg").textContent = "";
+}
+$("#set-x").onclick = () => closeSettings(); $("#set-cancel").onclick = () => closeSettings();
+$("#set-save").onclick = () => {
+  $("#set-save").disabled = true; $("#set-msg").textContent = S.dirty.ANTHROPIC_API_KEY ? "Checking the Claude key..." : "Saving...";
+  call("save_settings", S.dirty, [...S.clear]);
+};
+// ============================================================ what's new
+function showWhatsNew(e) {
+  const body = $("#wn-body"); body.textContent = "";
+  $("#wn-title").textContent = e.version ? `What's new in ${e.version}` : "What's new";
+  let ul = null;
+  String(e.notes || "Nothing listed for this version.").split("\n").forEach((line) => {
+    const t = line.trim(); if (!t) { ul = null; return; }
+    if (/^#+\s/.test(t)) { ul = null; body.appendChild(mk("p", { class: "ver", text: t.replace(/^#+\s*/, "") })); return; }
+    const rich = (x) => x.split(/\*\*(.+?)\*\*/).map((part, i) => i % 2 ? mk("b", { text: part }) : part);   // **bold**, safely
+    if (/^[-*]\s/.test(t)) { if (!ul) { ul = mk("ul"); body.appendChild(ul); } ul.appendChild(mk("li", {}, rich(t.slice(2)))); return; }
+    if (/^#\s/.test(t) || /^Newest first|^Each release/.test(t)) return;
+    ul = null; body.appendChild(mk("p", {}, rich(t)));
+  });
+  $("#wn").hidden = false; setTimeout(() => $("#wn-ok").focus(), 50);
+}
+const hideWhatsNew = () => { $("#wn").hidden = true; };
+$("#wn-x").onclick = hideWhatsNew; $("#wn-ok").onclick = hideWhatsNew;
+
 document.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => call("action", b.dataset.act, null));
 function slider(id, outId, act) {
   const s = $(id); let tm; fill(s);
@@ -1597,6 +1794,17 @@ function demo() {
           confirm: (id, ok, always) => { const c = ask && ask.category; J.on({ type: "confirm_done", id, approved: ok, always }); if (ok && always && c) { permState[c] = true; emitPerms(); } }, stop() {}, minimize() {}, toggle_max() {}, close() {},
           set_autostart: (on) => J.on({ type: "autostart", available: true, on }),
           key_status: () => J.on({ type: "setup", has_anthropic: true, has_groq: false }),
+          settings_view: () => setTimeout(() => J.on({ type: "settings", voices: { personas: [{ key: "jarvis", name: "Jarvis", voice: "bm_lewis", speed: 1.05, pitch: 1 }, { key: "ultron", name: "Ultron", voice: "bm_lewis", speed: 1.12, pitch: 1 }],
+            voices: [{ id: "bm_lewis", label: "Lewis (British male)" }, { id: "bm_george", label: "George (British male)" }, { id: "am_michael", label: "Michael (American male)" }], engine: "kokoro", speed: [0.6, 1.6], pitch: [0.7, 1.3] },
+            fields: [{ section: "Claude", key: "ANTHROPIC_API_KEY", label: "Claude API key", kind: "secret", saved: true, hint: "ends in 9fQx", help: "From console.anthropic.com > API keys. Required: it's his brain." },
+              { section: "Claude", key: "JARVIS_DAILY_BUDGET", label: "Daily spending limit ($)", kind: "number", value: "5", help: "He stops using Claude for the day past this." },
+              { section: "Email", key: "EMAIL_ADDRESS", label: "Email address", kind: "text", value: "", help: "Gmail, Yahoo or iCloud. Read-only." },
+              { section: "Email", key: "EMAIL_APP_PASSWORD", label: "App password", kind: "secret", saved: false, help: "NOT your normal password." },
+              { section: "Email", key: "JARVIS_EMAIL_ANNOUNCE", label: "Say new emails out loud", kind: "bool", value: "false", help: "" },
+              { section: "Discord bot", key: "DISCORD_BOT_REPLY", label: "Who he answers on Discord", kind: "choice", value: "everyone", options: [{ value: "everyone", label: "Everyone (rate limited)" }, { value: "owner", label: "Only me" }] }] }), 200),
+          save_settings: (d) => setTimeout(() => J.on(d.EMAIL_ADDRESS && !d.EMAIL_ADDRESS.includes("@") ? { type: "settings_result", ok: false, errors: { EMAIL_ADDRESS: "That isn't an email address." } } : { type: "settings_result", ok: true, restart: true }), 500),
+          set_voice: () => {}, preview_voice: () => {}, reset_voice: () => {},
+          whats_new: () => J.on({ type: "whats_new", version: "1.0.2", notes: "- Email: read your inbox out loud.\n- Netflix: open it on the web or app.\n- Settings: keys and accounts inside the app." }),
           save_keys: (a) => setTimeout(() => J.on(a.startsWith("sk-ant-") ? { type: "keys_result", ok: true } : { type: "keys_result", ok: false, error: "That doesn't look like an Anthropic key. They start with sk-ant-." }), 700),
           set_discord_send: (on) => J.on({ type: "discord_bot", configured: true, status: "online", name: "Jarvis#4412", send: on }),
           set_permission: (k, on) => { if (k === "*") for (const x in permState) delete permState[x]; else permState[k] = on; emitPerms(); },

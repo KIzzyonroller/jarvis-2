@@ -122,8 +122,19 @@ def ultron_fx(x, sr, pitch=0.84):
 
 EFFECTS = {"ultron": ultron_fx}
 
+
+def pitch_shift(x, pitch):
+    """Deeper (< 1) or higher (> 1) by resampling. That also changes the pace, so the voice is generated at
+    a matching speed first (see synth) and comes out at its normal speed."""
+    if not pitch or abs(pitch - 1.0) < 0.01 or not len(x):
+        return x
+    n = int(len(x) / pitch)
+    return np.interp(np.linspace(0, len(x) - 1, n), np.arange(len(x)), x).astype(np.float32)
+
+
 DEFAULT_PERSONA = {"voice": config.KOKORO_VOICE, "lang": config.KOKORO_LANG, "speed": config.KOKORO_SPEED,
-                   "effect": None, "edge_voice": config.TTS_VOICE, "eleven_voice": config.ELEVENLABS_VOICE_ID}
+                   "effect": None, "edge_voice": config.TTS_VOICE, "eleven_voice": config.ELEVENLABS_VOICE_ID,
+                   "pitch": 1.0}
 
 
 # =================================================================== engines
@@ -160,6 +171,11 @@ def _kokoro_model_name():
     return full
 
 
+def _lang_for(voice, lang):
+    """American voices (a*_) read with American pronunciation, British (b*_) with British."""
+    return {"a": "en-us", "b": "en-gb"}.get((voice or "x")[0], lang)
+
+
 class KokoroEngine:
     name = "kokoro"
 
@@ -180,11 +196,14 @@ class KokoroEngine:
                 self._warned.add(voice)
                 print(f"[tts] voice {voice} not found. Options: {', '.join(sorted(self.available))}")
             voice = "bm_george"
-        samples, sr = self.k.create(text, voice=voice, speed=p["speed"], lang=p["lang"])
+        pitch = float(p.get("pitch") or 1.0)
+        speed = min(max(float(p["speed"]) / pitch, 0.5), 2.0)
+        samples, sr = self.k.create(text, voice=voice, speed=speed, lang=_lang_for(voice, p["lang"]))
         pcm = np.asarray(samples, dtype=np.float32)
         peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
         if peak > 0.95:                      # some voices overshoot full scale and would crackle
             pcm *= 0.95 / peak
+        pcm = pitch_shift(pcm, pitch)
         fx = EFFECTS.get(p.get("effect") or "")
         return Audio(pcm=fx(pcm, sr) if fx else pcm, sr=sr)
 
@@ -235,9 +254,10 @@ class EdgeEngine:
         if temp:
             fd, path = tempfile.mkstemp(suffix=".mp3")
             os.close(fd)
-        pitch = "-12Hz" if p.get("effect") == "ultron" else "+0Hz"
+        hz = (-12 if p.get("effect") == "ultron" else 0) + round((float(p.get("pitch") or 1.0) - 1.0) * 120)
+        rate = round((float(p.get("speed") or 1.05) - 1.0) * 100) + 3      # his normal 1.05 ~ Edge's +8%
         asyncio.run(edge_tts.Communicate(text, p.get("edge_voice") or config.TTS_VOICE,
-                                         rate=config.TTS_RATE, pitch=pitch).save(str(path)))
+                                         rate=f"{rate:+d}%", pitch=f"{hz:+d}Hz").save(str(path)))
         return Audio(path=str(path), temp=temp)
 
 
@@ -377,7 +397,7 @@ class Speaker:
     def _phrase_key(self, text, p):
         import hashlib
         eng = self.engines[0].name if self.engines else "none"
-        raw = "|".join(str(x) for x in (eng, p.get("voice"), p.get("speed"), p.get("lang"), p.get("effect"),
+        raw = "|".join(str(x) for x in (eng, p.get("voice"), p.get("speed"), p.get("lang"), p.get("effect"), p.get("pitch"),
                                         p.get("edge_voice"), p.get("eleven_voice"), text.strip()))
         return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20]
 

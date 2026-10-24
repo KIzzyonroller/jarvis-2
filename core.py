@@ -44,6 +44,8 @@ import notifications
 import usage
 import permissions
 import tools
+import settings
+import voice_settings
 from voice import Speaker
 
 # Only "quit" really shuts him down. Everything that sounds like "close" just hides the window.
@@ -251,24 +253,7 @@ def looks_complete(text):
     return len(content) >= 3 and w[0] in QUESTION_START and s.endswith("?")
 
 
-def write_env(values, path=None):
-    """Set KEY=value lines in the .env file, keeping everything else in it as it was."""
-    path = path or config.ENV_FILE
-    path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        lines = ["# Jarvis keys and settings. Keep this file private."]
-    done = set()
-    for i, line in enumerate(lines):
-        k = line.split("=", 1)[0].strip().lstrip("#").strip()
-        if "=" in line and k in values and k not in done:
-            lines[i] = f"{k}={values[k]}"
-            done.add(k)
-    lines += [f"{k}={v}" for k, v in values.items() if k not in done]
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    tmp.replace(path)
+from settings import write_env  # noqa: E402  (kept here for older callers)
 
 
 class Core:
@@ -295,6 +280,10 @@ class Core:
             self.persona_key = "jarvis"
             self._save_state()
         self.listener = None
+        try:
+            voice_settings.apply_saved()             # voices you picked in Settings (or by asking)
+        except Exception as e:
+            print(f"[voice] couldn't load saved voice choices: {e}")
         self.speaker = Speaker(
             on_state=self._speaker_state,
             on_level=lambda v: self.emit({"type": "voice", "v": round(v, 3)}),
@@ -303,6 +292,7 @@ class Core:
         self.speaker.on_envelope = lambda env, step, delay: self.emit({"type": "voice_env", "env": env, "step": step,
                                                                          "delay": round(delay, 3)})
         self.speaker.set_persona(personas.PERSONAS[self.persona_key])
+        tools.set_voice_core(self)
         # Don't start answering while you're still talking (you might be adding to the question)
         self.speaker.wait_user = lambda: ((self._user_talking or time.time() < self._utt_pending_until)
                                           and self.state != "awaiting")
@@ -459,6 +449,19 @@ class Core:
             self.brain_error = str(e)
             self._log(f"NEURAL LINK FAILED: {e}")
 
+        # First run: nothing else starts until setup is done. No microphone, no talking, no background
+        # services, so he can't half-work (and repeat "I need a key" at everything he hears) before he's ready.
+        if not self._has_key():
+            voice_loader.join()
+            threading.Thread(target=self._loop, daemon=True, name="core").start()     # typing still answers
+            self._log("SETUP NEEDED  [ADD YOUR CLAUDE API KEY]")
+            self.emit({"type": "ready", "model": config.MODEL, "voice": False, "setup": True})
+            self.set_state("idle")
+            self.emit_key_status(reason="")
+            return
+        voice_loader.join()
+        self._first_voice_download()
+
         threading.Thread(target=self._loop, daemon=True, name="core").start()
         threading.Thread(target=self._telemetry, daemon=True, name="telemetry").start()
         tools.REMINDERS.start(on_due=lambda msg, late: self.events.put(("reminder", (msg, late))))
@@ -491,7 +494,6 @@ class Core:
         else:
             self._log("VOICE INPUT DISABLED")
 
-        voice_loader.join()
         self._log(f"VOICE SYNTHESIS ONLINE  [{self.speaker.engine_name.upper()}]")
         self._wake_for(self.persona_key)
         self.emit({"type": "ready", "model": config.MODEL, "voice": self.listener is not None})
@@ -504,7 +506,6 @@ class Core:
         self._start_discord_bot()
         self._start_email()
         self._start_netflix()
-        threading.Thread(target=self._ensure_voice_model, daemon=True, name="voice-download").start()
         threading.Thread(target=self._start_connectors, daemon=True, name="connectors-start").start()
         self._start_jobs()
         for old in (config.BASE_DIR / "creator.id", config.JARVIS_DIR / "voiceprint.json"):
@@ -603,9 +604,11 @@ class Core:
         p = personas.PERSONAS[key]
         config.CACHE_DIR.mkdir(parents=True, exist_ok=True)
         items = []
+        sig = "{voice}-{speed}-{pitch}".format(voice=p.get("voice"), speed=p.get("speed"), pitch=p.get("pitch", 1.0))
+        sig = re.sub(r"[^a-z0-9.-]+", "", sig.lower())      # a changed voice gets fresh "Yes?" recordings
         for phrase in p["wake_replies"]:
             safe = re.sub(r"[^a-z0-9]+", "_", phrase.lower()).strip("_") or "wake"
-            items.append((phrase, self.speaker.cache(phrase, path=config.CACHE_DIR / f"wake_{key}_{safe}.mp3")))
+            items.append((phrase, self.speaker.cache(phrase, path=config.CACHE_DIR / f"wake_{key}_{sig}_{safe}.mp3")))
         self._wake_audio[key] = items
         return items
 
@@ -1374,6 +1377,7 @@ class Core:
             self.events.put(("say", f"Update complete. I'm on version {updater.current_version()} now."))
             if not config.FROZEN:
                 return
+        self._whats_new_after_update()
         if config.FROZEN:
             threading.Thread(target=self._app_update_loop, daemon=True, name="app-update").start()
             return
@@ -1385,6 +1389,27 @@ class Core:
             self._state_flag("update_announced", found[1])
             self.events.put(("say", f"There's a newer version of me in your Downloads, {found[1]}. "
                                     "Say update yourself when you're ready."))
+
+    def _whats_new_after_update(self):
+        """Once per new version: pop up everything added since the version you had before."""
+        import changelog
+        latest = changelog.latest_version()
+        if not latest:
+            return
+        seen = self._state_flag("changelog_seen")
+        existing = seen is not None or self._state_flag("last_seen") is not None or self._state_flag("briefed") is not None
+        self._state_flag("changelog_seen", latest)
+        if not existing or seen == latest:
+            return                                    # brand-new install, or nothing new
+        picked = changelog.since(seen) if seen else changelog.sections()[:1]
+        if picked:
+            self.emit({"type": "whats_new", "version": "", "notes": changelog.as_markdown(picked)})
+
+    def whats_new(self):
+        import changelog
+        picked = changelog.sections()[:3]
+        self.emit({"type": "whats_new", "version": "",
+                   "notes": changelog.as_markdown(picked) if picked else "No release notes in this version."})
 
     def _app_update_loop(self):
         import app_update
@@ -1666,27 +1691,36 @@ class Core:
         except Exception as e:
             print(f"[discord] not available: {e}")
 
-    def _ensure_voice_model(self):
-        """The installer doesn't include the 350 MB voice: fetch it on first start. He talks with the
-        Microsoft online voice meanwhile and switches over the moment it's done."""
+    def _has_key(self):
+        k = config.ANTHROPIC_API_KEY or ""
+        return bool(k) and "paste-yours" not in k
+
+    def _first_voice_download(self):
+        """The installer doesn't include the 350 MB voice: fetch it during first-time setup, BEFORE he starts
+        listening or talking, so the first thing anyone hears is his real voice. Progress shows on screen.
+        If it can't download (offline), he starts anyway with a stand-in voice and tries again next start."""
         if config.TTS_ENGINE != "kokoro" or not self.speaker or not self.speaker.enabled:
             return
         import download_models
         if download_models.have_voice():
             return
-        self.emit({"type": "toast", "text": "Downloading his voice (about 350 MB, one time). He uses a stand-in voice until it's done."})
-        last = {"pct": -10}
+        self._log("FIRST-TIME SETUP  [DOWNLOADING VOICE, ABOUT 350 MB]")
+        last = {"pct": -10, "file": None}
 
         def progress(name, done, total):
             pct = int(done * 100 / total) if total else 0
+            if name != last["file"]:
+                last.update(file=name, pct=-10)
             if pct >= last["pct"] + 10:
                 last["pct"] = pct
+                part = "voice model" if name.endswith(".onnx") else "voices"
+                self._log(f"DOWNLOADING {part.upper()}  {pct}%")
                 self.emit({"type": "download", "what": "voice", "pct": pct})
         if download_models.ensure_voice(progress=progress, log=print) and self.speaker.add_kokoro():
             self.emit({"type": "download", "what": "voice", "pct": 100})
-            self.emit({"type": "toast", "text": "Voice downloaded. That's the real one now."})
+            self._log("VOICE DOWNLOADED")
         else:
-            self.emit({"type": "toast", "text": "Couldn't download his voice. He'll try again next time he starts."})
+            self._log("VOICE DOWNLOAD FAILED  [STAND-IN VOICE FOR NOW, RETRIES NEXT START]")
 
     # ================================================================ API keys (first run, or changing them)
     def emit_key_status(self, reason=""):
@@ -1695,39 +1729,80 @@ class Core:
                    "has_groq": bool(config.GROQ_API_KEY)})
 
     def save_keys(self, anthropic="", groq=""):
-        """From the setup card. Checks the Claude key with Anthropic before saving it to the .env file
-        (keys never go anywhere else: not the log, not the history, not back to the screen)."""
-        anthropic, groq = anthropic.strip(), groq.strip()
-        fail = lambda msg: self.emit({"type": "keys_result", "ok": False, "error": msg})
-        if anthropic and (not anthropic.startswith("sk-ant-") or len(anthropic) < 40 or " " in anthropic):
-            return fail("That doesn't look like an Anthropic API key. They start with sk-ant- and are long.")
-        if groq and (not groq.startswith("gsk_") or " " in groq):
-            return fail("That doesn't look like a Groq key. They start with gsk_.")
-        if not anthropic and not groq:
-            return fail("Paste a key first.")
-        note = ""
-        if anthropic:
-            try:
-                import anthropic as anthropic_sdk
-                anthropic_sdk.Anthropic(api_key=anthropic, timeout=15, max_retries=0).models.list(limit=1)
-            except Exception as e:
-                name = type(e).__name__
-                if name in ("AuthenticationError", "PermissionDeniedError"):
-                    return fail("Anthropic says that key isn't valid. Copy it again from console.anthropic.com.")
-                note = f" (I couldn't reach Anthropic to check it: {name}.)"
-        values = {}
-        if anthropic:
-            values["ANTHROPIC_API_KEY"] = anthropic
-        if groq:
-            values["GROQ_API_KEY"] = groq
-        try:
-            write_env(values)
-        except OSError as e:
-            return fail(f"Couldn't save the keys: {e}")
-        self.emit({"type": "keys_result", "ok": True, "note": note})
+        """The first-run card: just the Claude key (and Groq, optionally)."""
+        changes = {"ANTHROPIC_API_KEY": anthropic, "GROQ_API_KEY": groq}
+        if not (anthropic or "").strip() and not (groq or "").strip():
+            return self.emit({"type": "keys_result", "ok": False, "error": "Paste a key first."})
+        ok, errors = settings.save(changes)
+        if not ok:
+            return self.emit({"type": "keys_result", "ok": False, "error": next(iter(errors.values()))})
+        self.emit({"type": "keys_result", "ok": True})
         print("[setup] keys saved; restarting")
         time.sleep(1.5)
         self._restart()
+
+    # ================================================================ his voice, changed live
+    def _voice_view(self):
+        kok = next((e for e in self.speaker.engines if e.name == "kokoro"), None) if self.speaker else None
+        avail = voice_settings.english_voices(getattr(kok, "available", None)) or sorted(
+            {"bm_george", "bm_lewis", "bm_daniel", "bm_fable", "am_michael", "am_adam", "am_onyx", "am_puck",
+             "bf_emma", "af_heart", "af_bella", "af_nicole"})
+        return {"personas": [{"key": k, "name": personas.PERSONAS[k]["name"], **voice_settings.current(k)}
+                             for k in personas.ORDER],
+                "voices": [{"id": v, "label": voice_settings.describe(v)} for v in avail],
+                "engine": self.speaker.engine_name if self.speaker else "none",
+                "speed": list(voice_settings.SPEED), "pitch": list(voice_settings.PITCH)}
+
+    def set_voice(self, key, voice=None, speed=None, pitch=None, preview=True):
+        """Settings panel / the voice tool. Takes effect immediately, no restart."""
+        kok = next((e for e in self.speaker.engines if e.name == "kokoro"), None)
+        ok, msg = voice_settings.set_voice(key, voice, speed, pitch, getattr(kok, "available", None))
+        if ok:
+            self._wake_audio.pop(key, None)
+            if key == self.persona_key:
+                self.speaker.set_persona(self.persona)
+            if preview:
+                self.preview_voice(key)
+        self.emit({"type": "voices", **self._voice_view(), "msg": msg})
+        return msg
+
+    def reset_voice(self, key):
+        msg = voice_settings.reset(key)
+        self._wake_audio.pop(key, None)
+        if key == self.persona_key:
+            self.speaker.set_persona(self.persona)
+        self.emit({"type": "voices", **self._voice_view(), "msg": msg})
+        self.preview_voice(key)
+        return msg
+
+    def preview_voice(self, key):
+        """Say a line in that persona's (new) voice, without switching who you're talking to."""
+        if self._turn is not None or not self.speaker:
+            return
+        p = personas.PERSONAS[key]
+        line = p.get("voice_preview") or ("How's this, then?" if key == "jarvis" else "Is this voice adequate, human?")
+        before = dict(self.speaker.persona), self.speaker.who
+        self.speaker.set_persona(p)
+        try:
+            self.speaker.say(line)
+        finally:
+            self.speaker.persona, self.speaker.who = before
+
+    def emit_settings(self):
+        self.emit({"type": "settings", "fields": settings.view(), "voices": self._voice_view()})
+
+    def save_settings(self, changes=None, clear=None):
+        """From the Settings panel. Secrets arrive here once and are never sent back to the screen."""
+        ok, errors = settings.save(changes or {}, clear or [])
+        if not ok:
+            self.emit({"type": "settings_result", "ok": False, "errors": errors})
+            return
+        changed = [k for k, v in (changes or {}).items() if str(v or "").strip()] + list(clear or [])
+        self.emit({"type": "settings_result", "ok": True, "restart": bool(changed)})
+        if changed:
+            print(f"[settings] saved {', '.join(sorted(changed))}; restarting")
+            time.sleep(1.5)
+            self._restart()
 
     # ================================================================ Netflix log
     def _start_netflix(self):

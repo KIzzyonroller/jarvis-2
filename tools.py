@@ -2201,6 +2201,44 @@ def set_mailbox(m):
     _MAILBOX = m
 
 
+_VOICE_CORE = None
+
+
+def set_voice_core(c):
+    global _VOICE_CORE
+    _VOICE_CORE = c
+
+
+def voice_settings_tool(action="list", who=None, voice=None, speed=None, pitch=None):
+    import voice_settings
+    import personas
+    if _VOICE_CORE is None:
+        return "Voice settings aren't available."
+    key = (who or getattr(_CTX, "persona", None) or _VOICE_CORE.persona_key).lower()
+    key = "ultron" if "ultron" in key else "jarvis" if "jarvis" in key else key
+    if key not in personas.PERSONAS:
+        return f"No one called {who}."
+    if action == "reset":
+        return _VOICE_CORE.reset_voice(key)
+    if action == "set":
+        if voice is None and speed is None and pitch is None:
+            return "Nothing to change: give a voice, speed or pitch."
+        msg = _VOICE_CORE.set_voice(key, voice, speed, pitch, preview=False)
+        return msg + " It takes effect from the next thing said (this reply may still be in the old voice)."
+    v = _VOICE_CORE._voice_view()
+    cur = next(p for p in v["personas"] if p["key"] == key)
+    return (f"{cur['name']} now: {voice_settings.describe(cur['voice'])}, speed {cur['speed']}, pitch {cur['pitch']}. "
+            f"Speed {v['speed'][0]} to {v['speed'][1]} (1 = normal), pitch {v['pitch'][0]} to {v['pitch'][1]} (lower = deeper). "
+            "Voices: " + ", ".join(f"{x['id']} = {x['label']}" for x in v["voices"]))
+
+
+def apple_music_tool(action="play", query="", kind="auto", where="auto"):
+    import apple_music
+    if action == "now":
+        return apple_music.now_playing()
+    return apple_music.play(query, kind, where)
+
+
 def netflix_tool(action="open", query="", where="auto", days=7):
     import netflix
     if action == "recent":
@@ -2387,6 +2425,21 @@ TOOL_SPECS = [
                      "where possible; don't add your persona's flourishes unless they asked you to speak as yourself.",
           {"action": {"type": "string", "enum": ["recent", "unread", "servers", "read_channel", "send"]}, "who": S,
            "hours": {"type": "number"}, "channel": S, "text": S, "limit": {"type": "number"}}, ["action"]),
+    _spec("voice_settings", "Change how you (or the other AI) sound, live, no restart. list: current voice and the "
+                            "options. set: who (jarvis or ultron; default you), voice (an id from list), speed (0.6 to "
+                            "1.6, 1 = normal pace), pitch (0.7 to 1.3, lower = deeper). For relative requests, start from "
+                            "list's current values: 'a bit faster' = +0.1 speed, 'deeper' = -0.06 pitch, 'American' = "
+                            "an a*_ voice, 'British' = a b*_ voice. reset: back to the original voice.",
+          {"action": {"type": "string", "enum": ["list", "set", "reset"]}, "who": S, "voice": S,
+           "speed": {"type": "number"}, "pitch": {"type": "number"}}, ["action"]),
+    _spec("apple_music", "Apple Music (only when the user says Apple Music). play: finds the exact song, album or artist "
+                         "(query; kind auto/song/album/artist/playlist) and opens it in the Apple Music app or on the "
+                         "web (where: what the user said, else auto). Nothing can press play on a specific song from "
+                         "outside Apple Music, so the user presses play; say so briefly. now: what's playing. For "
+                         "pause/next/volume use media_control.",
+          {"action": {"type": "string", "enum": ["play", "now"]}, "query": S,
+           "kind": {"type": "string", "enum": ["auto", "song", "album", "artist", "playlist"]},
+           "where": {"type": "string", "enum": ["auto", "web", "app"]}}, ["action"]),
     _spec("netflix", "Netflix. open: query = a show or film to search for (optional), where = web (browser) or app "
                      "(the Windows app) or auto; use what the user says ('on the web', 'in the app'). Netflix can't be "
                      "told to start a specific title from outside: on the web it shows the search results, in the app "
@@ -2420,7 +2473,7 @@ FUNCS = {
     "keyboard_input": keyboard_input, "clipboard": clipboard, "screen": screen, "mouse": mouse,
     "look_at_camera": look_at_camera, "display": display, "media_control": media_control, "set_volume": set_volume,
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
-    "memory": memory, "reminders": reminders, "blender": blender, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "history": history_tool, "background": background_tool,
+    "memory": memory, "reminders": reminders, "blender": blender, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "history": history_tool, "background": background_tool,
 }
 
 assert set(FUNCS) == {s["name"] for s in TOOL_SPECS}, "TOOL_SPECS and FUNCS are out of sync"

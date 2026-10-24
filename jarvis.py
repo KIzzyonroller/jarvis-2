@@ -164,6 +164,27 @@ class Bridge:
     def key_status(self):
         self._core.emit_key_status()
 
+    def set_voice(self, key, voice=None, speed=None, pitch=None):
+        threading.Thread(target=self._core.set_voice, args=(str(key), voice or None,
+                         float(speed) if speed not in (None, "") else None,
+                         float(pitch) if pitch not in (None, "") else None), daemon=True).start()
+
+    def reset_voice(self, key):
+        threading.Thread(target=self._core.reset_voice, args=(str(key),), daemon=True).start()
+
+    def preview_voice(self, key):
+        threading.Thread(target=self._core.preview_voice, args=(str(key),), daemon=True).start()
+
+    def whats_new(self):
+        threading.Thread(target=self._core.whats_new, daemon=True).start()
+
+    def settings_view(self):
+        threading.Thread(target=self._core.emit_settings, daemon=True).start()
+
+    def save_settings(self, changes=None, clear=None):
+        changes = {str(k): str(v) for k, v in (changes or {}).items()}
+        threading.Thread(target=self._core.save_settings, args=(changes, [str(c) for c in (clear or [])]), daemon=True).start()
+
     def save_keys(self, anthropic="", groq=""):
         threading.Thread(target=self._core.save_keys, args=(str(anthropic or ""), str(groq or "")), daemon=True).start()
 

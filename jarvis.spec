@@ -5,7 +5,7 @@ import sys
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
-datas = [("ui", "ui"), ("jarvis_blender_bridge.py", "."), ("VERSION", ".")]
+datas = [("ui", "ui"), ("jarvis_blender_bridge.py", "."), ("VERSION", "."), ("CHANGELOG.md", ".")]
 if os.path.exists("update_source.txt"):
     datas.append(("update_source.txt", "."))
 binaries = []

@@ -100,6 +100,26 @@ New Discord messages are read out as they arrive ("Message from Alex: you on ton
 - **Needs:** Discord's desktop notifications on (Discord > Settings > Notifications), and Windows notifications allowed for Discord.
 - Read-outs happen on your PC without Claude, so they cost nothing. A message only goes to Claude if you ask him about it.
 
+## Settings (keys and accounts, inside the app)
+
+Click **Settings** in the System panel. Everything he needs a login for is there: your Claude and Groq keys, email, the Discord bot, Spotify, Netflix and Apple Music, what he calls you and your city. No `.env` editing needed (the installed app doesn't even have one you'd find).
+
+- Keys and passwords are typed into hidden boxes ("Show" reveals only what you just typed). Once saved, they never come back to the screen: the panel just says "Saved (ends in 9fQx)". Leave a box empty to keep what's saved; "Remove" deletes it.
+- They're stored encrypted with Windows' own per-user protection, so the settings file is useless on another PC or another Windows account.
+- The Claude key is checked with Anthropic before it's saved. Saving restarts him (about 10 seconds).
+
+## Changing their voices
+
+In **Settings > Voice**, pick Jarvis or Ultron, then a voice (British and American, male and female), speed and pitch. Changes apply instantly and **Preview** plays a line. Or just ask: "Jarvis, talk a bit faster", "use a deeper voice", "try an American voice", "make Ultron slower", "put your voice back to normal".
+
+## What's new
+
+After every update a pop-up lists everything added since the version you had (from `CHANGELOG.md`). **What's new** in the System panel shows it again.
+
+## Apple Music
+
+"Play Blinding Lights on Apple Music" finds that exact song (or album, or artist) in Apple's catalog and opens it in the **Apple Music app** if it's installed, or on **music.apple.com**; you press play. Apple doesn't let other programs start a specific song on Windows, so that last tap is yours. Pause, next and volume work through the media keys, and "what's playing on Apple Music?" works too. Say "on the web" or "in the app" to choose, or set it in Settings.
+
 ## Email (optional, read-only)
 
 **"Jarvis, read my emails"** lists who's written and what about, then reads whichever one you pick ("read the second one", "read the one from Alex") as a short summary, or in full if you ask. **"Any emails from the school this week?"** searches. He can't send, delete or mark anything, and reading doesn't mark mail as read. The morning briefing mentions who's emailed (names only).
@@ -449,6 +469,9 @@ Every ability is a plain Python function in `tools.py`. Write the function, add 
 - `notifications.py` Discord messages from Windows notifications
 - `email_reader.py` reading email (read-only, IMAP with an app password)
 - `netflix.py` opening Netflix (web or app) and the watch log
+- `apple_music.py` finding songs in Apple's catalog and opening them in the app or on the web
+- `settings.py`, `secretbox.py` the Settings panel and encrypted key storage
+- `voice_settings.py` changing their voices live; `changelog.py` + `CHANGELOG.md` the What's new pop-up
 - `discord_bot.py` the optional Discord bot (chatting, reading channels, sending when allowed)
 - `app_main.py`, `app_update.py` the installed app's entry point and self-updating (Velopack)
 - `jarvis.spec`, `build.ps1`, `.github/workflows/release.yml` building and publishing the installer (RELEASING.md)

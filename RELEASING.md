@@ -42,8 +42,9 @@ was on, switch it on again in the new app (it then points at the new one).
 
 ## Pushing an update
 
-1. Change the code (or drop in a new version from me), and write a line or two in `RELEASE_NOTES.md`.
-   Installed copies show that text on the update card.
+1. Change the code (or drop in a new version from me). Add a section at the top of `CHANGELOG.md` starting with
+   `## <version>` and a list of what's new (I do this in every version I send). Installed copies show it on the
+   update card and in the "What's new" pop-up after updating.
 2. Commit and push in GitHub Desktop.
 3. Actions > Release > Run workflow, with a **higher** version than last time (`1.0.1`, `1.1.0`...). Or push a
    tag: `git tag v1.0.1` then `git push origin v1.0.1`.

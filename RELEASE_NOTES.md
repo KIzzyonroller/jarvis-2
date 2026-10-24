@@ -1,6 +1,2 @@
-- Email: "read my emails", read one, search, and optional new-mail announcements (read-only; needs an app password, see README).
-- Netflix: open it on the web or in the app, and "what did I watch on Netflix?"
-- Spotify: plays on this PC instead of your phone, checks the song really started, "Spotify status" explains problems.
-- Follow-ups: he no longer ignores what you say while he's "listening" on slower PCs.
-- Longer answers when a question needs it; decimals read as "four point five".
-- Discord bot with a switch for sending messages; API keys set up inside the app.
+- Fixed: an error box about "cublas64_12.dll" on PCs with an NVIDIA graphics card. Speech recognition now quietly uses the CPU when NVIDIA's CUDA libraries aren't installed.
+- First-time setup now finishes before he starts: he waits for your Claude key and downloads his voice (with progress on screen) before listening or talking, so he can't repeat himself half set up.

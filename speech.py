@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 from collections import deque
+from pathlib import Path
 
 import numpy as np
 
@@ -76,6 +77,23 @@ print("CUDA_OK")
 """
 
 
+CUDA_DLLS = ("cublas64_12.dll", "cudnn_ops64_9.dll")
+
+
+def _cuda_libs_present():
+    """GPU speech needs NVIDIA's CUDA 12 libraries (cuBLAS, cuDNN). The installed app doesn't ship them (they're
+    over a gigabyte), so on most PCs they simply aren't there: then don't even try."""
+    if sys.platform != "win32":
+        return True
+    import ctypes
+    for dll in CUDA_DLLS:
+        try:
+            ctypes.WinDLL(dll)
+        except OSError:
+            return False
+    return True
+
+
 def _cuda_works():
     """Try the GPU in a SEPARATE process first. A missing or mismatched NVIDIA DLL can crash Python
     outright (no error to catch), and that must not take Jarvis down with it. The answer is cached
@@ -95,23 +113,42 @@ def _cuda_works():
     except Exception:
         pass
     _add_cuda_dlls()                       # so the child process inherits the PATH to the NVIDIA DLLs
-    try:
-        cmd = ([sys.executable, "--cuda-test"] if config.FROZEN                 # the installed app: Jarvis.exe
-               else [sys.executable, "-c", _CUDA_TEST, str(config.BASE_DIR)])
-        r = subprocess.run(cmd, capture_output=True, text=True,
-                           timeout=180, creationflags=0x08000000 if sys.platform == "win32" else 0)
-        ok = "CUDA_OK" in r.stdout
-        if not ok:
-            tail = (r.stderr or r.stdout).strip().splitlines()[-1:] or [f"exit code {r.returncode}"]
-            print(f"[voice] GPU speech recognition failed its test ({tail[0][:200]}); using the CPU")
-    except Exception as e:
+    if config.FROZEN and not _cuda_libs_present():
+        print("[voice] NVIDIA's CUDA 12 libraries aren't installed; speech recognition runs on the CPU")
         ok = False
-        print(f"[voice] GPU test couldn't run ({e}); using the CPU")
+    else:
+        ok = _run_cuda_test()
     try:
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps({"key": key, "ok": ok, "t": time.time()}), encoding="utf-8")
     except Exception:
         pass
+    return ok
+
+
+def _run_cuda_test():
+    import subprocess
+    import tempfile
+    result = Path(tempfile.gettempdir()) / f"jarvis-cuda-{os.getpid()}.txt"
+    try:
+        # The installed app has no console, so the child reports through a file, never a pop-up
+        cmd = ([sys.executable, "--cuda-test", str(result)] if config.FROZEN
+               else [sys.executable, "-c", _CUDA_TEST, str(config.BASE_DIR)])
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=180, creationflags=0x08000000 if sys.platform == "win32" else 0)
+        out = (r.stdout or "") + (result.read_text(encoding="utf-8", errors="replace") if result.exists() else "")
+        ok = "CUDA_OK" in out
+        if not ok:
+            tail = (out or r.stderr or "").strip().splitlines()[-1:] or [f"exit code {r.returncode}"]
+            print(f"[voice] GPU speech recognition failed its test ({tail[0][:200]}); using the CPU")
+    except Exception as e:
+        ok = False
+        print(f"[voice] GPU test couldn't run ({e}); using the CPU")
+    finally:
+        try:
+            result.unlink()
+        except OSError:
+            pass
     return ok
 
 

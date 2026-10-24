@@ -30,18 +30,36 @@ def _velopack():
     app.run()
 
 
-def _cuda_test():
+def _cuda_test(result_path):
     """speech.py tests the GPU in a separate process (a bad NVIDIA driver can crash the process outright).
-    In the installed app that process is Jarvis.exe --cuda-test."""
-    import speech
-    sys.argv = [sys.argv[0], ""]
-    exec(compile(speech._CUDA_TEST, "<cuda-test>", "exec"), {"__name__": "__cuda_test__"})
+    In the installed app that process is Jarvis.exe --cuda-test <file>. It has no console, so it writes its
+    answer to the file, and it must never let an error escape: that would pop up an error box for the user."""
+    import io
+    import os
+    import traceback
+    buf = io.StringIO()
+    try:
+        import contextlib
+        import speech
+        sys.argv = [sys.argv[0], ""]
+        with contextlib.redirect_stdout(buf):
+            exec(compile(speech._CUDA_TEST, "<cuda-test>", "exec"), {"__name__": "__cuda_test__"})
+        text = buf.getvalue()
+    except BaseException:
+        text = "CUDA_FAILED " + traceback.format_exc().strip().splitlines()[-1]
+    try:
+        with open(result_path, "w", encoding="utf-8") as f:
+            f.write(text)
+    except OSError:
+        pass
+    os._exit(0)
 
 
 SELFTEST_MODULES = [
     "config", "core", "brain", "tools", "speech", "voice", "vad", "aec", "intents", "personas", "permissions",
     "spotify", "youtube", "notifications", "briefing", "history", "connectors", "usage", "jobs", "discord_bot",
     "app_update", "autostart", "phone", "mini", "health", "cloud_stt", "download_models", "email_reader", "netflix",
+    "settings", "secretbox", "voice_settings", "changelog", "apple_music",
     "anthropic", "numpy", "onnxruntime", "faster_whisper", "ctranslate2", "kokoro_onnx", "sounddevice", "webview",
     "edge_tts", "pygame", "requests", "psutil", "PIL", "cv2", "yt_dlp", "mcp", "discord", "velopack",
     "espeakng_loader", "phonemizer",
@@ -65,7 +83,7 @@ def _selftest(out_path):
             problems.append(f"import {m}: {type(e).__name__}: {e}")
     try:
         import config
-        for rel in ("ui/index.html", "ui/mini.html", "jarvis_blender_bridge.py", "VERSION"):
+        for rel in ("ui/index.html", "ui/mini.html", "jarvis_blender_bridge.py", "VERSION", "CHANGELOG.md"):
             if not (config.RES_DIR / rel).exists():
                 problems.append(f"missing file: {rel}")
         import faster_whisper
@@ -85,8 +103,15 @@ if __name__ == "__main__":
         sys.exit(_selftest(sys.argv[2]))
     if getattr(sys, "frozen", False):
         _velopack()
-        if len(sys.argv) > 1 and sys.argv[1] == "--cuda-test":
-            _cuda_test()
-            sys.exit(0)
+        if len(sys.argv) > 2 and sys.argv[1] == "--cuda-test":
+            _cuda_test(sys.argv[2])
     import jarvis
-    jarvis.main()
+    try:
+        jarvis.main()
+    except SystemExit:
+        raise
+    except BaseException:
+        # keep the details in the log (Documents\Jarvis\logs\jarvis.log) before Windows shows its error box
+        import traceback
+        traceback.print_exc()
+        raise

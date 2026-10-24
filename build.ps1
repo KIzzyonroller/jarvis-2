@@ -79,6 +79,11 @@ if ($Publish -and $repo) {
 # 6. Make Setup.exe and the update packages in .\Releases
 $packArgs = @("pack", "--packId", $PackId, "--packVersion", $Version, "--packDir", "dist\Jarvis",
               "--mainExe", "Jarvis.exe", "--packTitle", $Title, "--icon", "assets\jarvis.ico")
+# Release notes for the update card: the newest section of CHANGELOG.md (or RELEASE_NOTES.md if there's no changelog)
+if (Test-Path CHANGELOG.md) {
+    $m = [regex]::Match((Get-Content CHANGELOG.md -Raw), '(?ms)^##\s+\S+\s*\r?\n(.*?)(?=^##\s|\z)')
+    if ($m.Success) { $Notes = Join-Path $env:TEMP "jarvis-notes.md"; Set-Content -Path $Notes -Value $m.Groups[1].Value.Trim() -Encoding utf8 }
+}
 if (Test-Path $Notes) { $packArgs += @("--releaseNotes", $Notes) }
 if ($SignFile) { $packArgs += @("--azureTrustedSignFile", $SignFile) }
 vpk @packArgs

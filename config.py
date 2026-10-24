@@ -26,7 +26,11 @@ def _load_env():
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        value = value.strip().strip('"').strip("'")
+        if value.startswith("dpapi:"):                     # saved from the Settings panel, encrypted (secretbox.py)
+            import secretbox
+            value = secretbox.unprotect(value)
+        os.environ.setdefault(key.strip(), value)
 
 
 _load_env()
@@ -181,6 +185,8 @@ DISCORD_READ = os.environ.get("JARVIS_DISCORD_READ", "true").lower() != "false"
 # Netflix: open it on the "web" or in the "app" by default ("auto" = the app if installed, the web to search)
 NETFLIX_DEFAULT = os.environ.get("JARVIS_NETFLIX", "auto").strip().lower()
 NETFLIX_TRACK = os.environ.get("JARVIS_NETFLIX_TRACK", "true").lower() != "false"     # keep a log of what you watch
+# Apple Music: open songs in the "app", on the "web", or "auto" (the app if it's installed)
+APPLE_MUSIC_DEFAULT = os.environ.get("JARVIS_APPLE_MUSIC", "auto").strip().lower()
 # Email (optional, read-only; README "Email"): your address and an APP password, never your real one
 EMAIL_ADDRESS = os.environ.get("EMAIL_ADDRESS", "").strip()
 EMAIL_APP_PASSWORD = os.environ.get("EMAIL_APP_PASSWORD", "").strip()
