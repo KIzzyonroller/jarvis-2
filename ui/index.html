@@ -253,6 +253,62 @@ body.booting #subs,body.booting #chips{display:none}
 #k-save:disabled{opacity:.5}
 
 
+/* ============================================================ studio (expert modes, each on its own key) */
+#studio{position:fixed;top:var(--top);right:0;bottom:0;width:min(392px,100vw);z-index:7;display:flex;flex-direction:column;
+  background:rgb(var(--vrgb));border-left:1px solid rgba(var(--crgb),.28);box-shadow:-30px 0 80px rgba(0,0,0,.45);
+  transform:translateX(104%);transition:transform .45s cubic-bezier(.2,.8,.2,1);visibility:hidden}
+#studio.open{transform:none;visibility:visible}
+#studio .d-head button{width:30px;height:30px;display:grid;place-items:center;color:var(--dim);font:400 20px/1 var(--text);letter-spacing:0}
+#studio .d-head button:hover{color:var(--ink)}
+#studio .d-body{overflow:auto;padding:0 18px 18px}
+#studio .intro{font-size:13px;color:var(--dim);line-height:1.5;margin:0 0 14px}
+.mode{position:relative;padding:14px 14px 12px;margin-bottom:12px;border:1px dashed rgba(var(--crgb),.28)}
+.mode.on{border-style:solid;border-color:rgba(var(--crgb),.5);background:rgba(var(--crgb),.035)}
+.mode .mh{display:flex;align-items:center;gap:10px}
+.mode .glyph{width:30px;height:30px;flex:none;color:var(--dim)}
+.mode.on .glyph{color:var(--c)}
+.mode h4{flex:1;font:var(--dispw) 13px var(--display);letter-spacing:.18em;color:var(--ink)}
+:root[data-ai=ultron] .mode h4{font-size:17px;letter-spacing:.1em}
+.mode .tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
+.mode .tag svg{width:13px;height:13px}
+.mode.on .tag{color:var(--c)}
+.mode .what{font-size:13px;color:var(--dim);line-height:1.45;margin:8px 0 10px}
+.mode .kv{margin:2px 0 10px}
+.mode .kv span:nth-child(even){text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.mode .ed{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.4;color:var(--ink);margin:0 0 10px}
+.mode .ed i{width:7px;height:7px;flex:none;margin-top:5px;transform:rotate(45deg);background:var(--dim)}
+.mode .ed.ok i{background:var(--c)}
+.mode .ed.bad i{background:var(--alarm)}
+.mode .acts{display:flex;flex-wrap:wrap;gap:6px}
+.mode .acts button,.mode form .row button,.mode form .in button{height:32px;padding:0 12px;font-size:13px;border:1px solid rgba(var(--crgb),.25);color:var(--ink)}
+.mode .acts button:hover,.mode form .row button:hover{border-color:rgba(var(--crgb),.6)}
+.mode .acts .quiet{color:var(--dim);border-color:transparent;padding:0 6px;text-decoration:underline;text-underline-offset:3px}
+.mode .acts .go,.mode form .go{background:var(--c);border-color:var(--c);color:#02121a;font-weight:600}
+.mode form .go:disabled{opacity:.45;cursor:default}
+.mode form .in button{height:36px;color:var(--dim)}
+.mode form{display:grid;gap:8px;margin-top:4px}
+.mode form label{display:grid;gap:4px;font-size:12.5px;color:var(--dim)}
+.mode form .in{display:flex;gap:6px}
+.mode form input{flex:1;min-width:0;height:36px;padding:0 10px;font:13px "Cascadia Mono",Consolas,monospace;color:var(--ink);
+  background:rgba(var(--crgb),.05);border:1px solid rgba(var(--crgb),.25);outline:none}
+.mode form input:focus-visible{border-color:var(--c)}
+.mode form .row{display:flex;gap:6px;justify-content:flex-end}
+.mode .msg{font-size:12.5px;color:var(--you);min-height:1.2em}
+.mode .msg.err{color:var(--alarm)}
+.mode .where{font-size:12px;color:var(--dim);line-height:1.5}
+.mode ol{margin:2px 0 10px 18px;font-size:12.5px;line-height:1.5;color:var(--ink)}
+.mode ol b{font-weight:500;color:var(--c)}
+#keys{max-height:calc(100vh - var(--top) - 190px);overflow:auto;scrollbar-width:thin;padding-bottom:0!important}
+#keys .btns{position:sticky;bottom:0;margin:0 -18px;padding:10px 18px 14px;background:rgba(var(--vrgb),.97);
+  box-shadow:0 -16px 16px -6px rgba(var(--vrgb),.95)}
+#keys .opt{margin:2px 0 4px;padding-top:10px;border-top:1px solid rgba(var(--crgb),.14)}
+#keys .opt>p{font-size:13px;color:var(--dim);margin-bottom:8px;line-height:1.45}
+#keys .opt .kf input{height:36px}
+#keys .opt .three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#keys .opt .kf{margin-bottom:6px;min-width:0}
+#keys .opt .kf input{width:100%;min-width:0}
+@media (max-width:700px){#keys .opt .three{grid-template-columns:1fr}}
+
 /* ============================================================ settings + what's new (overlays) */
 .overlay{position:fixed;inset:0;z-index:8;display:grid;place-items:center;background:rgba(var(--vrgb),.72);
   backdrop-filter:blur(6px);animation:askIn .18s ease-out}
@@ -439,6 +495,8 @@ body.swap #stage{animation:swap .6s steps(6)}
     <button data-ai="jarvis" aria-pressed="true">Jarvis</button><button data-ai="both" aria-pressed="false" title="Both of them, taking turns">Both</button><button data-ai="ultron" aria-pressed="false">Ultron</button>
   </div>
   <div id="clock"><span id="time">--:--</span><span id="date"></span></div>
+  <button class="ico" id="t-studio" aria-label="Studio: Blender and Unreal modes" aria-pressed="false" aria-controls="studio" title="Studio (Blender and Unreal)">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 2.5l6.5 3.75v7.5L10 17.5l-6.5-3.75v-7.5z"/><path d="M3.5 6.25L10 10l6.5-3.75M10 10v7.5"/></svg></button>
   <button class="ico" id="t-right" aria-label="Show system panel" aria-pressed="true" title="System">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h8M15 5h2M3 10h2M9 10h8M3 15h10M17 15h0"/><circle cx="13" cy="5" r="2"/><circle cx="7" cy="10" r="2"/><circle cx="15" cy="15" r="2"/></svg></button>
   <div class="win">
@@ -519,6 +577,14 @@ body.swap #stage{animation:swap .6s steps(6)}
   </div>
 </aside>
 
+<aside id="studio" aria-label="Studio" aria-hidden="true">
+  <div class="d-head">Studio<button id="studio-x" aria-label="Close Studio">×</button></div>
+  <div class="d-body">
+    <p class="intro">Expert modes for Blender and Unreal. Each one runs on its own AI key, so what it spends goes on that key's bill, not your Jarvis key. They stay locked until you add one.</p>
+    <div id="modes"></div>
+  </div>
+</aside>
+
 <main id="stage">
   <div id="you" class="gone" aria-live="polite"><span></span></div>
   <button id="presence" aria-label="Talk to him (Ctrl+Space)" title="Click to talk"></button>
@@ -541,7 +607,14 @@ body.swap #stage{animation:swap .6s steps(6)}
     <h2 id="k-title">Add your Claude API key</h2>
     <p class="fine">He thinks with Claude. Make a key at console.anthropic.com (API keys), add a few dollars of credit, and paste it below. It's saved only on this PC.</p>
     <label class="kf"><span>Anthropic API key</span><input id="k-ant" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..."></label>
-    <label class="kf"><span>Groq key, optional (makes his hearing faster; free at console.groq.com)</span><input id="k-groq" type="password" autocomplete="off" spellcheck="false" placeholder="gsk_..."></label>
+    <div class="opt">
+      <p>Optional, skip any of them: Groq makes his hearing faster (free at console.groq.com). Blender and Unreal keys unlock those modes, each on its own AI key (Claude, OpenRouter or OpenAI). Studio, the cube button at the top, has them later too.</p>
+      <div class="three">
+        <label class="kf"><span>Groq key</span><input id="k-groq" type="password" autocomplete="off" spellcheck="false" placeholder="gsk_..."></label>
+        <label class="kf"><span>Blender mode key</span><input id="k-blender" type="password" autocomplete="off" spellcheck="false" placeholder="sk-..."></label>
+        <label class="kf"><span>Unreal mode key</span><input id="k-unreal" type="password" autocomplete="off" spellcheck="false" placeholder="sk-..."></label>
+      </div>
+    </div>
     <p class="fine" id="k-msg" role="status"></p>
     <div class="btns"><button id="k-later">Later</button><button id="k-save">Save and restart</button></div>
   </section>
@@ -913,13 +986,17 @@ const toolName = (n) => n.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase(
 const STEP_LABEL = { web_search: "Searching the web", screen: "Looking at your screen", look_at_screen: "Looking at your screen", look_at_camera: "Looking at you",
   run_command: "Running PowerShell", open: "Opening", close_app: "Closing", self_control: "Window", window_control: "Windows", keyboard_input: "Typing",
   clipboard: "Clipboard", mouse: "Mouse", display: "Display", media_control: "Media", set_volume: "Volume", system_power: "Power",
-  system_info: "Checking the system", files: "Files", memory: "Memory", reminders: "Reminders", spotify: "Spotify", youtube: "YouTube", blender: "Blender" };
+  system_info: "Checking the system", files: "Files", memory: "Memory", reminders: "Reminders", spotify: "Spotify", youtube: "YouTube", blender: "Blender",
+  blender_expert: "Blender expert", unreal_expert: "Unreal expert", blender_lookup: "Checking the Blender API", unreal_lookup: "Checking the Unreal API",
+  unreal_python: "Working in Unreal", unreal_status: "Checking Unreal", unreal_log: "Reading Unreal's log", unreal_look: "Looking at Unreal" };
 const stepLabel = (n) => STEP_LABEL[n] || toolName(n);
 function shortDetail(name, a) {
   if (!a) return "";
   if (name === "web_search") return a.query ? `"${a.query}"` : "";
   if (name === "run_command") return a.command || "";
   if (name === "blender") return (a.action || "") + (a.name ? ": " + a.name : "");
+  if (name === "blender_expert" || name === "unreal_expert") return a.task ? (a.task.length > 70 ? a.task.slice(0, 70) + "…" : a.task) : "";
+  if (name === "unreal_python") return a.what || "";
   if (name === "mouse") return (a.action || "").replace(/_/g, " ") + (a.what ? ": " + a.what : "");
   const v = Object.entries(a).filter(([k, x]) => typeof x !== "object" && typeof x !== "boolean" && !["content", "code", "steps", "question"].includes(k)).map(([, x]) => x).join(", ");
   return v.length > 70 ? v.slice(0, 70) + "…" : v;
@@ -1551,16 +1628,19 @@ window.J = {
         if (!$("#settings").hidden && $("#set-voice")) $("#set-voice").replaceWith(voiceSection());
         if (e.msg && !$("#settings").hidden) $("#set-msg").textContent = e.msg; break;
       case "settings_result":
-        if (e.ok) { $("#set-msg").textContent = e.restart ? "Saved. Restarting..." : "Nothing to save."; break; }
+        if (e.ok) { $("#set-msg").textContent = e.restart ? "Saved. Restarting..." : "Saved."; if (!e.restart) { S.dirty = {}; S.clear.clear(); setTimeout(() => closeSettings(true), 700); } break; }
         $("#set-save").disabled = false; $("#set-msg").textContent = "Fix the highlighted fields.";
         Object.entries(e.errors || {}).forEach(([k, m]) => { const h = $(`#set-body .fld[data-key="${k}"] .help`); if (h) { h.textContent = m; h.classList.add("err"); } });
         break;
       case "whats_new": showWhatsNew(e); break;
       case "keys_result":
-        $("#k-save").disabled = !!e.ok;
-        $("#k-msg").textContent = e.ok ? "Saved. Restarting..." : e.error;
-        if (e.ok) $("#k-ant").value = $("#k-groq").value = "";
+        $("#k-save").disabled = !!e.ok && e.restart !== false;
+        $("#k-msg").textContent = e.ok ? (e.restart === false ? "Saved." : "Saved. Restarting...") : e.error;
+        if (e.ok) { KEY_INPUTS.forEach((i) => i.value = ""); if (e.restart === false) setTimeout(hideKeys, 700); }
+        else if (e.field) { const f = { ANTHROPIC_API_KEY: "#k-ant", GROQ_API_KEY: "#k-groq", BLENDER_AI_KEY: "#k-blender", UNREAL_AI_KEY: "#k-unreal" }[e.field]; if (f) $(f).focus(); }
         break;
+      case "studio": ST.modes = e.modes || []; renderStudio(); break;
+      case "studio_result": studioResult(e); break;
       case "download": if (e.what === "voice") { const t = $("#st-time"); if (t && e.pct < 100) t.textContent = `voice ${e.pct}%`; } break;
       case "update_ready": toast(`Version ${e.version} is ready. Say "update yourself" to switch now.`); break;
       case "discord_bot": {
@@ -1606,26 +1686,117 @@ document.addEventListener("keydown", (e) => {
   const t = document.activeElement;
   if (!ask && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey && !(t && (t.tagName === "INPUT" || t.isContentEditable))) $("#input").focus();
 });
+const KEY_INPUTS = ["#k-ant", "#k-groq", "#k-blender", "#k-unreal"].map((q) => $(q));
 function showKeys(e) {
   e = e || {};
   $("#k-ant").placeholder = e.has_anthropic ? "Saved. Paste a new one to replace it" : "sk-ant-...";
-  $("#k-groq").placeholder = e.has_groq ? "Saved. Paste a new one to replace it" : "gsk_... (optional)";
+  $("#k-groq").placeholder = e.has_groq ? "Saved" : "gsk_...";
+  $("#k-blender").placeholder = e.has_blender ? "Saved" : "sk-...";
+  $("#k-unreal").placeholder = e.has_unreal ? "Saved" : "sk-...";
   $("#k-msg").textContent = e.reason || "";
   $("#k-save").disabled = false;
   $("#keys").hidden = false; document.body.classList.add("asking");
-  setTimeout(() => $("#k-ant").focus(), 60);
+  $("#keys").scrollTop = 0;
+  setTimeout(() => $("#k-ant").focus({ preventScroll: true }), 60);
 }
-function hideKeys() { $("#keys").hidden = true; $("#k-ant").value = $("#k-groq").value = ""; if (!ask) document.body.classList.remove("asking"); }
+function hideKeys() { $("#keys").hidden = true; KEY_INPUTS.forEach((i) => i.value = ""); if (!ask) document.body.classList.remove("asking"); }
 $("#k-later").onclick = hideKeys;
 $("#keys-btn").onclick = () => openSettings();
 $("#wn-btn").onclick = () => call("whats_new");
 $("#k-save").onclick = () => {
-  const a = $("#k-ant").value.trim(), g = $("#k-groq").value.trim();
-  if (!a && !g) { $("#k-msg").textContent = "Paste a key first."; return; }
-  $("#k-save").disabled = true; $("#k-msg").textContent = "Checking the key with Anthropic...";
-  call("save_keys", a, g);
+  const [a, g, b, u] = KEY_INPUTS.map((i) => i.value.trim());
+  if (!a && !g && !b && !u && !$("#k-ant").placeholder.startsWith("Saved")) { $("#k-msg").textContent = "Paste your Claude key first."; return; }
+  $("#k-save").disabled = true; $("#k-msg").textContent = (a || b || u) ? "Checking the keys..." : "Saving...";
+  call("save_keys", a, g, b, u);
 };
-[$("#k-ant"), $("#k-groq")].forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#k-save").click(); } if (e.key === "Escape") hideKeys(); }));
+KEY_INPUTS.forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#k-save").click(); } if (e.key === "Escape") hideKeys(); }));
+
+// ============================================================ studio: Blender and Unreal modes (keys never come back)
+const ST = { modes: [], open: false, form: null };
+const GLYPH = {
+  // generic shapes, not anyone's logo: a wire polyhedron for modelling, a framed horizon for a game viewport
+  blender: '<svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M15 3l10.4 6v12L15 27 4.6 21V9z"/><path d="M15 3v24M4.6 9L25.4 21M25.4 9L4.6 21" opacity=".45"/><circle cx="15" cy="15" r="2" fill="currentColor" stroke="none"/></svg>',
+  unreal: '<svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3.5" y="5.5" width="23" height="17"/><path d="M3.5 17l6-5 4.5 3.5 5-6 7.5 7.5" stroke-linejoin="round"/><path d="M9 26h12M15 22.5V26"/></svg>' };
+const LOCK = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2.5" y="6" width="9" height="6.5"/><path d="M4.5 6V4.5a2.5 2.5 0 015 0V6"/></svg>';
+const OPEN = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2.5" y="6" width="9" height="6.5"/><path d="M4.5 6V4.5a2.5 2.5 0 014.8-1"/></svg>';
+const WHAT = { blender: "Models, materials, lighting and exports in Blender, checked against the API of the version you have.",
+  unreal: "Works in your open Unreal Editor: places and edits actors, materials, lighting and assets, reads errors, explains Blueprints and C++." };
+function openStudio(on) {
+  ST.open = on; $("#studio").classList.toggle("open", on); $("#studio").setAttribute("aria-hidden", String(!on));
+  $("#t-studio").setAttribute("aria-pressed", String(on));
+  if (on) { call("studio_view"); setTimeout(() => $("#studio-x").focus(), 60); }
+}
+$("#t-studio").onclick = () => openStudio(!ST.open);
+$("#studio-x").onclick = () => openStudio(false);
+$("#studio").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); if (ST.form) { ST.form = null; renderStudio(); } else openStudio(false); } });
+function money(t) {
+  if (!t) return "Nothing yet";
+  if (t.usd_known !== false || t.usd) return (t.usd > 0 && t.usd < 0.01 ? "under $0.01" : "$" + (t.usd || 0).toFixed(2)) + (t.usd_known === false ? " + some" : "");
+  return (t.tokens >= 1000 ? (t.tokens / 1000).toFixed(1) + "k" : t.tokens) + " tokens";
+}
+function keyForm(m) {
+  const change = m.unlocked, f = mk("form", { novalidate: true });
+  const inp = mk("input", { type: "password", autocomplete: "new-password", spellcheck: "false", "aria-label": `${m.name} AI key`,
+    placeholder: change ? `Paste a new key to replace the one ending ${m.hint}` : "sk-ant-..., sk-or-... or sk-..." });
+  const show = mk("button", { type: "button", text: "Show" });
+  show.onclick = () => { const on = inp.type === "password"; inp.type = on ? "text" : "password"; show.textContent = on ? "Hide" : "Show"; };
+  const model = mk("input", { type: "text", spellcheck: "false", value: m.model_auto === false ? (m.model || "") : "", placeholder: "Automatic", "aria-label": "Model (optional)" });
+  const msg = mk("p", { class: "msg", role: "status" });
+  const go = mk("button", { type: "submit", class: "go", text: change ? "Save" : "Unlock" });
+  f.append(mk("label", {}, `${m.name} AI key`, mk("div", { class: "in" }, inp, show)),
+    mk("label", {}, "Model, optional", model),
+    mk("p", { class: "where" }, "Claude keys: console.anthropic.com. One key for many models: openrouter.ai. OpenAI: platform.openai.com. Each needs a little credit on it."),
+    msg, mk("div", { class: "row" }, mk("button", { type: "button", text: "Cancel", onclick: () => { ST.form = null; renderStudio(); } }), go));
+  f.onsubmit = (ev) => {
+    ev.preventDefault();
+    const k = inp.value.trim(), md = model.value.trim();
+    if (!k && !change) { msg.textContent = "Paste a key first."; msg.className = "msg err"; inp.focus(); return; }
+    go.disabled = true; msg.className = "msg"; msg.textContent = k ? "Checking the key..." : "Saving...";
+    call("studio_save", m.mode, k, md);
+  };
+  setTimeout(() => inp.focus(), 40);
+  return f;
+}
+function modeCard(m) {
+  const card = mk("section", { class: "mode" + (m.unlocked ? " on" : ""), "data-mode": m.mode, "aria-label": `${m.name} mode` });
+  const glyph = mk("span", { class: "glyph", "aria-hidden": "true" }); glyph.innerHTML = GLYPH[m.mode] || "";
+  const tag = mk("span", { class: "tag" }); tag.innerHTML = (m.unlocked ? OPEN : LOCK) + `<span>${m.unlocked ? "Unlocked" : "Locked"}</span>`;
+  card.append(mk("div", { class: "mh" }, glyph, mk("h4", { text: m.name }), tag));
+  card.append(mk("p", { class: "what", text: WHAT[m.mode] || "" }));
+  if (ST.form === m.mode) { card.append(keyForm(m)); return card; }
+  if (!m.unlocked) {
+    card.append(mk("div", { class: "acts" }, mk("button", { type: "button", class: "go", text: "Add a key", onclick: () => { ST.form = m.mode; renderStudio(); } })));
+    return card;
+  }
+  card.append(mk("div", { class: "kv" }, mk("span", { text: "Key" }), mk("span", { text: `${m.provider}, ends ${m.hint}` }),
+    mk("span", { text: "Model" }), mk("span", { text: (m.model || "best available") + (m.model_auto ? " (auto)" : ""), title: m.model || "" }),
+    mk("span", { text: "Spent today" }), mk("span", { text: money(m.today) })));
+  if (m.editor) {
+    card.append(mk("p", { class: "ed " + (m.editor.ok ? "ok" : "bad") }, mk("i"), mk("span", { text: m.editor.text })));
+    if (m.editor.setup) card.append(mk("ol", {},
+      mk("li", {}, "In Unreal: Edit, Plugins, tick ", mk("b", { text: "Python Editor Script Plugin" }), "."),
+      mk("li", {}, "Edit, Project Settings, Plugins, Python: tick ", mk("b", { text: "Enable Remote Execution" }), ". Restart the editor if it asks.")));
+  } else card.append(mk("p", { class: "ed" }, mk("i"), mk("span", { text: "Checking the editor..." })));
+  const acts = mk("div", { class: "acts" });
+  if (m.editor && m.editor.action === "install_addon") acts.append(mk("button", { type: "button", text: "Install Blender add-on", onclick: () => call("studio_install_addon") }));
+  if (m.editor && !m.editor.ok) acts.append(mk("button", { type: "button", text: "Check again", onclick: () => call("studio_view") }));
+  acts.append(mk("button", { type: "button", text: "Change key or model", onclick: () => { ST.form = m.mode; renderStudio(); } }),
+    mk("button", { type: "button", class: "quiet", text: "Remove key", onclick: (ev) => {
+      const b = ev.currentTarget; if (b.dataset.armed) { call("studio_remove", m.mode); return; }
+      b.dataset.armed = "1"; b.textContent = `Lock ${m.name} mode?`; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = "Remove key"; } }, 4000); } }));
+  card.append(acts);
+  return card;
+}
+function renderStudio() {
+  const box = $("#modes"); if (!box) return;
+  box.textContent = ""; ST.modes.forEach((m) => box.appendChild(modeCard(m)));
+}
+function studioResult(e) {
+  const card = $(`#modes .mode[data-mode="${e.mode}"]`), msg = card && card.querySelector(".msg");
+  if (e.ok) { ST.form = null; if (!e.removed) toast(`${(ST.modes.find((m) => m.mode === e.mode) || {}).name || "Mode"} mode unlocked`); return; }
+  if (msg) { msg.textContent = e.error || "Couldn't save that."; msg.className = "msg err"; }
+  const go = card && card.querySelector("form .go"); if (go) go.disabled = false;
+}
 
 // ============================================================ settings (keys never come back from Python)
 const S = { fields: [], voices: null, dirty: {}, clear: new Set(), vkey: null, closeArmed: false };
@@ -1797,7 +1968,13 @@ function demo() {
           ptt: () => J.on({ type: "state", state: "listening" }), action: (a) => J.on({ type: "toast", text: "Demo: " + a }),
           confirm: (id, ok, always) => { const c = ask && ask.category; J.on({ type: "confirm_done", id, approved: ok, always }); if (ok && always && c) { permState[c] = true; emitPerms(); } }, stop() {}, minimize() {}, toggle_max() {}, close() {},
           set_autostart: (on) => J.on({ type: "autostart", available: true, on }),
-          key_status: () => J.on({ type: "setup", has_anthropic: true, has_groq: false }),
+          key_status: () => J.on({ type: "setup", has_anthropic: true, has_groq: false, has_blender: false, has_unreal: false }),
+          studio_view: () => setTimeout(() => J.on({ type: "studio", modes: DEMO_MODES.map((m) => ({ ...m, editor: m.unlocked ? (m.mode === "blender" ? { ok: true, text: "Installed. Builds in the background until you install the add-on", action: "install_addon" } : { ok: false, text: "Unreal isn't open, or remote execution is off", setup: true }) : undefined })) }), 250),
+          studio_save: (mode, k, md) => setTimeout(() => { if (k && !/^sk-/.test(k)) return J.on({ type: "studio_result", mode, ok: false, error: "That isn't a Claude (sk-ant-), OpenRouter (sk-or-) or OpenAI (sk-) key." });
+            const m = DEMO_MODES.find((x) => x.mode === mode); Object.assign(m, { unlocked: true, provider: k.startsWith("sk-ant-") ? "Claude" : k.startsWith("sk-or-") ? "OpenRouter" : "OpenAI", hint: (k || "abcd").slice(-4), model: md || (k.startsWith("sk-or-") ? "anthropic/claude-sonnet-4.5" : "claude-sonnet-5-5"), model_auto: !md, today: null });
+            J.on({ type: "studio_result", mode, ok: true }); api.studio_view(); }, 700),
+          studio_remove: (mode) => { Object.assign(DEMO_MODES.find((x) => x.mode === mode), { unlocked: false }); J.on({ type: "studio_result", mode, ok: true, removed: true }); api.studio_view(); },
+          studio_install_addon: () => J.on({ type: "toast", text: "Demo: add-on installed" }),
           settings_view: () => setTimeout(() => J.on({ type: "settings", voices: { personas: [{ key: "jarvis", name: "Jarvis", voice: "bm_lewis", speed: 1.05, pitch: 1 }, { key: "ultron", name: "Ultron", voice: "bm_lewis", speed: 1.12, pitch: 1 }],
             voices: [{ id: "bm_lewis", label: "Lewis (British male)" }, { id: "bm_george", label: "George (British male)" }, { id: "am_michael", label: "Michael (American male)" }], engine: "kokoro", speed: [0.6, 1.6], pitch: [0.7, 1.3] },
             fields: [{ section: "Claude", key: "ANTHROPIC_API_KEY", label: "Claude API key", kind: "secret", saved: true, hint: "ends in 9fQx", help: "From console.anthropic.com > API keys. Required: it's his brain." },
@@ -1815,6 +1992,8 @@ function demo() {
           toggle_mute: () => J.on({ type: "mic", muted: !muted, until: !muted ? Date.now() / 1000 + 600 : null, hotkey: "ctrl+alt+m" }),
           switch: (k) => { if (k === "both") { J.on({ type: "duo", on: true }); return; } J.on({ type: "duo", on: false }); persona(k || (aiKey === "jarvis" ? "ultron" : "jarvis")); },
           stop_dictation: () => J.on({ type: "dictation", on: false }) };
+  var DEMO_MODES = [{ mode: "blender", name: "Blender", unlocked: P.has("unlocked"), provider: "Claude", hint: "9fQx", model: "claude-sonnet-5-5", model_auto: true, today: { usd: 0.412, tokens: 81200, calls: 9, usd_known: true } },
+    { mode: "unreal", name: "Unreal", unlocked: false }];
   const k0 = P.has("ultron") ? "ultron" : "jarvis", u = k0 === "ultron";
   persona(k0); emitPerms();
   ["INITIALIZING CORE SYSTEMS", "NEURAL LINK ESTABLISHED  [claude-sonnet-5-5]", "VOICE SYNTHESIS ONLINE  [KOKORO]", "SPEECH RECOGNITION ONLINE  [GROQ]", "ALWAYS LISTENING"]

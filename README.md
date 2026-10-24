@@ -231,7 +231,27 @@ Put `JARVIS_PHONE=true` in `.env` and restart. The conversation panel shows a li
 - It only answers devices on your home network, and every request needs the secret key in the link. Delete `Documents\Jarvis\phone_token.txt` to make a new link (old ones stop working).
 - It's typing only (phone browsers won't share the mic over a plain home-network link). Don't turn it on while your PC is on public Wi-Fi.
 
+## Studio: Blender and Unreal modes (each on its own key)
+
+Blender and Unreal are **expert modes**. Each one runs on its own AI key, so its spending goes on that key's bill and not on your main Jarvis key. They're **locked until you add a key**: on the first-run card (optional boxes), in **Studio** (the cube button at the top of the window), or in Settings. Without a key Jarvis can still chat about Blender or Unreal; he just won't drive them.
+
+Any of these keys works (he works out which it is):
+- **Claude**, `sk-ant-...`, from console.anthropic.com
+- **OpenRouter**, `sk-or-...`, from openrouter.ai (one key, lots of models; you can pick one in Studio)
+- **OpenAI**, `sk-...`, from platform.openai.com
+
+Each needs some credit on it. Leave the model empty and he uses the strongest one the key can use, or type one in Studio (`gpt-5`, `anthropic/claude-sonnet-4.5`...). Studio shows which service each key is for, its last 4 characters (never the key itself), what that mode spent today, and whether the editor is connected. "Remove key" locks the mode again. Keys are stored encrypted on this PC.
+
+**What the experts do differently:** before writing code they look up the real API of the version you have open (Blender and Unreal rename things between versions, which is where AI usually trips up), then they work in the editor, check the result and fix it.
+
+**Unreal setup (once per project):** in Unreal, Edit > Plugins, tick **Python Editor Script Plugin**; then Edit > Project Settings > Plugins > Python, tick **Enable Remote Execution** (restart the editor if it asks). With the editor open, Studio shows "Connected: YourProject, Unreal 5.x". Everything the Unreal expert does is one undo step (Ctrl+Z). Saving, deleting, renaming or importing assets, console commands, and code that reaches outside the editor ask you first. It can't build Blueprint graphs from code (it explains which nodes to add) and can't compile C++ (it writes the code for you).
+
+> Jarvis, in Unreal, put three point lights around the statue and make them warm.
+> Why is my level throwing errors? (it reads the project log)
+
 ## 3D modelling (Blender)
+
+Needs Blender mode unlocked (above).
 
 > Jarvis, make me a phone stand I can 3D print.
 > Ultron, build a low-poly sword about a meter long.

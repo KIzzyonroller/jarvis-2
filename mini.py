@@ -66,7 +66,7 @@ def _detail(name, args):
         return str(args.get("action", "")) + (": " + args["name"] if args.get("name") else "")
     if name == "mouse":
         return (args.get("action", "").replace("_", " ") + (": " + args["what"] if args.get("what") else "")).strip()
-    for k in ("target", "name", "query", "url", "title", "path", "page", "message", "command", "action"):
+    for k in ("target", "name", "query", "task", "url", "title", "path", "page", "message", "command", "action"):
         v = args.get(k)
         if isinstance(v, str) and v.strip():
             v = v.strip().replace("\n", " ")

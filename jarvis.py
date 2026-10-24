@@ -185,8 +185,22 @@ class Bridge:
         changes = {str(k): str(v) for k, v in (changes or {}).items()}
         threading.Thread(target=self._core.save_settings, args=(changes, [str(c) for c in (clear or [])]), daemon=True).start()
 
-    def save_keys(self, anthropic="", groq=""):
-        threading.Thread(target=self._core.save_keys, args=(str(anthropic or ""), str(groq or "")), daemon=True).start()
+    def save_keys(self, anthropic="", groq="", blender="", unreal=""):
+        threading.Thread(target=self._core.save_keys, args=(str(anthropic or ""), str(groq or ""), str(blender or ""),
+                                                            str(unreal or "")), daemon=True).start()
+
+    def studio_view(self):
+        threading.Thread(target=self._core.emit_studio, args=(True,), daemon=True).start()
+
+    def studio_save(self, mode, key="", model=None):
+        threading.Thread(target=self._core.studio_save, args=(str(mode), str(key or ""),
+                                                              None if model is None else str(model)), daemon=True).start()
+
+    def studio_remove(self, mode):
+        threading.Thread(target=self._core.studio_remove, args=(str(mode),), daemon=True).start()
+
+    def studio_install_addon(self):
+        threading.Thread(target=self._core.studio_install_addon, daemon=True).start()
 
     def set_discord_send(self, on):
         threading.Thread(target=self._core.set_discord_send, args=(bool(on),), daemon=True).start()

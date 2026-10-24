@@ -2069,6 +2069,15 @@ def blender(action, code=None, angle="iso", look_after=True, name=None, format="
 
     return "Unknown action. Use status, build, look, scene, new, save, export, open or install_addon."
 
+def blender_expert(task):
+    import experts
+    return experts.run("blender", task)
+
+
+def unreal_expert(task):
+    import experts
+    return experts.run("unreal", task)
+
 
 # =================================================================== game mode
 _FS_CACHE = {"t": 0.0, "v": None}
@@ -2568,6 +2577,17 @@ TOOL_SPECS = [
         "name": {"type": "string", "description": "save/export: file name, no extension."},
         "format": {"type": "string", "enum": ["stl", "obj", "fbx", "glb", "gltf"]},
     }, ["action"]),
+    _spec("blender_expert", "Hand a Blender job to the Blender expert (it runs on the user's separate Blender key, "
+                            "checks the API of their Blender version, builds, renders, checks its work). Use for "
+                            "ANYTHING done in Blender: modelling, materials, lighting, rendering, exporting, scripting "
+                            "questions about their scene. Put the whole request in task, with every detail the user gave "
+                            "(sizes, style, what it's for). It replies with a summary to pass on.",
+          {"task": S}, ["task"]),
+    _spec("unreal_expert", "Hand an Unreal Engine job to the Unreal expert (it runs on the user's separate Unreal key "
+                           "and works in their open Unreal Editor: spawning and arranging actors, materials, lighting, "
+                           "assets, editor scripting, reading errors from the log; it explains Blueprint and C++). Put "
+                           "the whole request in task with every detail. It replies with a summary to pass on.",
+          {"task": S}, ["task"]),
 ]
 
 FUNCS = {
@@ -2575,7 +2595,8 @@ FUNCS = {
     "keyboard_input": keyboard_input, "clipboard": clipboard, "screen": screen, "mouse": mouse,
     "look_at_camera": look_at_camera, "display": display, "media_control": media_control, "set_volume": set_volume,
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
-    "memory": memory, "reminders": reminders, "blender": blender, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "history": history_tool, "background": background_tool,
+    "memory": memory, "reminders": reminders, "blender": blender, "blender_expert": blender_expert,
+    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "history": history_tool, "background": background_tool,
 }
 
 assert set(FUNCS) == {s["name"] for s in TOOL_SPECS}, "TOOL_SPECS and FUNCS are out of sync"
@@ -2590,9 +2611,14 @@ def set_connectors(c):
 
 
 def all_specs():
-    """Built-in tools plus whatever the app connectors (MCP) provide right now."""
+    """Built-in tools plus whatever the app connectors (MCP) provide right now.
+    Blender and Unreal are expert modes on their own keys: the experts drive the editors (the raw blender tool is
+    theirs), and each expert tool only shows up once its mode has a key (otherwise that mode is locked)."""
+    import experts
     extra = _CONNECTORS.specs() if _CONNECTORS is not None else []
-    return TOOL_SPECS + extra
+    hidden = {"blender"} | {f"{m}_expert" for m in experts.MODES if not experts.unlocked(m)}
+    return [s for s in TOOL_SPECS if s["name"] not in hidden] + extra
+
 
 
 def run_tool(name, args):

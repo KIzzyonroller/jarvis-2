@@ -1765,22 +1765,82 @@ class Core:
 
     # ================================================================ API keys (first run, or changing them)
     def emit_key_status(self, reason=""):
+        import experts
         self.emit({"type": "setup", "reason": reason,
                    "has_anthropic": bool(config.ANTHROPIC_API_KEY) and "paste-yours" not in config.ANTHROPIC_API_KEY,
-                   "has_groq": bool(config.GROQ_API_KEY)})
+                   "has_groq": bool(config.GROQ_API_KEY),
+                   "has_blender": experts.unlocked("blender"), "has_unreal": experts.unlocked("unreal")})
 
-    def save_keys(self, anthropic="", groq=""):
-        """The first-run card: just the Claude key (and Groq, optionally)."""
-        changes = {"ANTHROPIC_API_KEY": anthropic, "GROQ_API_KEY": groq}
-        if not (anthropic or "").strip() and not (groq or "").strip():
-            return self.emit({"type": "keys_result", "ok": False, "error": "Paste a key first."})
+    def save_keys(self, anthropic="", groq="", blender="", unreal=""):
+        """The first-run card: the Claude key, plus optional Groq, Blender and Unreal keys (blank = skip)."""
+        changes = {"ANTHROPIC_API_KEY": anthropic, "GROQ_API_KEY": groq, "BLENDER_AI_KEY": blender,
+                   "UNREAL_AI_KEY": unreal}
+        if not any(str(v or "").strip() for v in changes.values()):
+            if self._has_key():                      # nothing new, but he's already set up: just close the card
+                return self.emit({"type": "keys_result", "ok": True, "restart": False})
+            return self.emit({"type": "keys_result", "ok": False, "error": "Paste your Claude key first."})
+        if not self._has_key() and not (anthropic or "").strip():
+            return self.emit({"type": "keys_result", "ok": False,
+                              "error": "The Claude key is the one he can't run without; the others are optional."})
         ok, errors = settings.save(changes)
         if not ok:
-            return self.emit({"type": "keys_result", "ok": False, "error": next(iter(errors.values()))})
-        self.emit({"type": "keys_result", "ok": True})
-        print("[setup] keys saved; restarting")
-        time.sleep(1.5)
-        self._restart()
+            k, err = next(iter(errors.items()))
+            label = {"ANTHROPIC_API_KEY": "Claude key", "GROQ_API_KEY": "Groq key", "BLENDER_AI_KEY": "Blender key",
+                     "UNREAL_AI_KEY": "Unreal key"}.get(k, k)
+            return self.emit({"type": "keys_result", "ok": False, "error": f"{label}: {err}", "field": k})
+        needs_restart = any(str(changes[k] or "").strip() for k in ("ANTHROPIC_API_KEY", "GROQ_API_KEY"))
+        self.emit({"type": "keys_result", "ok": True, "restart": needs_restart})
+        self.emit_studio()
+        if needs_restart:
+            print("[setup] keys saved; restarting")
+            time.sleep(1.5)
+            self._restart()
+
+    # ================================================================ Studio: the Blender and Unreal modes
+    def emit_studio(self, probe=False):
+        import experts
+        self.emit({"type": "studio", "modes": experts.view(probe=probe)})
+
+    def studio_save(self, mode, key="", model=None):
+        """Unlock (or change) a mode from the Studio panel. Live: no restart. The key never goes back to the screen."""
+        import experts
+        if mode not in experts.MODES:
+            return
+        m = experts.MODES[mode]
+        changes = {}
+        if str(key or "").strip():
+            changes[m["key"]] = key
+        clear = []
+        if model is not None:
+            if str(model).strip():
+                changes[m["model"]] = model
+            else:
+                clear.append(m["model"])
+        if not changes and not clear:
+            return self.emit({"type": "studio_result", "mode": mode, "ok": False, "error": "Paste a key first."})
+        if not experts.unlocked(mode) and m["key"] not in changes:
+            return self.emit({"type": "studio_result", "mode": mode, "ok": False, "error": "Paste a key first."})
+        ok, errors = settings.save(changes, clear)
+        if not ok:
+            return self.emit({"type": "studio_result", "mode": mode, "ok": False, "error": next(iter(errors.values()))})
+        print(f"[studio] {m['name']} mode {'unlocked' if m['key'] in changes else 'updated'}")
+        self.emit({"type": "studio_result", "mode": mode, "ok": True})
+        self.emit_studio(probe=True)
+
+    def studio_remove(self, mode):
+        import experts
+        if mode not in experts.MODES:
+            return
+        m = experts.MODES[mode]
+        settings.save({}, [m["key"], m["model"]])
+        print(f"[studio] {m['name']} mode locked (key removed)")
+        self.emit({"type": "studio_result", "mode": mode, "ok": True, "removed": True})
+        self.emit_studio()
+
+    def studio_install_addon(self):
+        out = tools.blender("install_addon")
+        self.emit({"type": "toast", "text": out[:220]})
+        self.emit_studio(probe=True)
 
     # ================================================================ his voice, changed live
     def _voice_view(self):
@@ -1838,9 +1898,13 @@ class Core:
         if not ok:
             self.emit({"type": "settings_result", "ok": False, "errors": errors})
             return
+        import experts
         changed = [k for k, v in (changes or {}).items() if str(v or "").strip()] + list(clear or [])
-        self.emit({"type": "settings_result", "ok": True, "restart": bool(changed)})
-        if changed:
+        restart = [k for k in changed if k not in experts.LIVE_KEYS]      # Blender/Unreal keys apply live
+        self.emit({"type": "settings_result", "ok": True, "restart": bool(restart)})
+        if any(k in experts.LIVE_KEYS for k in changed):
+            self.emit_studio()
+        if restart:
             print(f"[settings] saved {', '.join(sorted(changed))}; restarting")
             time.sleep(1.5)
             self._restart()

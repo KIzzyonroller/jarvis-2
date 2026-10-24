@@ -262,7 +262,7 @@ class Brain:
     PARALLEL_SAFE = {"open", "close_app", "set_volume", "display", "system_info", "look_at_camera"}
 
     # Things that open or start something: repeating them in one request means duplicate tabs/windows.
-    ONCE_PER_REQUEST = {"open", "youtube", "spotify", "close_app"}
+    ONCE_PER_REQUEST = {"open", "youtube", "spotify", "close_app", "blender_expert", "unreal_expert"}
 
     def _guard(self, b):
         """None to go ahead, or the result to return instead of running the call again."""
@@ -303,6 +303,7 @@ class Brain:
         print(f"   [tool] {b.name} {json.dumps(b.input)[:150]}")
         on_event("tool_start", {"name": b.name, "args": b.input})
         t0 = time.time()
+        tools._CTX.on_event, tools._CTX.cancel = on_event, getattr(self, "_cancel", None)   # expert modes report steps too
         out = tools.run_tool(b.name, b.input)
         print(f"          -> {_summary(out)}")
         if isinstance(out, list):   # show the user exactly what he looked at

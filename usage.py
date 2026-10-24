@@ -107,6 +107,27 @@ def record_groq(seconds):
     return _add(max(10.0, seconds) / 3600 * GROQ_PER_HOUR, "groq", speech_secs=round(seconds, 1))
 
 
+def record_mode(mode, u):
+    """Spending by an expert mode (Blender, Unreal). It's on that mode's own key, so it's kept apart from the main
+    total and the daily limit. u: {"input", "output", "usd", "usd_known", "calls"} from providers."""
+    if not u or not u.get("calls"):
+        return
+    with _LOCK:
+        d = _load()["days"].setdefault(_day(), {"usd": 0.0, "claude": 0, "searches": 0, "speech_secs": 0.0})
+        m = d.setdefault("modes", {}).setdefault(mode, {"usd": 0.0, "tokens": 0, "calls": 0, "usd_known": True})
+        m["usd"] = round(m["usd"] + float(u.get("usd") or 0), 6)
+        m["tokens"] += int(u.get("input") or 0) + int(u.get("output") or 0)
+        m["calls"] += int(u.get("calls") or 0)
+        m["usd_known"] = bool(m.get("usd_known", True) and u.get("usd_known", True))
+        _save()
+
+
+def mode_today(mode):
+    """{"usd", "tokens", "calls", "usd_known"} for today, or None."""
+    with _LOCK:
+        return dict(_load()["days"].get(_day(), {}).get("modes", {}).get(mode) or {}) or None
+
+
 def today():
     with _LOCK:
         return _load()["days"].get(_day(), {}).get("usd", 0.0)

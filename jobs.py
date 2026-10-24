@@ -19,7 +19,7 @@ from datetime import datetime
 import config
 
 ALLOWED = {"web_search", "files", "run_command", "system_info", "memory", "reminders", "history", "discord",
-           "blender", "connectors"}
+           "blender_expert", "unreal_expert", "connectors"}
 MAX_RUNNING = 2
 MAX_STEPS = 40
 JOB_PROMPT = """[BACKGROUND JOB. You're working on this on your own while the user does other things; they can't

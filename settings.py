@@ -42,7 +42,16 @@ FIELDS = [
     ("Netflix", "JARVIS_NETFLIX_TRACK", "Keep a log of what I watch", "bool", "Stays on this PC.", None),
     ("Apple Music", "JARVIS_APPLE_MUSIC", "Open Apple Music in", "choice", "",
      [("auto", "The app if installed"), ("web", "The website"), ("app", "The app")]),
+    ("Blender mode", "BLENDER_AI_KEY", "Blender AI key", "secret",
+     "Unlocks Blender mode. A Claude (sk-ant-), OpenRouter (sk-or-) or OpenAI (sk-) key; its spending is separate.", None),
+    ("Blender mode", "BLENDER_AI_MODEL", "Model (optional)", "text",
+     "Leave empty to use the best one the key can. OpenRouter example: anthropic/claude-sonnet-4.5", None),
+    ("Unreal mode", "UNREAL_AI_KEY", "Unreal AI key", "secret",
+     "Unlocks Unreal mode. A Claude (sk-ant-), OpenRouter (sk-or-) or OpenAI (sk-) key; its spending is separate.", None),
+    ("Unreal mode", "UNREAL_AI_MODEL", "Model (optional)", "text",
+     "Leave empty to use the best one the key can.", None),
 ]
+MODE_KEYS = {"BLENDER_AI_KEY", "UNREAL_AI_KEY"}
 SECRETS = {f[1] for f in FIELDS if f[3] == "secret"}
 DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir", "DISCORD_BOT_REPLY": "everyone",
             "JARVIS_NETFLIX": "auto", "JARVIS_NETFLIX_TRACK": "true", "JARVIS_EMAIL_ANNOUNCE": "false",
@@ -93,6 +102,13 @@ def validate(key, value):
                 raise ValueError
         except ValueError:
             return "Use a number of dollars, like 5."
+    if key in MODE_KEYS:
+        import providers
+        problem = providers.looks_valid(v)
+        if problem:
+            return problem
+    if key in ("BLENDER_AI_MODEL", "UNREAL_AI_MODEL") and (len(v) > 100 or " " in v):
+        return "A model name has no spaces, like gpt-5 or anthropic/claude-sonnet-4.5."
     if key == "JARVIS_ADDRESS_AS" and len(v) > 30:
         return "Keep it short."
     if key == "JARVIS_ADDRESS_AS" and not config.name_allowed(v):
@@ -142,6 +158,12 @@ def save(changes, clear=()):
         if problem:
             errors["ANTHROPIC_API_KEY"] = problem
             values.pop("ANTHROPIC_API_KEY")
+    for k in [k for k in values if k in MODE_KEYS]:
+        import providers
+        ok, msg = providers.check(values[k])
+        if not ok:
+            errors[k] = msg
+            values.pop(k)
     if errors:
         return False, errors
     for key in clear or ():

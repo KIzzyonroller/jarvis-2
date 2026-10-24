@@ -30,6 +30,7 @@ CATEGORIES = {
     "connectors": ("App connectors", "Actions through connected apps (MCP) that can change things. Read-only ones never ask."),
     "blender": ("Blender scripting", "Blender code that touches files, and clearing the scene."),
     "addon": ("Blender add-on install", "Installing the Jarvis Bridge add-on into Blender."),
+    "unreal": ("Unreal scripting", "Unreal code that saves, deletes, renames or imports assets, or reaches outside the editor."),
 }
 
 _LOCK = threading.Lock()
