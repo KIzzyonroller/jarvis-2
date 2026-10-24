@@ -1,14 +1,16 @@
 # What's new
 
 Newest first. After an update, Jarvis shows everything added since the version you had before.
-Each release starts with a "## version" line.
+Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.7, 1.0.8...).
+
+## 1.0.7
+- **Studio: Blender and Unreal modes.** Each runs on its own AI key (Claude, OpenRouter or OpenAI, whichever you paste), so its spending is separate from your Jarvis key. They're locked until you add a key: on the first-run card, in Studio (the new cube button at the top), or in Settings. Unlocked, they check the real API of the version you have open before writing code, then work in the editor and check the result. Unreal mode is new: it works in your open Unreal Editor (one-time setup is shown in Studio), and everything it does is one Ctrl+Z.
+- **He checks the app is open first.** Asking for something in an app that's closed (a song on Spotify, a message in Discord, typing in Notepad) used to start the app and act straight away, while it was still on its loading screen, so things got missed. Now he checks whether it's open, opens it if not, waits until it has actually finished loading, and only then does it. If it's already open he uses it as it is instead of opening it again.
 
 ## 2026.10.23.14
 - **Living backgrounds.** Jarvis gets faint equations drifting over graph paper while a Fourier series slowly builds a wave; Ultron gets red fractures creeping in from the edges, corrupted fragments and a vast iris that slowly dilates. Very subtle, never behind him, and switchable in the System panel.
 - **He says what he's doing as he does it, then stops.** "Opening Spotify." is heard before Spotify opens, and no more "Done, I've opened Spotify" afterwards. He still speaks up after an action when there's an answer, a problem or a question.
 - **He presses play himself.** Without Spotify Premium (or in Apple Music), he opens the song and presses its Play button for you, the way a screen reader would: no mouse needed, works behind a game. If an app hides its buttons he uses the screen and mouse instead (never while you're in a fullscreen game).
-- **Studio: Blender and Unreal modes.** Each runs on its own AI key (Claude, OpenRouter or OpenAI, whichever you paste), so its spending is separate from your Jarvis key. They're locked until you add a key: on the first-run card, in Studio (the new cube button at the top), or in Settings. Unlocked, they check the real API of the version you have open before writing code, then work in the editor and check the result. Unreal mode is new: it works in your open Unreal Editor (one-time setup is shown in Studio), and everything it does is one Ctrl+Z.
-- **He checks the app is open first.** Asking for something in an app that's closed (a song on Spotify, a message in Discord, typing in Notepad) used to start the app and act straight away, while it was still on its loading screen, so things got missed. Now he checks whether it's open, opens it if not, waits until it has actually finished loading, and only then does it. If it's already open he uses it as it is instead of opening it again.
 - **Shuffle:** "shuffle my gym playlist on Spotify", "turn on shuffle", in Spotify and Apple Music.
 - **Playlists from your library and from friends:** "play my gym playlist" searches everything you've made or saved; "play Alex's chill playlist" checks playlists of Alex's you've saved, then Alex's public ones.
 - **Send from your own Discord:** "send Alex 'running late' from my Discord" types it into your Discord app as you. Off until you switch it on in Settings > Discord bot, and you approve every message (who it goes to and the exact text). If Discord's switcher lands on the wrong chat, he stops without sending.

@@ -1433,7 +1433,8 @@ class Core:
             return                                    # brand-new install, or nothing new
         picked = changelog.since(seen) if seen else changelog.sections()[:1]
         if picked:
-            self.emit({"type": "whats_new", "version": "", "notes": changelog.as_markdown(picked)})
+            self.emit({"type": "whats_new", "version": latest if len(picked) == 1 else "",
+                       "notes": changelog.as_markdown(picked)})
 
     def whats_new(self):
         import changelog
