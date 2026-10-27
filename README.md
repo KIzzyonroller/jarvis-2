@@ -62,6 +62,45 @@ For longer tasks, say **"in the background"**: *"Jarvis, in the background, rese
 - Anything risky still shows the approval card, labelled with which job is asking. If a job's card pops up while you're doing something else, just carry on: only "yes", "no" or "yes, always" answer it.
 - Two at once at most, and they stop at the daily spending limit.
 
+## Watching for things
+
+Say **"tell me when..."** and he keeps an eye on it while you do other things. When it happens he says it, shows it in the app and on your phone, and pops a Windows notification.
+
+| Say | What he watches | Cost |
+|---|---|---|
+| "Tell me when my download finishes" | Your Downloads folder, until the download's done | Free |
+| "Let me know when Blender's done rendering" | The app: busy, then quiet (renders, exports, compiles, installs) | Free |
+| "Tell me when Discord closes" / "when Steam opens" | Whether the app is running | Free |
+| "Tell me when the export window says complete" | Window titles | Free |
+| "Tell me when a file shows up in my Renders folder" | A file or folder (`downloads/*.zip` works too) | Free |
+| "Tell me when that GPU drops under 500 dollars" | A shop page's price (paste the link, or have it open and say "this page") | Free |
+| "Ping me when 'In stock' shows up on this page" | Words on a web page (or "when anything on it changes") | Free |
+| "Watch my screen and tell me when the match is found" | He looks at your screen every few minutes | About a cent a look |
+
+- Add **"and then..."** for a follow-up: "tell me when the download finishes and then open it". You OK the follow-up when you set it up, and anything risky in it still asks.
+- They stop on their own: web pages after a week, the screen after 2 hours, everything else after a day. Or say "for 3 days", "check every minute", "tell me every time".
+- "What are you watching?", "stop watching the price", "stop watching everything". The System panel lists them under **Watching**, with Stop.
+- Web pages are read the way a browser would, without your logins. Shops that block bots (Amazon often does) or pages that build themselves with JavaScript can't be read this way; he says so when you set it up, and the screen watcher works instead.
+- Saved in `Documents\Jarvis\watchers.json`, so they survive restarts. Up to 15 at once.
+
+## Activity memory (optional, off until you turn it on)
+
+Switch it on in the System panel (**Activity memory**) or Settings, or say "turn on activity memory". He then keeps track of which app and window is in front, so you can ask:
+
+- "What was I working on yesterday afternoon?"
+- "How long was I in Blender today?"
+- "When did I last have the budget spreadsheet open?"
+- "Reopen what I had going on Friday" (opens the files and apps; browser tabs can't come back from window titles)
+
+While it's on, he also knows which app you're in when you say "save this" or "what's this?".
+
+What it keeps, and doesn't:
+- Only the app and window title, every few seconds. Never screenshots, keystrokes, page contents or anything you type.
+- On this PC only (`Documents\Jarvis\Activity`, one small file a day), deleted after 14 days (Settings > Activity memory). Nothing leaves your PC until you ask him about it; then only the summary he needs goes to Claude.
+- Never logged: private and incognito windows, password managers, the lock screen, Windows security prompts, Jarvis himself, and anything in your **Never log** list (apps or words like "bank, tax").
+- Things that look like passwords, card numbers or keys in a title are blanked.
+- "Pause activity memory for an hour", "forget my activity from today", "wipe my activity memory". People talking to your Discord bot can't reach it.
+
 ## What he costs
 
 The System panel shows roughly what he's spent today and this month. There's a daily limit (5 dollars to start): he warns you at 80%, and at 100% he stops using Claude until tomorrow (instant commands like "pause" and "volume 30" keep working).
@@ -231,18 +270,71 @@ Put `JARVIS_PHONE=true` in `.env` and restart. The conversation panel shows a li
 - It only answers devices on your home network, and every request needs the secret key in the link. Delete `Documents\Jarvis\phone_token.txt` to make a new link (old ones stop working).
 - It's typing only (phone browsers won't share the mic over a plain home-network link). Don't turn it on while your PC is on public Wi-Fi.
 
+## Calendar
+
+> Dentist Tuesday at 3. Gym Monday, Wednesday and Friday, 6 to 7am. Mom's birthday is March 3rd.
+> What's on tomorrow? Am I free Friday afternoon? Move the dentist to 4. Skip standup this Wednesday.
+
+Jarvis has his own calendar (`Documents\Jarvis\calendar.json`) with repeating events, alerts before things start (10 minutes by default; spoken in full Jarvis), clash warnings, free-time finding, and today's events in the morning briefing. The System panel's **Agenda** tab shows the next 7 days. Quick "remind me in 20 minutes" pings are still reminders; anything with a day, a time and a name goes on the calendar.
+
+**Your calendar apps** (Settings > Calendar):
+
+| Calendar | How | What he can do |
+|---|---|---|
+| Google Calendar | Paste its private link: Settings > your calendar > Integrate calendar > **Secret address in iCal format** | See your events (refreshed every 15 min). Adding: he opens the event already filled in on Google Calendar and presses Save, after you OK it |
+| Outlook.com / Outlook for work | Paste its ICS link: Settings > Calendar > Shared calendars > **Publish a calendar** | Same as Google |
+| iCloud, Fastmail, Yahoo, Nextcloud | CalDAV server + username + an **app password** (iCloud: account.apple.com > Sign-In and Security > App-Specific Passwords) | Two-way: see, add, change and delete directly |
+| Outlook desktop / Windows Calendar app | Nothing | New events open there as a calendar file |
+
+"Add new events to" picks where new events go. Google's and Microsoft's full official access would mean registering your own app with them (and Google reviews those), which this avoids; the cost is that adding to Google or Outlook goes through their web page, and their events are read-only in Jarvis.
+
+**Calendar mode** is just the calendar and reminders in one window, using very little of your PC: no microphone, speech or voice models, animations, Discord or AI running in the background. Type things the way you'd say them ("lunch with Sam tomorrow at noon"); it shows what it understood before adding. Alerts come as Windows notifications with a chime, plus Windows' own voice if you want (Settings > Calendar). Get there by saying "calendar mode", the **Calendar mode** button in the System panel, or Settings > Calendar > **Start in: Calendar mode** (handy with Start with Windows). The **Full Jarvis** button in the window switches back (a restart, about 10 seconds). Reminders and alerts only come while one of the two is running.
+
+## RGB lighting
+
+> Make my lights red. Keyboard purple. Fans blue at 50 percent. Rainbow. RGB off. Put my lighting back.
+
+He works through the RGB software you already have, and uses every one that's running, so a mix of brands all changes together:
+
+| Program | What he can do | Switch on once |
+|---|---|---|
+| **OpenRGB** (most brands) | Any color per device, its modes, your saved profiles | SDK Server tab > Start Server (and tick it to start with OpenRGB) |
+| **SignalRGB** | Effects, presets, next/random, brightness, on/off | Nothing |
+| **Corsair iCUE** | Any color, per device type | Settings > General > Enable SDK |
+| **Razer Synapse** | Any color, per device type | Chroma Apps / Chroma Connect allowed (on by default) |
+| **Logitech G HUB** | Any color | Settings > "Allow games & applications to control my lighting" |
+
+Device words: keyboard, mouse, headset, mousepad, fans, RAM, "PC" (case, motherboard, fans, RAM). Colors: names (warm white, teal, hot pink...) or a hex code like #ff8800.
+
+Two honest limits: SignalRGB can't be handed an exact color from outside, so for a color he uses an effect or a preset with that name (make a Solid Color preset called "Red" and "make it red" uses it). And for iCUE, Razer and G HUB, a color he sets lasts while he's running: "put my lighting back" or quitting him hands control back to their own lighting.
+
+## Folders you let him into
+
+He can always read your user folder (and your local drives unless you turn off "Read files anywhere" in Settings), and edit freely in `Documents\Jarvis`. For anywhere else:
+
+> You can work in my Game Project folder. (edit: create, change, move, rename without asking; deleting still asks)
+> You can look in my USB drive. (read only; also reaches USB and network drives)
+> Stop accessing the Game Project folder.
+
+Each one shows an approval card first, and the System panel lists them with Remove. Passwords, keys and browser logins stay off-limits whatever you allow, and he won't edit a whole drive, your whole user folder or Windows' own folders.
+
 ## Studio: Blender and Unreal modes (each on its own key)
 
-Blender and Unreal are **expert modes**. Each one runs on its own AI key, so its spending goes on that key's bill and not on your main Jarvis key. They're **locked until you add a key**: on the first-run card (optional boxes), in **Studio** (the cube button at the top of the window), or in Settings. Without a key Jarvis can still chat about Blender or Unreal; he just won't drive them.
+Blender and Unreal are **expert modes**, **locked until you add their key**: on the first-run card (optional boxes), in **Studio** (the cube button at the top of the window), or in Settings. Without a key Jarvis can still chat about Blender or Unreal; he just won't drive them. Saving or removing a key restarts him (about 10 seconds) so everything picks it up.
 
-Any of these keys works (he works out which it is):
-- **Claude**, `sk-ant-...`, from console.anthropic.com
-- **OpenRouter**, `sk-or-...`, from openrouter.ai (one key, lots of models; you can pick one in Studio)
-- **OpenAI**, `sk-...`, from platform.openai.com
+**Blender mode: a Meshy key.** Get it at **meshy.ai/developers/keys**. Meshy only gives API keys on **Pro or higher** ($20 a month for 1,000 credits; a detailed textured model is about 30 credits, failed ones are refunded). Meshy makes the detailed things code can't: creatures, characters, statues, figurines, ornate props, from a description or a picture you give him. The model lands in your Blender standing on the floor at the size you asked for, and he checks it, adds measured parts (a base, text, holes) and exports it for printing. The thinking runs on your main Claude key. Studio shows your Meshy credits left.
 
-Each needs some credit on it. Leave the model empty and he uses the strongest one the key can use, or type one in Studio (`gpt-5`, `anthropic/claude-sonnet-4.5`...). Studio shows which service each key is for, its last 4 characters (never the key itself), what that mode spent today, and whether the editor is connected. "Remove key" locks the mode again. Keys are stored encrypted on this PC.
+> Jarvis, make me a dragon statue about 15 cm tall I can 3D print.
+> Turn this picture into a 3D model. (give him the file)
 
-**What the experts do differently:** before writing code they look up the real API of the version you have open (Blender and Unreal rename things between versions, which is where AI usually trips up), then they work in the editor, check the result and fix it.
+Honest limits: Meshy models look great but are dense and messy inside, so they're fine for renders and printing but not for animating or hand-editing. Thin parts can be fragile when printed, and sizes are close, not engineering-precise. Each model takes a minute or three.
+
+**Unreal mode: its own AI key**, any of:
+- **Claude**, `sk-ant-...`, from **console.anthropic.com/settings/keys**
+- **OpenRouter**, `sk-or-...`, from **openrouter.ai/settings/keys** (one key, lots of models; you can pick one in Studio)
+- **OpenAI**, `sk-...`, from **platform.openai.com/api-keys**
+
+Each needs some credit on it, and its spending stays on that key's bill. Studio shows which service it is, its last 4 characters (never the key itself), what it spent today, and whether Unreal is connected. Before writing code it looks up the real API of the engine version you have open, then works in the editor and checks the result.
 
 **Unreal setup (once per project):** in Unreal, Edit > Plugins, tick **Python Editor Script Plugin**; then Edit > Project Settings > Plugins > Python, tick **Enable Remote Execution** (restart the editor if it asks). With the editor open, Studio shows "Connected: YourProject, Unreal 5.x". Everything the Unreal expert does is one undo step (Ctrl+Z). Saving, deleting, renaming or importing assets, console commands, and code that reaches outside the editor ask you first. It can't build Blueprint graphs from code (it explains which nodes to add) and can't compile C++ (it writes the code for you).
 
@@ -251,7 +343,7 @@ Each needs some credit on it. Leave the model empty and he uses the strongest on
 
 ## 3D modelling (Blender)
 
-Needs Blender mode unlocked (above).
+Needs Blender mode unlocked with a Meshy key (above).
 
 > Jarvis, make me a phone stand I can 3D print.
 > Ultron, build a low-poly sword about a meter long.
@@ -269,7 +361,7 @@ Things to say: "start a new model" (the old one is kept, not deleted), "show me 
 
 Honest expectations:
 - **Good at:** measured, practical things. Stands, holders, boxes, brackets, organizers, simple furniture, low-poly props, architectural blockouts, anything built from shapes and modifiers.
-- **Bad at:** characters, faces, animals, anything organic or sculpted. They'll tell you instead of handing you a lumpy mess.
+- **Characters, faces, animals, anything organic or sculpted:** built with code they'd be a lumpy mess, so those come from Meshy instead (above) and he fixes them up in Blender.
 - **For 3D printing:** they model at real size and STL exports come out in millimeters, which is what slicers expect. Still check it in your slicer before printing; they can't test whether a part actually fits.
 - **Safety:** the code they write only gets to touch the model. If it tries to read or write files, import anything beyond Blender and math, or change Blender's settings, you get the approval prompt with the code shown. The add-on only listens on your own PC (127.0.0.1).
 - **Speed:** background mode starts Blender for each step, so expect a few seconds a step. Live mode is near instant.

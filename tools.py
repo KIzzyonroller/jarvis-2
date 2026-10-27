@@ -166,7 +166,10 @@ def _inside(path, roots):
 
 
 def _readable(p):
-    return _inside(p, config.READ_ROOTS + config.WRITE_ROOTS) and not permissions.is_secret(p)
+    if permissions.is_secret(p):
+        return False
+    import folder_access
+    return _inside(p, config.READ_ROOTS + config.WRITE_ROOTS) or folder_access.can_read(p)
 
 
 def _gate_write(paths, action, detail):
@@ -174,10 +177,12 @@ def _gate_write(paths, action, detail):
     (with 'always allow'), and Windows' own folders always ask."""
     if any(permissions.is_secret(p) for p in paths):
         return "That's a password, key or login store. I don't touch those."
-    if all(_inside(p, config.WRITE_ROOTS) for p in paths):
-        return None
-    if not all(_inside(p, config.READ_ROOTS + config.WRITE_ROOTS) for p in paths):
-        return "That's outside the drives I'm allowed to touch."
+    import folder_access
+    if all(_inside(p, config.WRITE_ROOTS) or folder_access.can_edit(p) for p in paths):
+        return None                                # the Jarvis folder, or folders the user let him edit
+    if not all(_readable(p) for p in paths):
+        return ("That's outside the folders I'm allowed to touch. If the user wants me in there, they can say so "
+                "(files grant_access).")
     if any(permissions.is_system(p) for p in paths):
         return None if _confirm(action + " (Windows system folder)", detail) else DENIED
     return None if _confirm(action, detail, "files") else DENIED
@@ -602,33 +607,12 @@ PROTECTED_PROCS = {
 
 
 def close_app(name, force=False):
+    """Close apps properly (closer.py): by app name, process or window title; checks it really closed; finishes
+    tray leftovers; spots 'save changes?' prompts; force needs approval. 'Discord and Steam' closes both."""
     if not IS_WINDOWS:
         return "Closing apps only works on Windows."
-    import psutil
-    q = name.lower().strip()
-    if q.endswith(".exe"):
-        q = q[:-4]
-    names = set()
-    for p in psutil.process_iter(["name"]):
-        n = p.info["name"] or ""
-        nl = n.lower()
-        if nl in PROTECTED_PROCS:
-            continue
-        base = nl[:-4] if nl.endswith(".exe") else nl
-        if q == base or (len(q) >= 3 and q in base):
-            names.add(n)
-    if not names:
-        return f"No running app matching '{name}'."
-    if len(names) > 3:
-        return f"Too many matches ({', '.join(sorted(names))}). Need a more specific name."
-    if force and not _confirm("Force-close " + ", ".join(sorted(names)), "Any unsaved work in it will be lost.", "force_close"):
-        return DENIED
-    results = []
-    for n in sorted(names):
-        r = _run(["taskkill", "/IM", n] + (["/F"] if force else []))
-        results.append(f"{n}: {'closed' if r.returncode == 0 else 'refused (' + (r.stderr or r.stdout).strip() + ')'}")
-    tail = "" if force else " If it refused, it can be force-closed."
-    return "; ".join(results) + "." + tail
+    import closer
+    return closer.close_many(name, force=bool(force), confirm=_confirm)
 
 
 _RECENT_OPENS = {}
@@ -673,8 +657,28 @@ def open_url(url, front=False):
             note = _launch(lambda show: _startfile(url, show), front)
             time.sleep(0.8)                                # let it switch to the page
             return f"Opened {url} ({app} wasn't open, so I opened it first and waited for it to load).{note}"
+        browser = None
+        if not app and url.lower().startswith(("http://", "https://")):
+            try:
+                browser = app_ready.default_browser()
+                titles = {getattr(w, "_hWnd", None): w.title for w in app_ready.windows_for(browser)} if browser else {}
+            except Exception:
+                browser, titles = None, {}
         before = app_ready.window_handles() if app else set()
         note = _launch(lambda show: _startfile(url, show), front)
+        if browser and titles:
+            # the browser was already open: the page opens in a tab. Wait until a browser window's title changes
+            # (the new tab's page title has arrived), so the next step doesn't look at a blank, half-loaded page.
+            end = time.time() + 8
+            changed = None
+            while time.time() < end and changed is None:
+                time.sleep(0.3)
+                for w in app_ready.windows_for(browser):
+                    if titles.get(getattr(w, "_hWnd", None)) != w.title and "new tab" not in (w.title or "").lower():
+                        changed = w
+                        break
+            if changed is not None:
+                app_ready.settle(changed, time.time() + 4, appeared=time.time() - 1.2)
         if app:                                            # the browser was closed: wait until it has the page up
             _, state = app_ready.wait_ready(app, before, timeout=20)
             if state != "ready":
@@ -807,6 +811,8 @@ def window_control(action, title=None):
     if w is None:
         return f"Couldn't find a window matching '{title}'." if title else "Tell me which window."
     if action == "focus":
+        import app_ready
+        app_ready.wait_if_loading(w)
         _GUARD["id"] += 1
         _activate(w)
         return f"Focused {w.title}."
@@ -902,10 +908,13 @@ def keyboard_input(action, text=None, keys=None, times=1, window=None):
 def _window_or_open(window):
     """The window to act in. If it isn't there: maybe it's still appearing (opened a moment ago), so wait a few
     seconds; if the app isn't running at all, open it and wait until it has loaded. Returns (window or None, note)."""
+    import app_ready
     target = _find_window(window)
     if target is not None:
+        if app_ready.wait_if_loading(target) == "busy":
+            return None, (f"{target.title} isn't responding right now (Windows says it's busy), so I didn't type into "
+                          "it. Try again in a moment.")
         return target, ""
-    import app_ready
     try:
         if app_ready.running(window):                 # starting up or sitting in the tray: give it a moment
             end = time.time() + 4
@@ -1024,8 +1033,15 @@ def look_at_screen(question="", target="all", detail="auto"):
             return f"Couldn't read monitor layout: {e}"
     elif t not in ("all", "screen", "everything", ""):
         w = _find_window(None if t in ("active", "focused", "current") else target)
+        import app_ready
+        if w is None and t not in ("active", "focused", "current") and app_ready.running(target):
+            end = time.time() + 8                      # it's starting up: give its window a moment to appear
+            while w is None and time.time() < end:
+                time.sleep(0.4)
+                w = _find_window(target)
         if w is None:
             return f"Couldn't find a window matching '{target}'. Use target 'all' or window_control list."
+        app_ready.wait_if_loading(w, max_wait=12)      # don't judge an app by its loading screen
         b = (max(0, w.left - ox), max(0, w.top - oy),
              min(full.width, w.left - ox + w.width), min(full.height, w.top - oy + w.height))
         if b[2] - b[0] > 50 and b[3] - b[1] > 50:
@@ -1538,67 +1554,7 @@ def read_notes(last_n=10):
 
 
 # =================================================================== reminders
-class ReminderManager:
-    def __init__(self, path):
-        self.path = Path(path)
-        self.lock = threading.Lock()
-        self.items = self._load()
-        self._stop = threading.Event()
-        self.on_due = None
-
-    def _load(self):
-        try:
-            return json.loads(self.path.read_text(encoding="utf-8"))
-        except Exception:
-            return []
-
-    def _save(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self.items, indent=2), encoding="utf-8")
-
-    def start(self, on_due):
-        self.on_due = on_due
-        threading.Thread(target=self._loop, daemon=True).start()
-
-    def stop(self):
-        self._stop.set()
-
-    def check(self, now=None):
-        now = now or datetime.now()
-        with self.lock:
-            due = [r for r in self.items if datetime.fromisoformat(r["due"]) <= now]
-            if due:
-                self.items = [r for r in self.items if r not in due]
-                self._save()
-        for r in due:
-            late = (now - datetime.fromisoformat(r["due"])).total_seconds() / 60
-            if self.on_due:
-                self.on_due(r["message"], late)
-        return due
-
-    def _loop(self):
-        while not self._stop.wait(1):
-            try:
-                self.check()
-            except Exception as e:
-                print(f"[reminders] error: {e}")
-
-    def add(self, message, due):
-        r = {"id": uuid.uuid4().hex[:6], "message": message, "due": due.isoformat(timespec="seconds")}
-        with self.lock:
-            self.items.append(r)
-            self.items.sort(key=lambda x: x["due"])
-            self._save()
-        return r
-
-    def cancel(self, query):
-        q = query.lower()
-        with self.lock:
-            gone = [r for r in self.items if r["id"] == q or q in r["message"].lower()]
-            self.items = [r for r in self.items if r not in gone]
-            self._save()
-        return gone
-
+from cal_store import ReminderManager  # noqa: E402  (shared with calendar mode)
 
 REMINDERS = ReminderManager(config.REMINDERS_FILE)
 
@@ -1756,6 +1712,11 @@ def context_note():
     r = routines()
     if r:
         parts.append("Saved routines: " + "; ".join(f'"{k}" = {v["steps"]}' for k, v in list(r.items())[:30]))
+    cur = _ACTIVITY.now() if _ACTIVITY is not None and _ACTIVITY.running and not _ACTIVITY.paused else None
+    if cur:                       # activity memory is on: he knows what's in front ("save this", "what's this?")
+        import activity
+        t = activity.short_title(cur["title"], cur["app"])
+        parts.append(f"In front right now: {cur['app']}" + (f" ({t[:80]})" if t else ""))
     return " | ".join(parts)
 
 
@@ -2069,6 +2030,211 @@ def blender(action, code=None, angle="iso", look_after=True, name=None, format="
 
     return "Unknown action. Use status, build, look, scene, new, save, export, open or install_addon."
 
+_CALENDAR = None
+
+
+def set_calendar(svc):
+    global _CALENDAR
+    _CALENDAR = svc
+
+
+def calendar_tool(action, when=None, title=None, start=None, end=None, duration_minutes=None, all_day=None,
+                  location=None, notes=None, repeat=None, remind=None, calendar=None, query=None, id=None, only=None,
+                  app=None):
+    if _CALENDAR is None:
+        return "The calendar isn't running."
+    import cal_store as cs
+    import cal_sync
+    a = (action or "").lower()
+    try:
+        if a == "agenda":
+            return _CALENDAR.agenda(when or "today")
+        if a == "add":
+            if not title or not start:
+                return "Need at least a title and a start."
+            out = _CALENDAR.add(title, start, end, duration_minutes, bool(all_day), location or "", notes or "",
+                                cs.parse_repeat(repeat) if isinstance(repeat, str) else repeat, remind, calendar)
+            return DENIED if out == "DENIED" else out
+        if a == "find":
+            return _CALENDAR.find(query or title or "")
+        if a == "edit":
+            if not id:
+                return "Which event? Find it first to get its id."
+            ch = {"title": title, "start": start, "end": end, "duration_minutes": duration_minutes, "all_day": all_day,
+                  "location": location, "notes": notes, "remind": remind,
+                  "repeat": (cs.parse_repeat(repeat) if repeat not in ("none", "no", "") else None) if isinstance(repeat, str) else repeat}
+            if repeat in ("none", "no", ""):
+                ch["repeat"] = {}
+            out = _CALENDAR.edit(id, **ch)
+            return DENIED if out == "DENIED" else out
+        if a == "delete":
+            if not id:
+                return "Which event? Find it first to get its id."
+            out = _CALENDAR.delete(id, only=only)
+            return DENIED if out == "DENIED" else out
+        if a == "free":
+            return _CALENDAR.free(when or "today", duration_minutes or 60)
+        if a == "open":
+            which = (app or os.environ.get("JARVIS_CAL_DEFAULT") or "google").lower()
+            which = "google" if which in ("jarvis", "caldav") else which
+            d = _CALENDAR.span(when or "today")[0].date()
+            url = cal_sync.open_url_for_day(which, d)
+            if not url:
+                return "app must be google, outlook, outlook_work or windows."
+            return open_url(url, front=True)
+        if a == "calendars":
+            return _CALENDAR.status()
+        if a == "sync":
+            _CALENDAR.sources.refresh(force=True)
+            return _CALENDAR.status()
+    except ValueError as e:
+        return f"Couldn't read that date/time ({e}). Use ISO like 2026-11-03T15:00."
+    return "Unknown calendar action."
+
+
+def rgb_tool(action, color=None, device="all", software="auto", value=None, effect=None):
+    if not IS_WINDOWS:
+        return "RGB control only works on Windows."
+    import rgb
+    return rgb.control(action, color, device, software, value, effect)
+
+
+_WATCHERS = None
+_ACTIVITY = None
+_ACTIVITY_CHANGED = []          # the app sets this to refresh the System panel
+
+
+def set_watchers(w):
+    global _WATCHERS
+    _WATCHERS = w
+
+
+def set_activity(t):
+    global _ACTIVITY
+    _ACTIVITY = t
+
+
+def watch_tool(action="add", kind=None, target=None, condition=None, value=None, question=None, every_minutes=None,
+               for_hours=None, repeat=False, then=None, label=None, id=None):
+    if _WATCHERS is None:
+        return "Watchers aren't running."
+    a = (action or "add").lower()
+    if a == "add":
+        return _WATCHERS.add(kind, target, condition, value, question, every_minutes, for_hours, bool(repeat),
+                             then or "", label or "")
+    if a == "list":
+        return _WATCHERS.list_text()
+    if a in ("remove", "stop", "cancel"):
+        return _WATCHERS.remove(id if id is not None else (target or label or ""))
+    if a == "pause":
+        return _WATCHERS.pause(id if id is not None else (target or label or "all"), True)
+    if a == "resume":
+        return _WATCHERS.pause(id if id is not None else (target or label or "all"), False)
+    if a == "check":
+        return _WATCHERS.check_now(id if id is not None else (target or label or "all"))
+    return "action must be add, list, remove, pause, resume or check."
+
+
+def _activity_changed():
+    for fn in _ACTIVITY_CHANGED:
+        try:
+            fn()
+        except Exception:
+            pass
+
+
+def activity_set(on):
+    """Switch activity memory on or off for good (saved in settings), live: no restart."""
+    import activity
+    import settings
+    settings.write_env({"JARVIS_ACTIVITY": "true" if on else "false"})
+    os.environ["JARVIS_ACTIVITY"] = "true" if on else "false"
+    if _ACTIVITY is not None:
+        if on:
+            _ACTIVITY.resume()
+            _ACTIVITY.start()
+        else:
+            _ACTIVITY.stop()
+    _activity_changed()
+    return ("Activity memory is on. I'll keep track of which apps and windows you use, on this PC only."
+            if on else "Activity memory is off. What's already saved stays until it ages out, unless you wipe it.")
+
+
+def activity_status():
+    import activity
+    t = _ACTIVITY
+    on = activity.enabled() and t is not None and t.running
+    files, size = t.size() if t else (0, 0)
+    state = "off" if not on else ("paused" if t.paused else "on")
+    return {"on": activity.enabled(), "state": state, "days": files, "kb": round(size / 1024),
+            "keep": activity.keep_days(),
+            "paused_until": t.paused_until if t and t.paused and t.paused_until - time.time() < 86400 * 365 else None}
+
+
+def activity_tool(action="summary", when=None, query=None, days=None, minutes=None):
+    import activity
+    t = _ACTIVITY
+    if t is None:
+        return "Activity memory isn't available."
+    a = (action or "summary").lower()
+    if a == "on":
+        return activity_set(True)
+    if a == "off":
+        return activity_set(False)
+    if a == "status":
+        s = activity_status()
+        if not s["on"]:
+            return "Activity memory is off. The user can switch it on in Settings or by asking you."
+        p = " It's paused right now." if s["state"] == "paused" else ""
+        return (f"Activity memory is on.{p} {s['days']} day{'s' if s['days'] != 1 else ''} saved ({s['kb']} KB), "
+                f"kept for {s['keep']} days.")
+    if a == "pause":
+        t.pause(minutes)
+        _activity_changed()
+        return f"Paused activity memory{' for ' + activity.dur(float(minutes) * 60) if minutes else ' until you turn it back on'}."
+    if a == "resume":
+        t.resume()
+        _activity_changed()
+        return "Activity memory is back on." if activity.enabled() else "It's switched off. Use action on."
+    if a == "forget":
+        everything = (when or "all").lower() in ("all", "everything", "")
+        if everything and not _confirm("Wipe all of his activity memory", "Every day he's logged is deleted. Can't be "
+                                       "undone.", None):
+            return DENIED
+        n = t.forget(None if everything else when)
+        _activity_changed()
+        return "Wiped all activity memory." if everything else (f"Forgot {n} entr{'ies' if n != 1 else 'y'} from "
+                                                                f"{activity.span(when)[2]}.")
+    off = "" if activity.enabled() else " (Activity memory is switched off, so this is only what was saved before.)"
+    if a == "summary":
+        a0, b0, label = activity.span(when or "today")
+        return activity.summarize(t.sessions(a0, b0), label, a0, b0) + off
+    if a == "search":
+        n = float(days) if days else activity.keep_days()
+        b0 = datetime.now()
+        return activity.search(t.sessions(b0 - timedelta(days=n), b0), query or "") + off
+    if a == "reopen":
+        a0, b0, label = activity.span(when or "today")
+        plan, missing = activity.reopen_plan(t.sessions(a0, b0))
+        if not plan:
+            return f"I don't have anything to reopen from {label}." + off
+        done = []
+        for item in plan:
+            try:
+                if item["kind"] == "file":
+                    open_path(item["path"], front=False)
+                else:
+                    _open_app_now(item["name"], front=False)
+                done.append(item["name"])
+            except Exception as e:
+                print(f"[activity] couldn't reopen {item['name']}: {e}")
+        out = f"Reopened from {label}: {', '.join(done)}."
+        if missing:
+            out += f" Couldn't find where these are saved: {', '.join(missing[:4])}."
+        return out + " Browser tabs can't be brought back from window titles; the browser's own history has them."
+    return "action must be summary, search, reopen, status, pause, resume, forget, on or off."
+
+
 def blender_expert(task):
     import experts
     return experts.run("blender", task)
@@ -2174,7 +2340,16 @@ def display(action, value=None):
 
 
 def system_info(what="status"):
-    return network_info() if (what or "").lower().startswith("net") else system_status()
+    w = (what or "").lower()
+    if w.startswith("app"):
+        if not IS_WINDOWS:
+            return "Windows only."
+        import closer
+        return closer.running_apps()
+    return network_info() if w.startswith("net") else system_status()
+
+
+_FOLDERS_CHANGED = []          # the app sets this to refresh the System panel's folder list
 
 
 def files(action, path=None, query=None, folder=None, content=None, mode="create", destination=None, new_name=None,
@@ -2204,6 +2379,21 @@ def files(action, path=None, query=None, folder=None, content=None, mode="create
         return take_note(content or query or "")
     if a == "read_notes":
         return read_notes(max_results or 10)
+    if a in ("grant_access", "revoke_access", "list_access"):
+        import folder_access
+        if a == "list_access":
+            return folder_access.describe()
+        if not path:
+            return "Which folder?"
+        p = _resolve(path, config.HOME)
+        if a == "revoke_access":
+            out = folder_access.revoke(path if not p.exists() else p)
+        else:
+            out = folder_access.grant(p, mode, _confirm)
+            out = DENIED if out == "DENIED" else out
+        if _FOLDERS_CHANGED:
+            _FOLDERS_CHANGED[0]()
+        return out
     return "Unknown files action."
 
 
@@ -2429,7 +2619,12 @@ TOOL_SPECS = [
            "front": {"type": "boolean", "description": FRONT},
            "new_window": {"type": "boolean", "description": "Open another window even if the app is already open "
                                                             "(only when the user asks for a new one)."}}, ["target"]),
-    _spec("close_app", "Close a running app by process name (chrome, spotify, discord). Graceful by default; force=true kills it (approval prompt).",
+    _spec("close_app", "Close apps: by app name (discord, steam, word, teams), process name, a game's or window's title, "
+                       "or a website open in a browser ('youtube' closes just that tab, not the browser). Several at once: "
+                       "'discord, steam and chrome'. It closes them like clicking X, checks they really closed, and quits "
+                       "apps that hide in the tray. If one is asking about unsaved work it tells you: pass that on and "
+                       "don't force it unless the user says so. force=true kills it outright (approval prompt). Never "
+                       "use run_command/taskkill to close apps; use this.",
           {"name": S, "force": B}, ["name"]),
     _spec("self_control", "Control yourself. hide/show: minimize or restore YOUR OWN window (when told to close, exit, go away "
                           "or hide: you minimize, you never quit; only the user saying 'quit' shuts you down). mute: turn the "
@@ -2467,18 +2662,26 @@ TOOL_SPECS = [
           {"level": {"type": "number", "minimum": 0, "maximum": 100}, "mute": B}),
     _spec("system_power", "lock, sleep, shutdown, restart, sign_out, cancel_shutdown. Risky ones trigger an approval prompt automatically.",
           {"action": {"type": "string", "enum": ["lock", "sleep", "shutdown", "restart", "sign_out", "cancel_shutdown"]}}, ["action"]),
-    _spec("system_info", "status: CPU, RAM, disk, battery, uptime, top memory hogs. network: local IP, Wi-Fi, signal, ping.",
-          {"what": {"type": "string", "enum": ["status", "network"]}}),
+    _spec("system_info", "status: CPU, RAM, disk, battery, uptime, top memory hogs. network: local IP, Wi-Fi, signal, ping. "
+                         "apps: which apps are open (and in the tray) with their memory, e.g. before closing things.",
+          {"what": {"type": "string", "enum": ["status", "network", "apps"]}}),
     _spec("run_command", "Run a PowerShell command and get its output. Read-only commands (Get-*, ipconfig, winget list/search...) run straight away; anything that changes things shows the user an approval prompt. Use for anything the other tools can't do (installing with winget, system info, scripts). Prefer specific tools when they exist. Keep commands non-interactive.",
           {"command": S}, ["command"]),
     _spec("files", "Files and notes. list (path: folder or shortcut home, desktop, documents, downloads, pictures, music, "
                    "videos, jarvis), read (text files), find (query = name or wildcard like '*.pdf', folder), write (path, "
                    "content, mode create/append/overwrite; relative paths go in the Jarvis folder; outside it asks the "
                    "user), create_folder, move / copy (path, destination), rename (path, new_name), delete (to the Recycle "
-                   "Bin, asks the user), empty_recycle_bin (asks), add_note (content), read_notes.",
+                   "Bin, asks the user), empty_recycle_bin (asks), add_note (content), read_notes. "
+                   "grant_access (path, mode read or edit): ONLY when the user asks you to have access to a specific folder "
+                   "or file (find it first if they give just a name; approval card). edit = work there without asking each "
+                   "time; read = just look (also reaches USB and network drives). revoke_access (path or folder name), "
+                   "list_access.",
           {"action": {"type": "string", "enum": ["list", "read", "find", "write", "create_folder", "move", "copy", "rename",
-                                                 "delete", "empty_recycle_bin", "add_note", "read_notes"]},
-           "path": S, "query": S, "folder": S, "content": S, "mode": {"type": "string", "enum": ["create", "append", "overwrite"]},
+                                                 "delete", "empty_recycle_bin", "add_note", "read_notes", "grant_access",
+                                                 "revoke_access", "list_access"]},
+           "path": S, "query": S, "folder": S, "content": S,
+           "mode": {"type": "string", "enum": ["create", "append", "overwrite", "read", "edit"],
+                    "description": "write: create/append/overwrite. grant_access: read or edit."},
            "destination": S, "new_name": S, "max_results": {"type": "integer"}}, ["action"]),
     _spec("memory", "Long-term memory shared by all the AIs. remember (text = a fact worth keeping: names, birthdays, "
                     "preferences, their setup; never passwords or card numbers), forget (text = words to match, or "
@@ -2577,12 +2780,77 @@ TOOL_SPECS = [
         "name": {"type": "string", "description": "save/export: file name, no extension."},
         "format": {"type": "string", "enum": ["stl", "obj", "fbx", "glb", "gltf"]},
     }, ["action"]),
-    _spec("blender_expert", "Hand a Blender job to the Blender expert (it runs on the user's separate Blender key, "
-                            "checks the API of their Blender version, builds, renders, checks its work). Use for "
-                            "ANYTHING done in Blender: modelling, materials, lighting, rendering, exporting, scripting "
-                            "questions about their scene. Put the whole request in task, with every detail the user gave "
-                            "(sizes, style, what it's for). It replies with a summary to pass on.",
+    _spec("calendar", "The user's calendar: Jarvis's own plus any they've connected (Google/Outlook links, iCloud and "
+                      "other CalDAV). Times are local, ISO like 2026-11-03T15:00 (date only for all-day). action: agenda "
+                      "(when = today, tomorrow, this week, next week, weekend, month, next 14 days, or a date), add "
+                      "(title, start, end or duration_minutes, all_day, location, notes, repeat = daily / weekdays / weekly / "
+                      "monthly / yearly or e.g. 'every 2 weeks on mon wed until 2026-12-20', remind = minutes before, "
+                      "calendar = jarvis / caldav / google / outlook / outlook_work / windows; leave calendar out for "
+                      "the user's default), find (query), edit (id + any fields), delete (id; only = an occurrence's "
+                      "start to skip just that one of a repeating event), free (when + duration_minutes: open slots), "
+                      "open (app = google / outlook / outlook_work / windows, when), calendars (what's connected), sync. "
+                      "Ids come from agenda/find. 'Remind me in 10 minutes' style pings are the reminders tool; things "
+                      "with a time and a name go on the calendar.",
+          {"action": {"type": "string", "enum": ["agenda", "add", "find", "edit", "delete", "free", "open", "calendars", "sync"]},
+           "when": S, "title": S, "start": S, "end": S, "duration_minutes": N, "all_day": B, "location": S, "notes": S,
+           "repeat": S, "remind": N, "calendar": S, "query": S, "id": S, "only": S, "app": S},
+          ["action"]),
+    _spec("rgb", "Control the user's RGB lighting through the RGB software on their PC (OpenRGB, SignalRGB, Corsair iCUE, "
+                 "Razer Synapse, Logitech G HUB; software=auto uses every one that's running). action: status (what's "
+                 "found and what to switch on), color (color = a name like red / warm white, or hex; device = all, "
+                 "keyboard, mouse, headset, mousepad, pc (case, fans, RAM, motherboard), fans, ram; value = brightness "
+                 "0-100 for that color), off, on, brightness (value; SignalRGB), effect (effect = name like rainbow or "
+                 "a saved profile; SignalRGB effects, OpenRGB profiles and modes), effects (list them), next / previous / "
+                 "random (SignalRGB), devices, reset (hand lighting back to their RGB apps). If something needs a "
+                 "setting switched on, the result says exactly which: pass that on in a sentence.",
+          {"action": {"type": "string", "enum": ["status", "color", "off", "on", "brightness", "effect", "effects", "next",
+                                                 "previous", "random", "devices", "reset"]},
+           "color": S, "device": S, "value": N, "effect": S,
+           "software": {"type": "string", "enum": ["auto", "openrgb", "signalrgb", "icue", "razer", "logitech"]}},
+          ["action"]),
+    _spec("blender_expert", "Hand a Blender job to the Blender expert (unlocked by the user's Meshy key). It makes "
+                            "detailed models (creatures, characters, statues, figurines, ornate props) with Meshy from a "
+                            "description or the user's picture, builds measured things with code, checks the API of "
+                            "their Blender version, renders and checks its work. Use for ANYTHING done in Blender: "
+                            "modelling, materials, lighting, rendering, exporting, 3D printing. Put the whole request in "
+                            "task with every detail (sizes, style, what it's for, the picture's path if they gave one). "
+                            "Detailed models take a few minutes. It replies with a summary to pass on.",
           {"task": S}, ["task"]),
+    _spec("watch", "Keep an eye on something and tell the user when it happens (they hear it, see it in the app and "
+                   "on their phone, and get a Windows notification), even while they do other things. add: kind + "
+                   "condition. kind page (target = URL, or 'this page' for the browser tab they're on): contains / "
+                   "gone (value = words), below / above (value = a price), changes, ai (question, for fuzzy things "
+                   "like 'is it back in stock'). kind app (target = app name): idle (it was busy and has gone quiet: "
+                   "renders, exports, compiles, installs, game updates), closes, opens. kind window (target = words "
+                   "in a window title): appears, gone. kind file (target = a file, folder or pattern like "
+                   "'downloads/*.zip'): appears, changes, gone. kind download (target = folder, default Downloads): "
+                   "finishes. kind screen (question; target = a window title or all): you look at the screen every "
+                   "few minutes and answer the question; use it only when nothing else can tell (a game queue, a "
+                   "progress bar with no window title), since each look costs a little. every_minutes, for_hours "
+                   "(defaults: pages 10 min for a week, screen 5 min for 2 hours, the rest every few seconds for a "
+                   "day), repeat (tell them every time, not just once), then (something to do when it happens, in "
+                   "the user's words, e.g. 'open the file'; they approve it up front). list, remove / pause / resume "
+                   "/ check (id from list, or words from its label; 'all'). The add result says what it sees right "
+                   "now: pass that on in a sentence.",
+          {"action": {"type": "string", "enum": ["add", "list", "remove", "pause", "resume", "check"]},
+           "kind": {"type": "string", "enum": ["page", "app", "window", "file", "download", "screen"]},
+           "target": S, "condition": {"type": "string", "enum": ["contains", "gone", "below", "above", "changes",
+                                                                  "ai", "idle", "closes", "opens", "appears",
+                                                                  "finishes"]},
+           "value": S, "question": S, "every_minutes": N, "for_hours": N, "repeat": B, "then": S, "label": S,
+           "id": N}, ["action"]),
+    _spec("activity", "Activity memory: which apps and windows the user had in front, logged on this PC (titles "
+                      "only, never screenshots or typing), if they've switched it on. summary (when: today, "
+                      "yesterday, this morning, yesterday afternoon, last 2 hours, friday, last week, 2026-10-20): "
+                      "time per app, the files/pages/chats in their titles, and a timeline; use it for 'what was I "
+                      "working on', 'how long was I in X'. search (query, days): when they last had something open. "
+                      "reopen (when): opens the files and apps they were using then. status, pause (minutes; none = "
+                      "until resumed), resume, forget (when, or all to wipe), on, off (only when they ask). When "
+                      "answering, talk about what they did in plain words; don't read titles out verbatim unless "
+                      "asked.",
+          {"action": {"type": "string", "enum": ["summary", "search", "reopen", "status", "pause", "resume", "forget",
+                                                 "on", "off"]},
+           "when": S, "query": S, "days": N, "minutes": N}, ["action"]),
     _spec("unreal_expert", "Hand an Unreal Engine job to the Unreal expert (it runs on the user's separate Unreal key "
                            "and works in their open Unreal Editor: spawning and arranging actors, materials, lighting, "
                            "assets, editor scripting, reading errors from the log; it explains Blueprint and C++). Put "
@@ -2595,8 +2863,9 @@ FUNCS = {
     "keyboard_input": keyboard_input, "clipboard": clipboard, "screen": screen, "mouse": mouse,
     "look_at_camera": look_at_camera, "display": display, "media_control": media_control, "set_volume": set_volume,
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
-    "memory": memory, "reminders": reminders, "blender": blender, "blender_expert": blender_expert,
+    "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "history": history_tool, "background": background_tool,
+    "watch": watch_tool, "activity": activity_tool,
 }
 
 assert set(FUNCS) == {s["name"] for s in TOOL_SPECS}, "TOOL_SPECS and FUNCS are out of sync"

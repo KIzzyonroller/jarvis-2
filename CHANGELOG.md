@@ -1,7 +1,27 @@
 # What's new
 
 Newest first. After an update, Jarvis shows everything added since the version you had before.
-Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.9, 1.0.10...).
+Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
+
+## 1.0.13
+- **He watches things for you.** "Tell me when my download finishes", "let me know when Blender's done rendering", "tell me when that GPU drops under 500 dollars" (paste or open the shop page), "ping me when 'In stock' shows up on this page", "tell me when Discord closes", "tell me when a file shows up in my Renders folder". When it happens he says it, shows it here and on your phone, and pops a Windows notification. Add "and then open it" and he does that too (you OK it when you set it up). Last resort for things nothing else can see, like a game queue: "watch my screen and tell me when the match is found" (he looks every few minutes; each look costs about a cent). They're listed in the System panel under Watching, with Stop.
+- **Activity memory (off until you turn it on).** Switch it on in the System panel or Settings, and he keeps track of which app and window you're in. Then ask "what was I working on yesterday afternoon?", "how long was I in Blender today?", "when did I last have the budget spreadsheet open?" or "reopen what I had going on Friday". Only app and window names, never screenshots or typing, kept on this PC for 14 days. Private windows and password managers are never logged, you can add your own "never log" list, and "pause activity memory for an hour" or "wipe it" work any time. While it's on he also knows which app you're in when you say "save this" or "what's this?".
+
+## 1.0.12
+- **A full calendar.** "Dentist Tuesday at 3", "gym Monday Wednesday Friday 6 to 7am", "Mom's birthday March 3" (every year, on its own), "what's on tomorrow?", "am I free Friday afternoon?", "move the dentist to 4", "skip standup this Wednesday". Repeating events, alerts before things start (10 minutes by default, spoken), clash warnings, and today's events in the morning briefing. The System panel has an Agenda tab for the next 7 days.
+- **Your calendar apps.** See your Google Calendar and Outlook events by pasting their private calendar link in Settings > Calendar. iCloud, Fastmail, Yahoo and Nextcloud connect two-way (CalDAV, with an app password). New events can go straight to Google Calendar or Outlook too: he opens the event filled in and presses Save after you OK it. Or to Outlook desktop and the Windows Calendar app.
+- **Calendar mode.** Just the calendar and reminders in one window, using very little of your PC: no microphone, voice models, animations or AI running in the background. Type things the way you'd say them ("lunch with Sam tomorrow at noon"), see the month at a glance, and get alerts as Windows notifications with a chime (and Windows' own voice, if you like). Say "calendar mode", press Calendar mode in the System panel, or set Settings > Calendar > Start in. "Full Jarvis" in the window switches back.
+
+## 1.0.11
+- **Blender mode now uses a Meshy key, and makes detailed models.** Creatures, characters, statues, figurines, ornate props: describe it or give him a picture, and Meshy makes it in a minute or two. It lands in your Blender standing on the floor at the size you asked for, and he checks it, adds measured parts and exports it for printing. Get the key at meshy.ai/developers/keys (Meshy Pro or higher). Studio shows your Meshy credits left. The old Blender AI key slot is gone; the thinking runs on your main Claude key.
+- **Where to get each key** is written right in Studio, on the first-run screen and in Settings.
+- **Saving a key or setting always restarts him now**, including in Studio (the Unreal key didn't), and restarts can't get stuck any more: before, if something was slow to close, the new copy could give up and you'd be left with no Jarvis.
+
+## 1.0.10
+- **RGB lighting by voice.** "Make my lights red", "keyboard purple", "fans blue", "rainbow", "RGB off", "brightness 40", "put my lighting back". Works with Corsair iCUE, Razer Synapse, Logitech G HUB, OpenRGB and SignalRGB, all at once if you have several. If one needs a setting switched on, he tells you exactly which.
+- **Closing apps actually works now.** "Close Discord" quits it properly instead of leaving it in the tray, "close Steam" shuts Steam down cleanly, "close Word" finds Word, "close Minecraft" finds the game by its window, and "close YouTube" closes just that tab. If an app is asking about unsaved work, he tells you instead of forcing it. Several at once: "close Discord, Steam and Chrome". "What's open?" lists your apps and how much memory each uses.
+- **Let him into specific folders.** "You can work in my Game Project folder" lets him edit there without asking every time (deleting still asks). "You can look in my USB drive" lets him read it. You approve each one, they're listed in the System panel with Remove, and passwords and keys stay off-limits. New in Settings: turn off "Read files anywhere" to keep him to your user folder plus the folders you've let him into.
+- **He waits for apps that are still loading.** Right after an app opens, or while Windows says it's not responding, he waits before typing, clicking or looking at it. Links in an already-open browser wait for the page.
 
 ## 1.0.9
 - **The What's new pop-up now shows after every update, titled with the version you're actually on.** (1.0.8 still named it after the old notes.)

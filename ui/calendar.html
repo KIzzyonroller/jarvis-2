@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jarvis Calendar</title>
+<style>
+@font-face{font-family:"Michroma";font-weight:400;font-display:swap;src:url(fonts/michroma-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-weight:400;font-display:swap;src:url(fonts/jost-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-weight:500;font-display:swap;src:url(fonts/jost-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-weight:600;font-display:swap;src:url(fonts/jost-latin-600-normal.woff2) format("woff2")}
+/* Same projection-light palette as the HUD, nothing that moves on its own: calendar mode is meant to sit idle at ~0% CPU. */
+:root{
+  --void:#02060b; --vrgb:2,6,11; --panel:#050c13; --ink:#dff6ff; --c:#7fe7ff; --crgb:127,231,255; --dim:#6f8d9b; --line:rgba(127,231,255,.1);
+  --you:#ffc46b; --alarm:#ff9d2e; --argb:255,157,46;
+  --cal-c:#7fe7ff; --cal-g:#ffc46b; --cal-o:#b9a2ff; --cal-d:#8ff0a4; --cal-x:#ff9ec7;
+  --display:"Michroma",sans-serif; --text:"Jost",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--void);color:var(--ink);font:400 15px/1.45 var(--text);-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:1.5px solid var(--c);outline-offset:2px}
+[hidden]{display:none!important}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:rgba(var(--crgb),.18)}
+
+.app{display:grid;grid-template-columns:1fr 340px;grid-template-rows:auto 1fr;height:100%}
+header{grid-column:1/3;display:flex;align-items:center;gap:10px;padding:14px 18px 10px;border-bottom:1px solid var(--line)}
+.mark{font:400 11px var(--display);letter-spacing:.3em;color:var(--c);margin-right:14px;white-space:nowrap}
+h1{font:400 19px/1 var(--display);letter-spacing:.06em;min-width:0;white-space:nowrap}
+h1 small{font:400 15px var(--text);letter-spacing:0;color:var(--dim);margin-left:8px}
+.nav{display:flex;gap:2px;margin-left:6px}
+.nav button,.tb{height:30px;min-width:30px;padding:0 10px;border:1px solid rgba(var(--crgb),.18);color:var(--ink);font-size:13.5px}
+.nav button:hover,.tb:hover{border-color:rgba(var(--crgb),.5)}
+.nav svg{width:14px;height:14px;display:block}
+.grow{flex:1}
+.tb.full{color:var(--c);border-color:rgba(var(--crgb),.35)}
+
+/* ---------- month */
+main{display:flex;flex-direction:column;min-height:0;padding:0 0 0 18px}
+#alert{margin:12px 18px 0 0;display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--alarm);background:rgba(var(--argb),.08);color:var(--ink)}
+#alert b{color:var(--alarm);font-weight:600;font-size:12.5px;letter-spacing:.04em}
+#alert span{flex:1}
+#alert button{color:var(--dim);font-size:13px}
+.dow{display:grid;grid-template-columns:repeat(7,1fr);padding:12px 18px 6px 0;font-size:12px;color:var(--dim)}
+.dow span{padding-left:8px}
+.grid{flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;border-top:1px solid var(--line);border-left:1px solid var(--line);margin-right:18px;margin-bottom:16px;min-height:0}
+.day{position:relative;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px 6px 4px;min-width:0;overflow:hidden;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:2px}
+.day:hover{background:rgba(var(--crgb),.035)}
+.day .n{font-size:13px;color:var(--ink);width:24px;height:24px;display:grid;place-items:center;margin:-2px 0 2px -2px;flex:none}
+.day.out .n{color:#3b5361}
+.day.today .n{background:var(--c);color:#02121a;font-weight:600}
+.day[aria-selected=true]{outline:1.5px solid rgba(var(--crgb),.55);outline-offset:-1.5px;background:rgba(var(--crgb),.05)}
+.chip{display:block;font-size:12px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:6px;border-left:2px solid var(--k,var(--cal-c));color:var(--ink)}
+.chip i{font-style:normal;color:var(--dim);margin-right:4px}
+.chip.allday{background:color-mix(in srgb,var(--k,var(--cal-c)) 14%,transparent)}
+.more{font-size:11.5px;color:var(--dim);padding-left:8px}
+.k-c{--k:var(--cal-c)}.k-g{--k:var(--cal-g)}.k-o{--k:var(--cal-o)}.k-d{--k:var(--cal-d)}.k-x{--k:var(--cal-x)}
+
+/* ---------- side */
+aside{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--panel)}
+.side{overflow:auto;padding:14px 18px 18px;display:flex;flex-direction:column;gap:18px;flex:1}
+.add input,.rem-add input{width:100%;height:40px;padding:0 12px;background:rgba(var(--crgb),.05);border:1px solid rgba(var(--crgb),.25);outline:none;color:var(--ink)}
+.add input:focus,.rem-add input:focus{border-color:var(--c)}
+.add label,.sec h2{display:block;font-size:12.5px;color:var(--dim);font-weight:400;margin-bottom:6px}
+.prev{font-size:13px;color:var(--you);min-height:1.4em;margin-top:6px}
+.prev.no{color:var(--dim)}
+.to{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px;color:var(--dim)}
+.to select{background:transparent;border:0;color:var(--ink);font-size:12.5px;padding:2px 0}
+.to select option{background:#06121b}
+.sec h2{display:flex;justify-content:space-between;align-items:baseline}
+.sec h2 button{color:var(--c);font-size:12.5px}
+.daytitle{font:500 17px var(--text);color:var(--ink);margin-bottom:8px}
+.evs{list-style:none;display:flex;flex-direction:column;gap:2px}
+.evs li button{width:100%;display:grid;grid-template-columns:62px 1fr;gap:10px;text-align:left;padding:7px 8px 7px 0;border-left:2px solid var(--k,var(--cal-c));padding-left:10px}
+.evs li button:hover{background:rgba(var(--crgb),.05)}
+.evs .t{font-size:12.5px;color:var(--dim);font-variant-numeric:tabular-nums;line-height:1.5}
+.evs .w b{display:block;font-weight:500;font-size:14px}
+.evs .w small{display:block;font-size:12px;color:var(--dim)}
+.empty{font-size:13px;color:var(--dim)}
+.rems{list-style:none;display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.rems li{display:flex;gap:10px;align-items:baseline;font-size:13.5px}
+.rems li span{flex:1}
+.rems li small{color:var(--dim);font-size:12px;white-space:nowrap}
+.rems li.soon small{color:var(--alarm)}
+.rems li button{color:var(--dim);font-size:15px;line-height:1;padding:0 2px}
+.rems li button:hover{color:var(--ink)}
+.rem-add input{height:36px;font-size:13.5px}
+footer{border-top:1px solid var(--line);padding:10px 18px 12px;font-size:12px;color:var(--dim);display:flex;gap:10px;align-items:flex-start}
+footer span{flex:1;line-height:1.5}
+footer button{color:var(--c);font-size:12px;white-space:nowrap}
+
+/* ---------- dialogs */
+.ov{position:fixed;inset:0;background:rgba(var(--vrgb),.72);display:grid;place-items:center;z-index:5;padding:16px}
+.dlg{width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto;background:#040b12;border:1px solid rgba(var(--crgb),.4);padding:18px 20px 16px}
+.dlg h3{font:400 12px var(--display);letter-spacing:.2em;color:var(--c);margin-bottom:14px}
+.f{display:grid;grid-template-columns:96px 1fr;gap:8px 12px;align-items:center;margin-bottom:10px}
+.f>label{font-size:13px;color:var(--dim)}
+.f input,.f select,.f textarea{width:100%;height:36px;padding:0 10px;background:rgba(var(--crgb),.05);border:1px solid rgba(var(--crgb),.22);outline:none;color:var(--ink);font-size:14px;color-scheme:dark}
+.f textarea{height:64px;padding:8px 10px;resize:vertical}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--c)}
+.f select option{background:#06121b}
+.row2{display:flex;gap:8px}
+.chk{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink);height:36px}
+.chk input{width:16px;height:16px;accent-color:var(--c)}
+.msg{font-size:13px;color:var(--you);min-height:1.3em;margin:4px 0 10px}
+.msg.err{color:var(--alarm)}
+.acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.acts button{height:38px;padding:0 16px;border:1px solid rgba(var(--crgb),.28);font-size:14px}
+.acts .go{background:var(--c);border-color:var(--c);color:#02121a;font-weight:600}
+.acts .warn{color:var(--alarm);border-color:rgba(var(--argb),.45);margin-right:auto}
+.acts .warn+.warn{margin-right:0}
+.ro{font-size:13px;color:var(--dim);margin-bottom:10px}
+.ask pre{white-space:pre-wrap;font:14px/1.5 var(--text);color:var(--ink);margin-bottom:14px}
+
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto minmax(320px,55vh) 1fr;overflow:auto;height:auto;min-height:100%}
+  body{overflow:auto}
+  header{grid-column:1;flex-wrap:wrap;row-gap:8px;padding:12px 12px 10px}
+  h1{font-size:16px}
+  .mark{display:none}
+  .grow{flex-basis:100%;height:0}
+  body{overflow-x:hidden}
+  aside{border-left:0;border-top:1px solid var(--line)}
+  main{padding-left:12px}
+  .grid,.dow{margin-right:12px;padding-right:0}
+  .chip{font-size:0;height:5px;border-left:0;background:var(--k,var(--cal-c));margin:1px 2px;padding:0}
+  .chip i{display:none}
+  .more{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="mark" aria-hidden="true">J.A.R.V.I.S.</span>
+    <h1 id="title">October <small>2026</small></h1>
+    <div class="nav">
+      <button id="prev" aria-label="Previous month"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2L4 7l5 5"/></svg></button>
+      <button id="next" aria-label="Next month"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 2l5 5-5 5"/></svg></button>
+    </div>
+    <button class="tb" id="today">Today</button>
+    <span class="grow"></span>
+    <button class="tb" id="new">New event</button>
+    <button class="tb full" id="full" title="Switch to the whole Jarvis (restarts, about 10 seconds)">Full Jarvis</button>
+  </header>
+
+  <main>
+    <div id="alert" hidden role="alert"><b>HEADS UP</b><span id="alert-t"></span><button id="alert-x">Dismiss</button></div>
+    <div class="dow" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+    <div class="grid" id="grid" role="grid" aria-label="Month"></div>
+  </main>
+
+  <aside>
+    <div class="side">
+      <div class="add">
+        <label for="q">Add to the calendar</label>
+        <input id="q" autocomplete="off" spellcheck="false" placeholder="Dentist Tuesday 3pm">
+        <p class="prev no" id="qp" aria-live="polite">Type it the way you'd say it: “gym mon wed fri 6-7am”.</p>
+        <div class="to"><span>Add to</span><select id="target" aria-label="Which calendar"></select></div>
+      </div>
+      <section class="sec">
+        <h2><span class="daytitle" id="dtitle">Today</span><button id="dayadd">Add</button></h2>
+        <ul class="evs" id="evs"></ul>
+      </section>
+      <section class="sec">
+        <h2>Reminders</h2>
+        <ul class="rems" id="rems"></ul>
+        <div class="rem-add"><input id="r" autocomplete="off" spellcheck="false" placeholder="Remind me to call mom at 5" aria-label="New reminder"></div>
+        <p class="prev no" id="rp" aria-live="polite"></p>
+      </section>
+    </div>
+    <footer><span id="status">Loading...</span><button id="sync">Sync now</button></footer>
+  </aside>
+</div>
+
+<div class="ov" id="edit" hidden role="dialog" aria-modal="true" aria-labelledby="e-h">
+  <form class="dlg" id="ef" novalidate>
+    <h3 id="e-h">New event</h3>
+    <p class="ro" id="e-ro" hidden></p>
+    <div class="f"><label for="e-title">Title</label><input id="e-title" required></div>
+    <div class="f"><label>When</label><div class="chk"><input type="checkbox" id="e-allday"><label for="e-allday">All day</label></div></div>
+    <div class="f"><label for="e-date">Date</label><div class="row2"><input type="date" id="e-date"><input type="date" id="e-edate" aria-label="End date" hidden></div></div>
+    <div class="f" id="e-times"><label for="e-start">Time</label><div class="row2"><input type="time" id="e-start" step="300"><input type="time" id="e-end" step="300" aria-label="End time"></div></div>
+    <div class="f"><label for="e-rep">Repeats</label><div class="row2"><select id="e-rep"><option value="none">Doesn't repeat</option><option value="daily">Every day</option><option value="weekdays">Every weekday</option><option value="weekly">Every week</option><option value="every 2 weeks">Every 2 weeks</option><option value="monthly">Every month</option><option value="yearly">Every year</option></select><input type="date" id="e-until" aria-label="Until (optional)" title="Until (optional)"></div></div>
+    <div class="f"><label for="e-rem">Alert</label><select id="e-rem"><option value="default">Default</option><option value="none">No alert</option><option value="0">When it starts</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
+    <div class="f"><label for="e-loc">Where</label><input id="e-loc"></div>
+    <div class="f"><label for="e-notes">Notes</label><textarea id="e-notes"></textarea></div>
+    <div class="f" id="e-calrow"><label for="e-cal">Calendar</label><select id="e-cal"></select></div>
+    <p class="msg" id="e-msg" role="status"></p>
+    <div class="acts">
+      <button type="button" class="warn" id="e-del" hidden>Delete</button>
+      <button type="button" class="warn" id="e-del1" hidden>Skip just this one</button>
+      <button type="button" id="e-cancel">Cancel</button>
+      <button type="submit" class="go" id="e-save">Save</button>
+    </div>
+  </form>
+</div>
+
+<div class="ov" id="ask" hidden role="alertdialog" aria-modal="true" aria-labelledby="a-h">
+  <div class="dlg ask">
+    <h3>NEEDS YOUR OK</h3>
+    <p id="a-h" style="font-size:17px;margin-bottom:8px"></p>
+    <pre id="a-d"></pre>
+    <div class="acts"><button id="a-no">Don't</button><button id="a-always">Always allow</button><button class="go" id="a-yes">Do it</button></div>
+  </div>
+</div>
+
+<script>
+(() => {
+const $ = (q) => document.querySelector(q);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const pad = (n) => String(n).padStart(2, "0");
+const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+let api = null, today = new Date(), view = new Date(today.getFullYear(), today.getMonth(), 1), sel = ymd(today);
+let events = [], rems = [], info = { targets: [{ value: "jarvis", label: "Jarvis's calendar" }], default: "jarvis" };
+const call = async (n, ...a) => { try { return api ? await api[n](...a) : null; } catch (e) { console.error(n, e); return null; } };
+
+// ---------------------------------------------------------------- month grid
+function gridRange() {
+  const first = new Date(view), start = new Date(first); start.setDate(1 - first.getDay());
+  const end = new Date(start); end.setDate(start.getDate() + 42);
+  return [start, end];
+}
+async function load() {
+  const [a, b] = gridRange();
+  events = (await call("range", ymd(a), ymd(b))) || events;
+  rems = (await call("reminders")) || rems;
+  draw();
+}
+function onDay(d) {
+  return events.filter((e) => e.start.slice(0, 10) <= d && (e.end.slice(0, 10) >= d))
+    .sort((a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start));
+}
+function draw() {
+  $("#title").innerHTML = `${MONTHS[view.getMonth()]} <small>${view.getFullYear()}</small>`;
+  const [a] = gridRange(), g = $("#grid"), t = ymd(new Date());
+  g.textContent = "";
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(a); d.setDate(a.getDate() + i);
+    const k = ymd(d), list = onDay(k);
+    const b = document.createElement("button");
+    b.className = "day" + (d.getMonth() !== view.getMonth() ? " out" : "") + (k === t ? " today" : "");
+    b.setAttribute("role", "gridcell"); b.setAttribute("aria-selected", String(k === sel));
+    b.setAttribute("aria-label", d.toDateString() + (list.length ? `, ${list.length} event${list.length > 1 ? "s" : ""}` : ""));
+    b.dataset.d = k;
+    const max = list.length > 3 ? 2 : 3;
+    b.innerHTML = `<span class="n">${d.getDate()}</span>` + list.slice(0, max).map((e) =>
+      `<span class="chip k-${e.color}${e.all_day ? " allday" : ""}">${e.all_day ? "" : `<i>${esc(e.time.replace(" ", "").toLowerCase())}</i>`}${esc(e.title)}</span>`).join("")
+      + (list.length > max ? `<span class="more">${list.length - max} more</span>` : "");
+    b.onclick = () => { sel = k; draw(); };
+    b.ondblclick = () => openEdit(null, k);
+    g.appendChild(b);
+  }
+  drawDay(); drawRems();
+}
+function drawDay() {
+  const d = new Date(sel + "T12:00"), t = ymd(new Date());
+  const tm = new Date(); tm.setDate(tm.getDate() + 1);
+  $("#dtitle").textContent = (sel === t ? "Today, " : sel === ymd(tm) ? "Tomorrow, " : "") +
+    d.toLocaleDateString([], { weekday: sel === t || sel === ymd(tm) ? undefined : "long", month: "long", day: "numeric" });
+  const list = onDay(sel), ul = $("#evs");
+  ul.textContent = "";
+  if (!list.length) { ul.innerHTML = `<li class="empty">Nothing. Double-click a day or type above to add something.</li>`; return; }
+  list.forEach((e) => {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.className = "k-" + e.color;
+    const meta = [e.cal !== "Jarvis" ? e.cal : "", e.location, e.repeat_text].filter(Boolean).join(", ");
+    b.innerHTML = `<span class="t">${e.all_day ? "All day" : esc(e.time) + "<br>" + esc(e.end_time)}</span><span class="w"><b>${esc(e.title)}</b>${meta ? `<small>${esc(meta)}</small>` : ""}</span>`;
+    b.onclick = () => openEdit(e);
+    li.appendChild(b); ul.appendChild(li);
+  });
+}
+function rel(iso) {
+  const d = new Date(iso), m = Math.round((d - Date.now()) / 60000);
+  if (m < 60) return m <= 0 ? "now" : `in ${m} min`;
+  const same = ymd(d) === ymd(new Date());
+  return (same ? "" : d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) + ", ") + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+function drawRems() {
+  const ul = $("#rems"); ul.textContent = "";
+  if (!rems.length) { ul.innerHTML = `<li class="empty">No reminders.</li>`; return; }
+  rems.forEach((r) => {
+    const li = document.createElement("li");
+    li.className = new Date(r.due) - Date.now() < 600000 ? "soon" : "";
+    li.innerHTML = `<span>${esc(r.message)}</span><small>${esc(rel(r.due))}</small>`;
+    const x = document.createElement("button"); x.textContent = "×"; x.setAttribute("aria-label", `Cancel reminder: ${r.message}`);
+    x.onclick = async () => { await call("cancel_reminder", r.id); load(); };
+    li.appendChild(x); ul.appendChild(li);
+  });
+}
+setInterval(drawRems, 30000);
+setInterval(() => { if (ymd(new Date()) !== ymd(today)) { today = new Date(); load(); } }, 60000);
+
+// ---------------------------------------------------------------- quick add
+let qt;
+$("#q").addEventListener("input", () => {
+  clearTimeout(qt);
+  const v = $("#q").value.trim();
+  if (!v) { $("#qp").className = "prev no"; $("#qp").textContent = "Type it the way you'd say it: “gym mon wed fri 6-7am”."; return; }
+  qt = setTimeout(async () => {
+    const p = await call("parse", v);
+    if (!p) return;
+    $("#qp").className = "prev" + (p.ok ? "" : " no");
+    $("#qp").textContent = p.ok ? p.preview + "  ⏎ to add" : p.why;
+  }, 140);
+});
+$("#q").addEventListener("keydown", async (e) => {
+  if (e.key !== "Enter") return;
+  const v = $("#q").value.trim(); if (!v) return;
+  $("#qp").className = "prev"; $("#qp").textContent = "Adding...";
+  const r = await call("quick_add", v, $("#target").value);
+  if (!r) return;
+  $("#qp").className = "prev" + (r.ok ? "" : " no"); $("#qp").textContent = r.msg;
+  if (r.ok) { $("#q").value = ""; if (r.start) { sel = r.start.slice(0, 10); const d = new Date(sel + "T12:00"); view = new Date(d.getFullYear(), d.getMonth(), 1); } load(); }
+});
+$("#r").addEventListener("keydown", async (e) => {
+  if (e.key !== "Enter") return;
+  const v = $("#r").value.trim(); if (!v) return;
+  const r = await call("add_reminder", v); if (!r) return;
+  $("#rp").className = "prev" + (r.ok ? "" : " no"); $("#rp").textContent = r.msg;
+  if (r.ok) { $("#r").value = ""; load(); }
+});
+
+// ---------------------------------------------------------------- edit dialog
+let cur = null;
+function hm(iso) { return iso.length > 10 ? iso.slice(11, 16) : ""; }
+function openEdit(e, day) {
+  cur = e;
+  const ro = !!(e && e.readonly);
+  $("#e-h").textContent = e ? (ro ? "EVENT" : "EDIT EVENT") : "NEW EVENT";
+  $("#e-ro").hidden = !ro; $("#e-ro").textContent = ro ? `From ${e.cal}. It's read-only here: change it in ${e.cal}, or connect it with CalDAV for two-way.` : "";
+  const d = e ? e.start.slice(0, 10) : (day || sel);
+  $("#e-title").value = e ? e.title : "";
+  $("#e-allday").checked = e ? e.all_day : false;
+  $("#e-date").value = d; $("#e-edate").value = e && e.all_day ? e.end.slice(0, 10) : d;
+  $("#e-start").value = e && !e.all_day ? hm(e.start) : "09:00";
+  $("#e-end").value = e && !e.all_day ? hm(e.end) : "10:00";
+  const r = e && e.repeat;
+  $("#e-rep").value = !r ? "none" : r.freq === "weekly" && r.days && r.days.length === 5 ? "weekdays" : r.freq === "weekly" && r.interval === 2 ? "every 2 weeks" : r.freq;
+  $("#e-until").value = r && r.until ? r.until : "";
+  $("#e-rem").value = !e || e.remind == null ? "default" : e.remind.length === 0 ? "none" : String(e.remind[0]);
+  $("#e-loc").value = e ? e.location : ""; $("#e-notes").value = e ? e.notes : "";
+  $("#e-cal").innerHTML = info.targets.map((t) => `<option value="${esc(t.value)}"${t.value === info.default ? " selected" : ""}>${esc(t.label)}</option>`).join("");
+  $("#e-calrow").hidden = !!e;
+  $("#e-del").hidden = !e || ro; $("#e-del1").hidden = !e || ro || !e.repeat;
+  $("#e-del").textContent = e && e.repeat ? "Delete all" : "Delete";
+  $("#e-save").hidden = ro;
+  [...$("#ef").elements].forEach((x) => { if (x.tagName !== "BUTTON") x.disabled = ro; });
+  $("#e-msg").textContent = ""; $("#e-msg").className = "msg";
+  syncAllDay();
+  $("#edit").hidden = false; setTimeout(() => (ro ? $("#e-cancel") : $("#e-title")).focus(), 30);
+}
+function syncAllDay() { const a = $("#e-allday").checked; $("#e-times").hidden = a; $("#e-edate").hidden = !a; }
+$("#e-allday").onchange = syncAllDay;
+const closeEdit = () => { $("#edit").hidden = true; cur = null; };
+$("#e-cancel").onclick = closeEdit;
+$("#ef").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const title = $("#e-title").value.trim();
+  if (!title) { $("#e-msg").className = "msg err"; $("#e-msg").textContent = "Give it a name."; $("#e-title").focus(); return; }
+  const all = $("#e-allday").checked, d = $("#e-date").value;
+  if (!d) { $("#e-msg").className = "msg err"; $("#e-msg").textContent = "Pick a date."; return; }
+  let s = all ? d : `${d}T${$("#e-start").value || "09:00"}`, en = all ? ($("#e-edate").value || d) : `${d}T${$("#e-end").value || "10:00"}`;
+  if (!all && en <= s) { const x = new Date(s); x.setHours(x.getHours() + 1); en = `${ymd(x)}T${pad(x.getHours())}:${pad(x.getMinutes())}`; }
+  const f = { id: cur ? cur.id : null, title, start: s, end: en, all_day: all, repeat: $("#e-rep").value, until: $("#e-until").value,
+    remind: $("#e-rem").value, location: $("#e-loc").value.trim(), notes: $("#e-notes").value.trim(), calendar: $("#e-cal").value };
+  $("#e-save").disabled = true; $("#e-msg").className = "msg"; $("#e-msg").textContent = "Saving...";
+  const r = await call("save", f); $("#e-save").disabled = false;
+  if (!r) return;
+  $("#e-msg").className = "msg" + (r.ok ? "" : " err"); $("#e-msg").textContent = r.msg;
+  if (r.ok) { sel = d; setTimeout(closeEdit, 500); load(); }
+};
+async function del(only) {
+  if (!cur) return;
+  const r = await call("delete", cur.id, only ? cur.start : null);
+  if (!r) return;
+  $("#e-msg").className = "msg" + (r.ok ? "" : " err"); $("#e-msg").textContent = r.msg;
+  if (r.ok) { setTimeout(closeEdit, 500); load(); }
+}
+$("#e-del").onclick = () => del(false); $("#e-del1").onclick = () => del(true);
+
+// ---------------------------------------------------------------- buttons
+$("#prev").onclick = () => { view.setMonth(view.getMonth() - 1); load(); };
+$("#next").onclick = () => { view.setMonth(view.getMonth() + 1); load(); };
+$("#today").onclick = () => { const t = new Date(); view = new Date(t.getFullYear(), t.getMonth(), 1); sel = ymd(t); load(); };
+$("#new").onclick = () => openEdit(null, sel); $("#dayadd").onclick = () => openEdit(null, sel);
+$("#sync").onclick = async () => { $("#status").textContent = "Syncing..."; const s = await call("sync"); if (s) $("#status").textContent = s; load(); };
+$("#full").onclick = async () => { $("#full").textContent = "Switching..."; $("#full").disabled = true; const r = await call("full_mode"); if (r && !r.ok) { $("#full").textContent = "Full Jarvis"; $("#full").disabled = false; alertBar(r.msg); } };
+$("#alert-x").onclick = () => { $("#alert").hidden = true; };
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { if (!$("#ask").hidden) answer(false); else if (!$("#edit").hidden) closeEdit(); return; }
+  const typing = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName);
+  if (typing || !$("#edit").hidden) return;
+  if (e.key === "ArrowLeft" && e.altKey) $("#prev").click();
+  if (e.key === "ArrowRight" && e.altKey) $("#next").click();
+  if (e.key === "n") { e.preventDefault(); $("#q").focus(); }
+});
+
+// ---------------------------------------------------------------- events from Python
+let at;
+function alertBar(t) { $("#alert-t").textContent = t; $("#alert").hidden = false; clearTimeout(at); at = setTimeout(() => { $("#alert").hidden = true; }, 120000); }
+let askId = null;
+function answer(ok, always) { if (askId) call("answer", askId, ok, !!always); askId = null; $("#ask").hidden = true; }
+$("#a-yes").onclick = () => answer(true); $("#a-no").onclick = () => answer(false); $("#a-always").onclick = () => answer(true, true);
+let lt;
+window.J = {
+  on(e) {
+    if (e.type === "changed") { clearTimeout(lt); lt = setTimeout(load, 150); }
+    else if (e.type === "alert") alertBar(e.text);
+    else if (e.type === "confirm") { askId = e.id; $("#a-h").textContent = e.title; $("#a-d").textContent = e.detail || ""; $("#a-always").hidden = !e.can_always; $("#ask").hidden = false; $("#a-yes").focus(); }
+  },
+  batch(list) { list.forEach((e) => window.J.on(e)); },
+};
+
+async function start() {
+  const r = await call("ready");
+  if (r) { info = r; $("#status").textContent = r.status; }
+  $("#target").innerHTML = info.targets.map((t) => `<option value="${esc(t.value)}"${t.value === info.default ? " selected" : ""}>${esc(t.label)}</option>`).join("");
+  load();
+  setTimeout(() => $("#q").focus(), 100);
+}
+window.addEventListener("pywebviewready", () => { api = window.pywebview.api; start(); });
+setTimeout(() => { if (!api && !window.pywebview) demo(); }, 600);
+
+// ---------------------------------------------------------------- demo (opened in a normal browser)
+function demo() {
+  const t = new Date(), d = (n, h, m = 0) => { const x = new Date(t); x.setDate(t.getDate() + n); return `${ymd(x)}T${pad(h)}:${pad(m)}`; };
+  const D = (n) => { const x = new Date(t); x.setDate(t.getDate() + n); return ymd(x); };
+  const ev = (id, title, s, e, o = {}) => ({ id, title, start: s, end: e, all_day: s.length === 10, location: "", notes: "", repeat: null, repeat_text: "", remind: null, cal: "Jarvis", color: "c", readonly: false,
+    time: s.length > 10 ? new Date(s).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "", end_time: e.length > 10 ? new Date(e).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "", ...o });
+  const E = [ev("e1", "Dentist", d(0, 15), d(0, 16), { location: "Main St Dental" }), ev("e2", "Hockey practice", d(1, 17), d(1, 18, 30), { cal: "Google Calendar", color: "g", readonly: true }),
+    ev("e3", "Mom's birthday", D(4), D(4), { repeat: { freq: "yearly", interval: 1 }, repeat_text: "every year" }), ev("e4", "Standup", d(1, 9, 30), d(1, 10), { repeat_text: "every weekday", color: "o", cal: "Outlook" }),
+    ev("e5", "Gym", d(2, 6), d(2, 7), { repeat_text: "every Mon, Wed, Fri" }), ev("e6", "Lunch with Sam", d(2, 12), d(2, 13, 30), { color: "d", cal: "iCloud" }),
+    ev("e7", "Gym", d(4, 6), d(4, 7), { repeat_text: "every Mon, Wed, Fri" }), ev("e8", "Flight to Vancouver", d(9, 6), d(9, 8), {}), ev("e9", "Team review", d(0, 10), d(0, 11), { color: "o", cal: "Outlook" }),
+    ev("e10", "Pay rent", D(5), D(5), { repeat_text: "every month" }), ev("e11", "Trash day", D(-2), D(-2), {}), ev("e12", "Movie night", d(0, 19), d(0, 21), {})];
+  const R = [{ id: "r1", message: "Stretch", due: new Date(Date.now() + 8 * 60000).toISOString() }, { id: "r2", message: "Call mom", due: d(0, 17) }];
+  api = {
+    ready: () => ({ today: ymd(t), default: "jarvis", alert: 10, targets: [{ value: "jarvis", label: "Jarvis's calendar" }, { value: "caldav", label: "iCloud" }, { value: "google", label: "Google Calendar" }, { value: "outlook", label: "Outlook" }],
+      status: "Jarvis's calendar: 9 events. Google Calendar: 41 events, updated 1:52 PM (read-only link). iCloud: 12 events, updated 1:52 PM (two-way)." }),
+    range: () => E, reminders: () => R,
+    parse: (v) => /\d|today|tomorrow|mon|tue|wed|thu|fri|sat|sun|noon|tonight/i.test(v) ? { ok: true, preview: v.replace(/^\w/, (c) => c.toUpperCase()) + " (demo)" } : { ok: false, why: "No day or time in that. Try “dentist Tuesday 3pm”." },
+    quick_add: (v) => ({ ok: true, msg: "Added (demo)." }), save: () => ({ ok: true, msg: "Saved (demo)." }), delete: () => ({ ok: true, msg: "Deleted (demo)." }),
+    add_reminder: (v) => ({ ok: true, msg: "Reminder set (demo)." }), cancel_reminder: () => ({ ok: true }), answer() {}, sync: () => "Synced (demo).", full_mode: () => ({ ok: true }),
+  };
+  start();
+  const P = new URLSearchParams(location.search);
+  if (P.has("alert")) setTimeout(() => window.J.on({ type: "alert", text: "Dentist starts in 10 minutes, at Main St Dental." }), 400);
+  if (P.has("edit")) setTimeout(() => openEdit(E[0]), 500);
+  if (P.has("ask")) setTimeout(() => window.J.on({ type: "confirm", id: "x", title: "Add to Google Calendar", detail: "Dentist, Tuesday 3 PM to 4 PM\n\nI'll open it in Google Calendar already filled in and press Save.", can_always: true }), 500);
+}
+})();
+</script>
+</body>
+</html>

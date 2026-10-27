@@ -17,7 +17,7 @@ hiddenimports = [
 # Packages that ship data files, native libraries or plugins next to their code
 for pkg in ["faster_whisper", "ctranslate2", "onnxruntime", "kokoro_onnx", "espeakng_loader", "phonemizer",
             "language_tags", "segments", "csvw", "webview", "mcp", "discord", "velopack", "certifi",
-            "screen_brightness_control", "pycaw", "comtypes", "_sounddevice_data", "winrt", "uiautomation"]:
+            "screen_brightness_control", "pycaw", "comtypes", "_sounddevice_data", "winrt", "uiautomation", "cuesdk", "openrgb", "caldav", "icalendar", "recurring_ical_events", "x_wr_timezone", "niquests", "urllib3_future", "jh2", "qh3", "wassima", "icalendar_searcher", "calendaring_config", "dns"]:
     try:
         d, b, h = collect_all(pkg)
         datas += d

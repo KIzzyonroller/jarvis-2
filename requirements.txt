@@ -28,3 +28,8 @@ winrt-Windows.Media.Control; sys_platform == "win32"
 winrt-Windows.Foundation; sys_platform == "win32"
 winrt-Windows.Foundation.Collections; sys_platform == "win32"
 uiautomation; sys_platform == "win32"
+openrgb-python    # RGB through OpenRGB
+cuesdk; sys_platform == "win32"    # RGB through Corsair iCUE
+icalendar                 # calendar files and Google/Outlook links
+recurring-ical-events
+caldav                    # two-way calendars: iCloud, Fastmail, Yahoo, Nextcloud

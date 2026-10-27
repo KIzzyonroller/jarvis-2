@@ -157,6 +157,7 @@ def discord_since(watcher, since):
 
 
 EMAIL_LINE = None             # set by the core when email is set up: () -> "3 unread emails, from ..."
+CALENDAR_LINE = None          # set by the core: () -> "On the calendar today: dentist at 3 PM, ..."
 
 
 def gather(reminder_items, watcher=None, discord_from=None, flags_get=None, flags_set=None, budget=5.0):
@@ -184,6 +185,8 @@ def gather(reminder_items, watcher=None, discord_from=None, flags_get=None, flag
     for j in jobs:
         j.start()
     run("reminders", reminders_today, reminder_items)
+    if CALENDAR_LINE is not None:
+        run("calendar", CALENDAR_LINE)
     if watcher is not None:
         run("discord", discord_since, watcher, discord_from or time.time() - 12 * 3600)
     end = time.time() + budget
@@ -211,7 +214,8 @@ def gather(reminder_items, watcher=None, discord_from=None, flags_get=None, flag
 def prompt(facts, morning=True):
     now = datetime.now()
     when = f"{now.strftime('%A, %B')} {now.day}, {now.strftime('%I:%M %p').lstrip('0')}"
-    lines = [f"{k}: {v}" for k, v in (("Weather", facts.get("weather")), ("Reminders today", facts.get("reminders")),
+    lines = [f"{k}: {v}" for k, v in (("Weather", facts.get("weather")), ("Calendar", facts.get("calendar")),
+                                      ("Reminders today", facts.get("reminders")),
                                       ("Discord", facts.get("discord")), ("Email", facts.get("email")),
                                       ("PC", facts.get("pc")),
                                       ("Headlines", facts.get("headlines"))) if v]

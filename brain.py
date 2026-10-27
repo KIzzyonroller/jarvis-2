@@ -262,7 +262,7 @@ class Brain:
     PARALLEL_SAFE = {"open", "close_app", "set_volume", "display", "system_info", "look_at_camera"}
 
     # Things that open or start something: repeating them in one request means duplicate tabs/windows.
-    ONCE_PER_REQUEST = {"open", "youtube", "spotify", "close_app", "blender_expert", "unreal_expert"}
+    ONCE_PER_REQUEST = {"open", "youtube", "spotify", "close_app", "blender_expert", "unreal_expert", "watch"}
 
     def _guard(self, b):
         """None to go ahead, or the result to return instead of running the call again."""

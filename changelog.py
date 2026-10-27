@@ -22,7 +22,7 @@ def sections(text=None):
     return out
 
 
-def since(seen_version, text=None, cap=6):
+def since(seen_version, text=None, cap=20):
     """Notes for every release newer than seen_version (all of the latest few if it isn't listed)."""
     secs = sections(text)
     if seen_version not in [v for v, _ in secs]:

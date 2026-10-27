@@ -126,3 +126,18 @@ def claim(on_show, wait=0.0):
                     pass
     threading.Thread(target=serve, daemon=True, name="single-copy").start()
     return True
+
+
+def release():
+    """Let go of the 'I'm running' lock now (restarting): the new copy can start straight away."""
+    global _server
+    s, _server = _server, None
+    if s is not None:
+        try:
+            s.shutdown(socket.SHUT_RDWR)         # wakes the thread waiting in accept(); a plain close() doesn't free
+        except OSError:                          # the port while that thread is still blocked on it
+            pass
+        try:
+            s.close()
+        except OSError:
+            pass

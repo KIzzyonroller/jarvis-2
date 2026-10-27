@@ -223,6 +223,45 @@ def settle(w, deadline, min_controls=8, appeared=None):
     return False
 
 
+FRESH_SECS = 45        # an app whose process started less than this long ago may still be loading
+
+
+def _hung(w):
+    """Windows' own 'Not responding' check for that window."""
+    try:
+        import tools
+        _, _, u, _ = tools._win()
+        return bool(u.IsHungAppWindow(getattr(w, "_hWnd", 0)))
+    except Exception:
+        return False
+
+
+def _age(w):
+    try:
+        import psutil
+        import tools
+        return time.time() - psutil.Process(tools._wpid(getattr(w, "_hWnd", 0))).create_time()
+    except Exception:
+        return 1e9
+
+
+def wait_if_loading(w, max_wait=20.0):
+    """Before acting in a window that's already there: if its app only just started, or Windows says it's not
+    responding, wait for it. Covers "open Discord", then a moment later "type hi in Discord".
+    Returns 'ready' (instantly for apps that have been running a while), or 'busy' if it never came good."""
+    if w is None:
+        return "ready"
+    deadline = time.time() + max_wait
+    young = _age(w) < FRESH_SECS
+    if not young and not _hung(w):
+        return "ready"
+    while _hung(w) and time.time() < deadline:
+        time.sleep(0.3)
+    if young:
+        settle(w, deadline)
+    return "busy" if _hung(w) else "ready"
+
+
 def wait_ready(name, before=(), timeout=25.0, extra_titles=()):
     """After launching: (window or None, 'ready' | 'loading' | 'no window').
     before = window handles that existed before the launch; any new window also counts as the app's."""
@@ -268,6 +307,9 @@ def ensure(name, front=False, timeout=25.0):
         return None, "unknown", ""
     if wins:
         w = wins[0]
+        if wait_if_loading(w) == "busy":
+            return w, "loading", (f"{name} is open but not responding right now (Windows says it's busy). Wait a "
+                                  "moment and check it with the screen tool before doing anything in it.")
         if front:
             tools._GUARD["id"] += 1
             tools._activate(w)

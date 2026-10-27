@@ -217,8 +217,12 @@ def restart_command():
     return [str(exe), str(config.BASE_DIR / "jarvis.py"), "--after-update"]
 
 
+NEXT_ARGS = []        # extra arguments for the restarted copy (e.g. --calendar to come back as calendar mode)
+
+
 def spawn_restart():
     flags = 0
     if os.name == "nt":
         flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    subprocess.Popen(restart_command(), cwd=str(config.BASE_DIR), close_fds=True, creationflags=flags)
+    cmd = restart_command() + list(NEXT_ARGS)
+    subprocess.Popen(cmd, cwd=str(config.BASE_DIR), close_fds=True, creationflags=flags)

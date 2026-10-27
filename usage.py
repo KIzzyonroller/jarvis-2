@@ -122,6 +122,23 @@ def record_mode(mode, u):
         _save()
 
 
+def record_usd(usd, **counts):
+    """Spending on the main Claude key from outside the normal conversation (the Blender expert)."""
+    return _add(float(usd or 0), "claude", **counts)
+
+
+def record_credits(mode, credits):
+    """Meshy credits a mode used (Meshy bills in credits, not dollars)."""
+    if not credits:
+        return
+    with _LOCK:
+        d = _load()["days"].setdefault(_day(), {"usd": 0.0, "claude": 0, "searches": 0, "speech_secs": 0.0})
+        m = d.setdefault("modes", {}).setdefault(mode, {"usd": 0.0, "tokens": 0, "calls": 0, "usd_known": True})
+        m["credits"] = int(m.get("credits", 0)) + int(credits)
+        m["calls"] += 1
+        _save()
+
+
 def mode_today(mode):
     """{"usd", "tokens", "calls", "usd_known"} for today, or None."""
     with _LOCK:

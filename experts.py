@@ -1,10 +1,14 @@
 """
-Expert modes: Blender and Unreal, each on ITS OWN AI key.
+Expert modes: Blender and Unreal, each unlocked by its own key.
+
+  * Blender mode: a Meshy key (meshy.ai/developers/keys, Meshy Pro or higher). Meshy makes the detailed models
+    (creatures, characters, statues) from text or a picture; the Blender expert's thinking runs on Jarvis's main
+    Claude key and does everything in Blender: importing, sizing, fixing, building measured parts with code.
+  * Unreal mode: its own AI key (Claude, OpenRouter or OpenAI), so its spending is on that key's bill.
 
 Locked until a key is added (first-run card, the Studio panel, or Settings). While locked, Jarvis can still chat
 about Blender or Unreal, but he can't drive either editor. Once unlocked, Jarvis hands the job to the expert
-(blender_expert / unreal_expert tools). The expert runs on that mode's key, so its spending is on that key's bill,
-and it works in the editor itself:
+(blender_expert / unreal_expert tools), which works in the editor itself:
 
   * it checks the real API of the version the user has open (live lookup inside the editor), instead of
     guessing from memory, which is where AI usually goes wrong with Blender and Unreal (renamed functions);
@@ -12,7 +16,7 @@ and it works in the editor itself:
   * anything that saves, deletes, imports or reaches outside the editor asks the user first. In Unreal everything
     it does is one undo step (Ctrl+Z).
 
-Keys: Claude (sk-ant-), OpenRouter (sk-or-) or OpenAI (sk-); providers.py works out which.
+Unreal keys: Claude (sk-ant-), OpenRouter (sk-or-) or OpenAI (sk-); providers.py works out which.
 """
 import ast
 import os
@@ -21,20 +25,30 @@ import re
 import providers
 
 MODES = {
-    "blender": {"name": "Blender", "key": "BLENDER_AI_KEY", "model": "BLENDER_AI_MODEL"},
+    "blender": {"name": "Blender", "key": "MESHY_API_KEY", "model": None},
     "unreal": {"name": "Unreal", "key": "UNREAL_AI_KEY", "model": "UNREAL_AI_MODEL"},
 }
-LIVE_KEYS = {m[k] for m in MODES.values() for k in ("key", "model")}     # take effect without a restart
+MODE_SETTINGS = {m[k] for m in MODES.values() for k in ("key", "model") if m[k]}
+WHERE = {   # where to get each key, shown in Studio, the first-run card and Settings
+    "meshy": "meshy.ai/developers/keys (needs Meshy Pro or higher)",
+    "claude": "console.anthropic.com/settings/keys",
+    "openrouter": "openrouter.ai/settings/keys",
+    "openai": "platform.openai.com/api-keys",
+}
 _LAST_MODEL = {}
 
 
 def key(mode):
     v = (os.environ.get(MODES[mode]["key"]) or "").strip()
+    if mode == "blender":
+        import meshy
+        return v if v and meshy.looks_valid(v) is None else ""
     return v if providers.detect(v) else ""
 
 
 def model_setting(mode):
-    return (os.environ.get(MODES[mode]["model"]) or "").strip()
+    m = MODES[mode]["model"]
+    return (os.environ.get(m) or "").strip() if m else ""
 
 
 def unlocked(mode):
@@ -42,9 +56,12 @@ def unlocked(mode):
 
 
 def locked_note(mode):
-    n = MODES[mode]["name"]
-    return (f"{n} mode is locked: it runs on its own AI key, and none is set. The user can add one in the Studio panel "
-            f"(the cube button at the top of the window) or in Settings > {n} mode: a Claude, OpenRouter or OpenAI key.")
+    if mode == "blender":
+        return ("Blender mode is locked: it needs a Meshy API key (from " + WHERE["meshy"] + "). The user can add it "
+                "in the Studio panel (the cube button at the top of the window) or in Settings > Blender mode.")
+    return ("Unreal mode is locked: it runs on its own AI key, and none is set. The user can add one in the Studio "
+            "panel (the cube button at the top) or in Settings > Unreal mode: a Claude key (" + WHERE["claude"]
+            + "), OpenRouter (" + WHERE["openrouter"] + ") or OpenAI (" + WHERE["openai"] + ").")
 
 
 # ============================================================ Blender expert
@@ -132,7 +149,15 @@ How to work:
 - Prefer modifiers and bmesh over long vertex lists. Clear names, materials with a base color so renders show it.
 - Don't read or write files in code; use save/export. Anything that touches files or Blender's settings asks
   the user first (that's fine, but don't do it unless the job needs it).
-- Detailed organic sculpts (faces, characters) aren't realistic this way: say so rather than faking it."""
+
+Detailed and organic things (creatures, characters, people, animals, statues, figurines, ornate or sculpted props,
+food, plants) can't be built well with code. Make those with meshy_generate: a clear prompt (subject, pose, style,
+key details; no sizes, set those with height_cm), or the user's picture as image. It takes a minute or two and uses
+Meshy credits, so make one, look at it, and only try again if it's clearly wrong. It arrives in Blender already
+standing on the floor at the height you asked for. Then check the render from a couple of angles, and do the
+practical part with code: a base or stand, text, holes, combining with measured parts. Meshy models are dense and
+a bit messy inside; that's fine for renders and 3D printing (export STL), but tell the user if they want to animate
+or hand-edit it. Measured, practical objects (stands, boxes, brackets, furniture) are still better built with code."""
 
 
 # ============================================================ Unreal expert
@@ -224,6 +249,96 @@ How to work:
 - If something needs a plugin or setting that's off, say exactly which one."""
 
 
+# ============================================================ Meshy: detailed models into Blender
+IMPORT_CODE = r'''
+import bpy
+from mathutils import Vector
+_before = set(bpy.data.objects)
+bpy.ops.import_scene.gltf(filepath={path!r})
+_new = [o for o in bpy.data.objects if o not in _before]
+_root = bpy.data.objects.new({name!r}, None)
+bpy.context.scene.collection.objects.link(_root)
+for _o in _new:
+    if _o.parent is None:
+        _o.parent = _root
+def _box():
+    bpy.context.view_layer.update()
+    _pts = [_o.matrix_world @ Vector(_c) for _o in _new if _o.type == "MESH" for _c in _o.bound_box]
+    if not _pts:
+        return None
+    return (Vector((min(p.x for p in _pts), min(p.y for p in _pts), min(p.z for p in _pts))),
+            Vector((max(p.x for p in _pts), max(p.y for p in _pts), max(p.z for p in _pts))))
+_b = _box()
+if _b:
+    _h = _b[1].z - _b[0].z
+    if {height} > 0 and _h > 0:
+        _s = ({height} / 100.0) / _h
+        _root.scale = (_s, _s, _s)
+        _b = _box()
+    _root.location.x -= (_b[0].x + _b[1].x) / 2
+    _root.location.y -= (_b[0].y + _b[1].y) / 2
+    _root.location.z -= _b[0].z
+    _b = _box()
+    _d = _b[1] - _b[0]
+    _faces = sum(len(_o.data.polygons) for _o in _new if _o.type == "MESH")
+    print("Imported %s: %d parts, %d faces, %.1f x %.1f x %.1f cm, standing on the floor." % (
+        {name!r}, len(_new), _faces, _d.x * 100, _d.y * 100, _d.z * 100))
+else:
+    print("Imported, but it has no mesh in it.")
+'''
+
+
+def meshy_generate(prompt="", image=None, height_cm=None, textured=True, polycount=None, name=None):
+    import config
+    import meshy
+    import tools
+    k = key("blender")
+    if not k:
+        return locked_note("blender")
+    img = None
+    if image:
+        p = tools._resolve(image, config.HOME)
+        if not tools._readable(p):
+            return "I'm not allowed to read that picture's folder. The user can let me in (files grant_access)."
+        img = p
+    cancel = getattr(tools._CTX, "cancel", None)
+    t0 = __import__("time").time()
+
+    def progress(pct, queue):
+        print(f"   [meshy] {pct}%" + (f" ({queue} ahead in Meshy's queue)" if queue else ""))
+    try:
+        res = meshy.generate(k, prompt or "", img, textured=textured is not False, polycount=polycount,
+                             on_progress=progress, cancel=cancel)
+        label = re.sub(r"\s+", " ", (name or prompt or (img.stem if img else "model"))).strip()[:40] or "model"
+        path = meshy.download(res["glb"], config.MODELS_3D_DIR / "meshy", label)
+    except meshy.MeshyError as e:
+        return f"Meshy: {e}"
+    except Exception as e:
+        return f"Meshy didn't work: {type(e).__name__}: {str(e)[:200]}"
+    try:
+        import usage
+        usage.record_credits("blender", res.get("credits") or 0)
+    except Exception:
+        pass
+    code = IMPORT_CODE.format(path=str(path), name=label, height=float(height_cm or 0))
+    steps = [{"cmd": "run", "code": code}, {"cmd": "look", "angle": "iso"}]
+    live = tools._bl_send({"cmd": "ping"}, timeout=5) is not None
+    out = ([tools._bl_send(st, timeout=240) or {"ok": False, "error": "Lost the connection to Blender."} for st in steps]
+           if live else tools._bl_background(steps, timeout=300))
+    if out == "NO_BLENDER":
+        return (f"Meshy made it (saved as {path}), but Blender isn't installed, so I couldn't bring it in. "
+                "Blender is free at blender.org.")
+    mins = (__import__("time").time() - t0) / 60
+    head = (f"Meshy made it in {mins:.1f} min using {res.get('credits') or '?'} credits (file: {path.name}). ")
+    first = out[0]
+    if not first.get("ok"):
+        return head + "Importing it into Blender failed: " + (first.get("error") or "unknown")
+    text = head + (first.get("output") or "").strip()
+    if len(out) > 1 and out[1].get("ok"):
+        return [{"type": "text", "text": text}] + tools._bl_image(out[1], "live" if live else "background")
+    return text
+
+
 # ============================================================ specs for each expert
 def _s(name, desc, props=None, req=None):
     return {"name": name, "description": desc, "input_schema": {"type": "object", "properties": props or {},
@@ -233,7 +348,19 @@ def _s(name, desc, props=None, req=None):
 def _blender_specs():
     import tools
     base = next(s for s in tools.TOOL_SPECS if s["name"] == "blender")
-    return [base, _s("blender_lookup", "Look up the exact Blender Python API for the user's Blender version: an operator "
+    return [base, _s("meshy_generate", "Make a detailed 3D model with Meshy from a text prompt or a picture, and bring it "
+                     "into the user's Blender (standing on the floor, at height_cm if given). For organic and detailed "
+                     "things code can't build well. Takes 1-3 minutes and uses Meshy credits (about 30 textured). "
+                     "Returns a render.",
+                     {"prompt": {"type": "string", "description": "what to make (or, with image, how to texture it)"},
+                      "image": {"type": "string", "description": "path to the user's picture to turn into a model"},
+                      "height_cm": {"type": "number", "description": "real-world height to scale it to"},
+                      "textured": {"type": "boolean", "description": "colors and textures (default true; false for "
+                                                                       "a plain shape, cheaper, fine for printing)"},
+                      "polycount": {"type": "integer", "description": "make it lighter (e.g. 30000 for a game prop); "
+                                                                      "leave out for full detail"},
+                      "name": {"type": "string"}}),
+            _s("blender_lookup", "Look up the exact Blender Python API for the user's Blender version: an operator "
                      "(bpy.ops.mesh.bevel), a type (Object, BevelModifier) or bmesh.ops function. Shows its options/properties.",
                      {"name": {"type": "string"}}, ["name"])]
 
@@ -259,7 +386,7 @@ def _run_tool_for(mode):
     import tools
     import unreal_bridge
     if mode == "blender":
-        fns = {"blender": tools.blender, "blender_lookup": blender_lookup}
+        fns = {"blender": tools.blender, "blender_lookup": blender_lookup, "meshy_generate": meshy_generate}
     else:
         fns = {"unreal_status": unreal_status, "unreal_python": unreal_python, "unreal_lookup": unreal_bridge.lookup,
                "unreal_log": unreal_bridge.project_log, "unreal_look": unreal_look}
@@ -300,7 +427,11 @@ def run(mode, task):
     if not (task or "").strip():
         return f"What should the {name} expert do?"
     try:
-        ag = providers.agent(key(mode), model_setting(mode))
+        if mode == "blender":                       # Meshy makes models; the thinking is Jarvis's own Claude key
+            import config
+            ag = providers.AnthropicAgent(config.ANTHROPIC_API_KEY, config.MODEL, "anthropic")
+        else:
+            ag = providers.agent(key(mode), model_setting(mode))
     except Exception as e:
         return f"The {name} key couldn't be used: {e}"
     _LAST_MODEL[mode] = ag.model
@@ -315,6 +446,8 @@ def run(mode, task):
         return "Stopped."
     except Exception as e:
         msg = str(e)
+        if mode == "blender" and ("Meshy" in msg):
+            return f"Blender expert: {msg}"
         if type(e).__name__ in ("AuthenticationError", "PermissionDeniedError") or "401" in msg:
             return f"The {name} key was refused by {providers.LABEL[ag.provider]}. Check it in the Studio panel."
         if "credit" in msg.lower() or "balance" in msg.lower() or "402" in msg:
@@ -322,7 +455,10 @@ def run(mode, task):
         return f"The {name} expert hit a problem: {type(e).__name__}: {msg[:300]}"
     finally:
         try:
-            usage.record_mode(mode, ag.usage)
+            if mode == "blender":
+                usage.record_usd(ag.usage.get("usd") or 0, claude=ag.usage.get("calls") or 0)   # on the main key
+            else:
+                usage.record_mode(mode, ag.usage)
         except Exception as e:
             print(f"[expert] couldn't record usage: {e}")
     return f"[{name} expert] " + (text or "Done.")
@@ -358,9 +494,24 @@ def view(probe=False):
     out = []
     for mode, m in MODES.items():
         k = key(mode)
-        p = providers.detect(k) if k else None
-        row = {"mode": mode, "name": m["name"], "unlocked": bool(k)}
-        if k:
+        row = {"mode": mode, "name": m["name"], "unlocked": bool(k), "has_model": bool(m["model"]),
+               "where": ({"Meshy": WHERE["meshy"]} if mode == "blender" else
+                         {"Claude": WHERE["claude"], "OpenRouter": WHERE["openrouter"], "OpenAI": WHERE["openai"]})}
+        if k and mode == "blender":
+            row.update(provider="Meshy", hint=k[-4:])
+            try:
+                row["today"] = usage.mode_today(mode)
+            except Exception:
+                row["today"] = None
+            if probe:
+                try:
+                    import meshy
+                    b = meshy.balance(k)
+                    row["credits"] = b.get("balance")
+                except Exception as e:
+                    row["credits_error"] = str(e)[:140]
+        elif k:
+            p = providers.detect(k)
             row.update(provider=providers.LABEL[p], hint=k[-4:], model=model_setting(mode) or _LAST_MODEL.get(mode) or "",
                        model_auto=not model_setting(mode))
             try:

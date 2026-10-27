@@ -111,11 +111,45 @@ def _close(m):
     if _DRY.on:
         return HIT
     out = tools.close_app(target)
-    if out.startswith("No running app"):
-        return f"{target.title()} isn't running.", out
-    if out.startswith("Too many"):
+    if " isn't running" in out and out.startswith(target.strip()):
+        return f"{target.strip().title() if target.islower() else target.strip()} isn't running.", out
+    if out.startswith("Closed") or out.startswith("Force-closed"):
+        return f"Closing {target}.", out
+    return out.split(" Running now:")[0].split(" Answer it")[0].strip(), out      # asking / admin / still running: say why
+
+
+SWITCH_MODE = None      # set by the core: switch_mode("calendar")
+
+
+def _calendar_mode(m):
+    if _DRY.on:
+        return HIT
+    if SWITCH_MODE is None:
         return None
-    return f"Closing {target}." if "closed" in out else None, out
+    import threading
+    threading.Timer(2.5, SWITCH_MODE, args=("calendar",)).start()     # after he's said it
+    return "Switching to calendar mode. Just the calendar and reminders from here; open full Jarvis from it any time.", "Calendar mode"
+
+
+def _agenda(m):
+    if tools._CALENDAR is None:
+        return None
+    if _DRY.on:
+        return HIT
+    when = (m.group(1) or "today").strip()
+    when = {"this week": "this week", "the week": "this week", "next week": "next week", "tomorrow": "tomorrow",
+            "the weekend": "this weekend", "this weekend": "this weekend"}.get(when, "today")
+    a, b, label = tools._CALENDAR.span(when)
+    items = tools._CALENDAR.between(a, b)
+    import cal_store as cs
+    if not items:
+        return f"Nothing on your calendar {label}.", f"Agenda {label}: empty"
+    parts = []
+    for ev, st in items[:6]:
+        day = "" if label in ("today", "tomorrow") else cs.nice_day(st) + " "
+        parts.append(f"{ev['title']}, {day}{'all day' if ev.get('all_day') else cs.nice_time(st)}".strip())
+    more = f", and {len(items) - 6} more" if len(items) > 6 else ""
+    return f"{label.capitalize()}: " + "; ".join(parts) + more + ".", f"Agenda {label}: {len(items)} items"
 
 
 def _time(m):
@@ -286,6 +320,11 @@ RULES = [
     (r"^(?:open|launch|start|run|fire up|load up|boot up|pull up|bring up)(?: up)? (?:the |my )?(.+?)(?: app| application)?$", _open),
     (r"^(?:close|quit|exit|kill) (?:the |my )?(.+?)(?: app| application)?$", _close),
     (r"^(?:what(?:'s| is) the time|what time is it|time|what time is it right now|got the time)$", _time),
+    (r"^(?:switch to |go to |go into |open |start )?calendar mode$", _calendar_mode),
+    (r"^(?:what(?:'s| is)|what do i have|anything|do i have anything) (?:on |in )?(?:my |the )?(?:calendar|schedule|agenda)"
+     r"(?: for)?(?: (today|tomorrow|this week|the week|next week|the weekend|this weekend))?$", _agenda),
+    (r"^what(?:'s| is) (?:on )?(?:for )?(today|tomorrow|this week|next week|this weekend)$", _agenda),
+    (r"^what do i have (today|tomorrow|this week|next week|this weekend)$", _agenda),
     (r"^(?:what(?:'s| is) (?:the |today's )?date(?: today)?|what day is it(?: today)?|what(?:'s| is) today)$", _date),
     (r"^lock (?:the |my )?(?:pc|computer|screen|it|laptop)$", _lock),
     (r"^(?:take a |take |grab a )?screenshot(?: (?:of )?(?:this|that|my screen|the screen))?$", _screenshot),

@@ -15,7 +15,6 @@ import time
 from pathlib import Path
 
 import config
-from core import Core
 
 
 # =================================================================== HUD app
@@ -208,6 +207,15 @@ class Bridge:
     def confirm(self, cid, approved, always=False):
         self._core.resolve_confirm(cid, bool(approved), always=bool(always))
 
+    def folder_revoke(self, path):
+        threading.Thread(target=self._core.folder_revoke, args=(str(path),), daemon=True).start()
+
+    def watch_remove(self, wid):
+        threading.Thread(target=self._core.watch_remove, args=(str(wid),), daemon=True).start()
+
+    def activity(self, action, value=None):
+        threading.Thread(target=self._core.activity_action, args=(str(action), value), daemon=True).start()
+
     def set_permission(self, key, on):
         threading.Thread(target=self._core.set_permission, args=(str(key), bool(on)), daemon=True).start()
 
@@ -246,6 +254,7 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         if phone:
             phone[0].feed(ev)
 
+    from core import Core               # loaded here, not at the top: calendar mode never needs it
     core = Core(emit, voice=voice)
     _start_phone(core, phone, emitter)
     bridge = Bridge(core, emitter)
@@ -395,6 +404,7 @@ def run_console(voice):
         elif t == "quit":
             done.set()
 
+    from core import Core               # loaded here, not at the top: calendar mode never needs it
     core = Core(emit, voice=voice)
     core.on_quit = done.set
     _start_phone(core, phone, lambda ev: None)
@@ -457,13 +467,15 @@ def main():
     ap.add_argument("--no-voice", action="store_true", help="don't use the microphone")
     ap.add_argument("--startup", action="store_true", help="started by Windows at login (no console, starts tucked away)")
     ap.add_argument("--after-update", action="store_true", help="restarted by the updater")
+    ap.add_argument("--calendar", action="store_true", help="calendar mode: just the calendar and reminders (light)")
+    ap.add_argument("--full", action="store_true", help="the whole Jarvis, even if Settings says start in calendar mode")
     args, _unknown = ap.parse_known_args()      # the installer may pass its own arguments; ignore them
     if (args.startup or config.FROZEN or sys.stdout is None
             or (args.after_update and Path(sys.executable).name.lower() == "pythonw.exe")):
         _log_to_file()                         # no console window: keep a log file instead
     import autostart
     show_hook = {"fn": None}
-    if not autostart.claim(lambda: show_hook["fn"] and show_hook["fn"](), wait=45 if args.after_update else 0):
+    if not autostart.claim(lambda: show_hook["fn"] and show_hook["fn"](), wait=60 if args.after_update else 0):
         print("Jarvis is already running; brought him to the front.")
         return
     if args.startup and config.STARTUP_DELAY > 0:
@@ -472,6 +484,16 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
+    mode = "calendar" if args.calendar else "full" if args.full else \
+        ("calendar" if (os.environ.get("JARVIS_START_MODE") or "").lower() == "calendar" else "full")
+    if mode == "calendar" and not args.console:
+        import calendar_mode                  # just the calendar: no voice, mic, AI models or animations loaded
+        calendar_mode.run(start_hidden=args.startup, show_hook=show_hook)
+        import updater
+        if getattr(updater, "RESTARTING", False):
+            sys.stdout.flush()
+            os._exit(updater.RESTART_CODE)
+        return
     if args.console:
         run_console(not args.no_voice)
     else:
@@ -479,7 +501,8 @@ def main():
             run_gui(not args.no_voice, start_hidden=args.startup, show_hook=show_hook)
             import updater
             if getattr(updater, "RESTARTING", False):
-                sys.exit(updater.RESTART_CODE)        # tells run_jarvis.bat to close this window quietly
+                sys.stdout.flush()
+                os._exit(updater.RESTART_CODE)        # don't wait on leftover threads; run_jarvis.bat reads the code
         except ImportError:
             print("pywebview isn't installed (run setup.bat). Falling back to console mode.")
             run_console(not args.no_voice)

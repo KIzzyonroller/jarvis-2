@@ -42,20 +42,61 @@ FIELDS = [
     ("Netflix", "JARVIS_NETFLIX_TRACK", "Keep a log of what I watch", "bool", "Stays on this PC.", None),
     ("Apple Music", "JARVIS_APPLE_MUSIC", "Open Apple Music in", "choice", "",
      [("auto", "The app if installed"), ("web", "The website"), ("app", "The app")]),
-    ("Blender mode", "BLENDER_AI_KEY", "Blender AI key", "secret",
-     "Unlocks Blender mode. A Claude (sk-ant-), OpenRouter (sk-or-) or OpenAI (sk-) key; its spending is separate.", None),
-    ("Blender mode", "BLENDER_AI_MODEL", "Model (optional)", "text",
-     "Leave empty to use the best one the key can. OpenRouter example: anthropic/claude-sonnet-4.5", None),
+    ("Calendar", "JARVIS_CAL_DEFAULT", "Add new events to", "choice",
+     "Google and Outlook: he opens the event filled in and presses Save (you OK it first).",
+     [("jarvis", "Jarvis's own calendar"), ("caldav", "My CalDAV calendar (iCloud, Fastmail, Yahoo...)"),
+      ("google", "Google Calendar"), ("outlook", "Outlook.com"), ("outlook_work", "Outlook for work or school"),
+      ("windows", "Outlook desktop / Windows Calendar app")]),
+    ("Calendar", "JARVIS_CAL_ALERT", "Alert before events (minutes)", "number", "0 = when it starts.", None),
+    ("Calendar", "GOOGLE_CAL_ICS", "Google Calendar private link", "secret",
+     "To SEE your Google events: Google Calendar > Settings > your calendar > Integrate calendar > "
+     "'Secret address in iCal format'. Read-only.", None),
+    ("Calendar", "OUTLOOK_CAL_ICS", "Outlook calendar link", "secret",
+     "To SEE your Outlook events: Outlook.com > Settings > Calendar > Shared calendars > Publish a calendar > "
+     "copy the ICS link. Read-only.", None),
+    ("Calendar", "OTHER_CAL_ICS", "Other calendar links", "secret",
+     "Any other .ics / webcal links (school, sports team, iCloud public calendar). Separate with spaces.", None),
+    ("Calendar", "CALDAV_URL", "CalDAV server (two-way)", "text",
+     "iCloud: https://caldav.icloud.com  Fastmail: https://caldav.fastmail.com  Yahoo: https://caldav.calendar.yahoo.com",
+     None),
+    ("Calendar", "CALDAV_USER", "CalDAV username", "text", "Usually your email address.", None),
+    ("Calendar", "CALDAV_PASSWORD", "CalDAV app password", "secret",
+     "An app password, never your normal one. iCloud: account.apple.com > Sign-In and Security > App-Specific "
+     "Passwords.", None),
+    ("Calendar", "CALDAV_CALENDAR", "CalDAV calendar name (optional)", "text",
+     "Which of that account's calendars to use. Empty = the first one.", None),
+    ("Calendar", "JARVIS_START_MODE", "Start in", "choice",
+     "Calendar mode is just the calendar and reminders, using very little of your PC.",
+     [("full", "Full Jarvis"), ("calendar", "Calendar mode")]),
+    ("Calendar", "JARVIS_CAL_SPEAK", "Calendar mode: say alerts out loud", "bool",
+     "With Windows' built-in voice (light). Off: a notification and a chime only.", None),
+    ("Files", "JARVIS_READ_ANYWHERE", "Read files anywhere on my drives", "bool",
+     "Off: he only reads your user folder and folders you've let him into (System panel lists them).", None),
+    ("Activity memory", "JARVIS_ACTIVITY", "Remember what I work on", "bool",
+     "Logs which app and window is in front (names and titles only, never screenshots or typing), on this PC only, so "
+     "you can ask 'what was I working on yesterday?' or 'reopen what I had open on Friday'.", None),
+    ("Activity memory", "JARVIS_ACTIVITY_DAYS", "Keep it for (days)", "number", "Older days are deleted.", None),
+    ("Activity memory", "JARVIS_ACTIVITY_SKIP", "Never log", "text",
+     "Apps or words, separated by commas (like: bank, tax, steam). Private windows and password managers are never "
+     "logged anyway.", None),
+    ("Blender mode", "MESHY_API_KEY", "Meshy API key", "secret",
+     "Unlocks Blender mode (Meshy makes the detailed models). Get it at meshy.ai/developers/keys; needs Meshy Pro "
+     "or higher.", None),
     ("Unreal mode", "UNREAL_AI_KEY", "Unreal AI key", "secret",
-     "Unlocks Unreal mode. A Claude (sk-ant-), OpenRouter (sk-or-) or OpenAI (sk-) key; its spending is separate.", None),
+     "Unlocks Unreal mode; its spending is separate. Claude: console.anthropic.com/settings/keys. OpenRouter: "
+     "openrouter.ai/settings/keys. OpenAI: platform.openai.com/api-keys.", None),
     ("Unreal mode", "UNREAL_AI_MODEL", "Model (optional)", "text",
      "Leave empty to use the best one the key can.", None),
 ]
-MODE_KEYS = {"BLENDER_AI_KEY", "UNREAL_AI_KEY"}
+MODE_KEYS = {"UNREAL_AI_KEY"}
 SECRETS = {f[1] for f in FIELDS if f[3] == "secret"}
+RETIRED = ("BLENDER_AI_KEY", "BLENDER_AI_MODEL")      # Blender mode used to take an AI key; it's a Meshy key now
 DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir", "DISCORD_BOT_REPLY": "everyone",
             "JARVIS_NETFLIX": "auto", "JARVIS_NETFLIX_TRACK": "true", "JARVIS_EMAIL_ANNOUNCE": "false",
-            "JARVIS_APPLE_MUSIC": "auto", "JARVIS_DISCORD_TYPE": "false"}
+            "JARVIS_APPLE_MUSIC": "auto", "JARVIS_DISCORD_TYPE": "false",
+            "JARVIS_READ_ANYWHERE": "true", "JARVIS_CAL_DEFAULT": "jarvis", "JARVIS_CAL_ALERT": "10",
+            "JARVIS_START_MODE": "full", "JARVIS_CAL_SPEAK": "true",
+            "JARVIS_ACTIVITY": "false", "JARVIS_ACTIVITY_DAYS": "14"}
 
 
 def _current(key):
@@ -107,8 +148,33 @@ def validate(key, value):
         problem = providers.looks_valid(v)
         if problem:
             return problem
-    if key in ("BLENDER_AI_MODEL", "UNREAL_AI_MODEL") and (len(v) > 100 or " " in v):
+    if key == "MESHY_API_KEY":
+        import meshy
+        problem = meshy.looks_valid(v)
+        if problem:
+            return problem
+    if key == "UNREAL_AI_MODEL" and (len(v) > 100 or " " in v):
         return "A model name has no spaces, like gpt-5 or anthropic/claude-sonnet-4.5."
+    if key in ("GOOGLE_CAL_ICS", "OUTLOOK_CAL_ICS", "OTHER_CAL_ICS"):
+        for u in re.split(r"[\s,]+", v):
+            if u and not re.match(r"(?i)^(https|webcal)://\S+$", u):
+                return "Paste the full link (it starts with https:// or webcal://)."
+    if key == "CALDAV_URL" and not re.match(r"(?i)^https://\S+$", v):
+        return "The server address starts with https://"
+    if key == "JARVIS_CAL_ALERT":
+        try:
+            if not 0 <= float(v) <= 10080:
+                raise ValueError
+        except ValueError:
+            return "Minutes, like 10."
+    if key == "JARVIS_ACTIVITY_DAYS":
+        try:
+            if not 1 <= float(v) <= 365:
+                raise ValueError
+        except ValueError:
+            return "Days, from 1 to 365."
+    if key == "JARVIS_ACTIVITY_SKIP" and len(v) > 500:
+        return "Keep the list under 500 characters."
     if key == "JARVIS_ADDRESS_AS" and len(v) > 30:
         return "Keep it short."
     if key == "JARVIS_ADDRESS_AS" and not config.name_allowed(v):
@@ -164,6 +230,12 @@ def save(changes, clear=()):
         if not ok:
             errors[k] = msg
             values.pop(k)
+    if "MESHY_API_KEY" in values:
+        import meshy
+        ok, msg = meshy.check(values["MESHY_API_KEY"])
+        if not ok:
+            errors["MESHY_API_KEY"] = msg
+            values.pop("MESHY_API_KEY")
     if errors:
         return False, errors
     for key in clear or ():

@@ -31,6 +31,8 @@ import queue
 import random
 import re
 import threading
+import os
+import sys
 import time
 import traceback
 import uuid
@@ -352,6 +354,7 @@ class Core:
         self.on_minimize = lambda: False   # set by the app; returns True if it hid a window
         self.on_restore = lambda: False
         tools.set_confirm_handler(self.confirm)
+        tools._FOLDERS_CHANGED[:] = [self._emit_permissions]
         tools.set_dictation_handler(lambda window=None: self.events.put(("dictate", window)))
         tools.set_mute_handler(lambda minutes: self.set_muted(True, minutes=minutes, speak=False))
         tools.set_self_window_handler(lambda show: self.on_restore() if show else self.on_minimize())
@@ -417,6 +420,17 @@ class Core:
         if self.listener:
             self.listener.stop()
         tools.REMINDERS.stop()
+        for part in (getattr(self, "watchers", None), getattr(self, "activity", None)):
+            if part is not None:
+                try:
+                    part.stop()
+                except Exception:
+                    pass
+        if "rgb" in sys.modules:                       # give iCUE / Razer / G HUB their own lighting back
+            try:
+                sys.modules["rgb"].release_all()
+            except Exception:
+                pass
 
     def _log(self, line):
         print(line)
@@ -448,6 +462,14 @@ class Core:
     def _boot(self):
         config.JARVIS_DIR.mkdir(parents=True, exist_ok=True)
         self._purge_retired()
+        if any(os.environ.get(k) for k in settings.RETIRED):     # Blender mode takes a Meshy key now
+            try:
+                settings.write_env({k: "" for k in settings.RETIRED})
+                for k in settings.RETIRED:
+                    os.environ.pop(k, None)
+                print("[settings] removed the old Blender AI key (Blender mode uses a Meshy key now)")
+            except Exception as e:
+                print(f"[settings] couldn't remove the old Blender key: {e}")
         self._emit_persona()
         self.emit({"type": "duo", "on": self.duo})
         self._log("INITIALIZING CORE SYSTEMS")
@@ -495,6 +517,7 @@ class Core:
         threading.Thread(target=self._loop, daemon=True, name="core").start()
         threading.Thread(target=self._telemetry, daemon=True, name="telemetry").start()
         tools.REMINDERS.start(on_due=lambda msg, late: self.events.put(("reminder", (msg, late))))
+        self._start_calendar()
         self._log(f"TOOL MATRIX ONLINE  [{len(tools.TOOL_SPECS) + 1} capabilities]")
         if tools.IS_WINDOWS:
             threading.Thread(target=tools._start_apps, daemon=True, name="app-index").start()
@@ -538,6 +561,8 @@ class Core:
         self._start_netflix()
         threading.Thread(target=self._start_connectors, daemon=True, name="connectors-start").start()
         self._start_jobs()
+        self._start_watchers()
+        self._start_activity()
         for old in (config.BASE_DIR / "creator.id", config.JARVIS_DIR / "voiceprint.json"):
             try:                                # left over from removed features (owner PC, voice lock)
                 old.unlink()
@@ -1046,8 +1071,17 @@ class Core:
         self._emit_permissions()
 
     def _emit_permissions(self):
+        import folder_access
         self.emit({"type": "permissions", "items": permissions.state(),
                    "keys": {"yes": config.APPROVE_HOTKEY, "no": config.DENY_HOTKEY}})
+        self.emit({"type": "folders", "items": folder_access.items()})
+
+    def folder_revoke(self, path):
+        """System panel: Remove next to a folder he was let into."""
+        import folder_access
+        msg = folder_access.revoke(path)
+        self.emit({"type": "toast", "text": msg})
+        self._emit_permissions()
 
     # ================================================================ main loop
     def _loop(self):
@@ -1097,6 +1131,19 @@ class Core:
             return
         if kind == "wake":
             self._wake()
+            return
+        if kind == "watch_alert":
+            w, line = payload
+            self.emit({"type": "alert", "text": line})
+            self.emit({"type": "msg", "role": "system", "text": line})
+            self.speak(line)
+            if w.get("then"):
+                self.events.put(("text", ("watcher", f"(Your watcher just went off: {line}) {w['then']}", time.time())))
+            return
+        if kind == "cal_alert":
+            self.emit({"type": "alert", "text": payload})
+            self.emit({"type": "msg", "role": "system", "text": payload})
+            self.speak("Heads up. " + payload)
             return
         if kind == "reminder":
             msg, late = payload
@@ -1569,9 +1616,31 @@ class Core:
         self._restart()
 
     def _restart(self):
+        """Start a fresh copy and get out of its way. The new copy can only start once this one has let go of
+        the 'I'm running' lock, so let go FIRST, and if anything hangs while closing (the Discord bot, the mic,
+        a stuck thread) end this process anyway: a half-closed copy used to block the new one for good."""
+        import autostart
         import updater
         updater.RESTARTING = True
-        updater.spawn_restart()            # the new copy waits until this one has let go, then starts
+        try:
+            updater.spawn_restart()
+        except Exception as e:
+            print(f"[restart] couldn't start a new copy: {type(e).__name__}: {e}")
+            updater.RESTARTING = False
+            self.emit({"type": "toast", "text": "Saved, but I couldn't restart myself. Close me and open me again."})
+            return
+        print("[restart] new copy started; closing this one")
+        autostart.release()
+
+        def watchdog():
+            time.sleep(10)
+            print("[restart] still closing after 10 s; ending this copy so the new one runs")
+            try:
+                self.shutdown()
+            except Exception:
+                pass
+            os._exit(0)
+        threading.Thread(target=watchdog, daemon=True, name="restart-watchdog").start()
         time.sleep(0.5)
         if getattr(self, "on_quit", None):
             self.on_quit()
@@ -1652,6 +1721,85 @@ class Core:
                     h.add(who, ev["text"])
         except Exception as e:
             print(f"[history] couldn't save: {e}")
+
+    # ================================================================ watchers + activity memory
+    def _start_watchers(self):
+        """Things he keeps an eye on for you (watchers.py)."""
+        self.watchers = None
+        try:
+            import watchers
+            self._watch_emit_t = 0.0
+            self.watchers = watchers.Watchers(on_fire=self._watch_fired, on_change=self._emit_watchers,
+                                              on_note=lambda text: self.events.put(("say", text)),
+                                              confirm=self.confirm, log=print)
+            tools.set_watchers(self.watchers)
+            self.watchers.start()
+            self._emit_watchers(force=True)
+        except Exception as e:
+            print(f"[watch] not available: {type(e).__name__}: {e}")
+
+    def _watch_fired(self, w, info):
+        line = f"Heads up. {info}"
+        try:
+            if tools.IS_WINDOWS and not tools._is_jarvis_focused():
+                import calendar_mode
+                calendar_mode.notify("Jarvis noticed something" if self.persona_key == "jarvis" else "Ultron noticed something", info)
+        except Exception as e:
+            print(f"[watch] notification failed: {e}")
+        self.events.put(("watch_alert", (w, line)))
+
+    def _emit_watchers(self, force=False):
+        ws = getattr(self, "watchers", None)
+        now = time.time()
+        if ws is None or (not force and now - getattr(self, "_watch_emit_t", 0.0) < 2.0):
+            return
+        self._watch_emit_t = now
+        self.emit({"type": "watchers", "items": ws.views()})
+
+    def _start_activity(self):
+        """Activity memory (activity.py). Made either way, so old days can be asked about; only runs when on."""
+        self.activity = None
+        try:
+            import activity
+            self.activity = activity.Tracker(log=print)
+            tools.set_activity(self.activity)
+            tools._ACTIVITY_CHANGED[:] = [self._emit_activity]
+            if activity.enabled():
+                self.activity.start()
+            self._emit_activity()
+        except Exception as e:
+            print(f"[activity] not available: {type(e).__name__}: {e}")
+
+    def _emit_activity(self):
+        if getattr(self, "activity", None) is None:
+            return
+        try:
+            self.emit({"type": "activity_mem", **tools.activity_status()})
+        except Exception as e:
+            print(f"[activity] {e}")
+
+    def watch_remove(self, wid):
+        ws = getattr(self, "watchers", None)
+        if ws is not None:
+            self.emit({"type": "toast", "text": ws.remove(str(wid))})
+
+    def activity_action(self, action, value=None):
+        tools._com_init()
+        if action == "on":
+            res = tools.activity_set(True)
+        elif action == "off":
+            res = tools.activity_set(False)
+        elif action == "pause":
+            res = tools.activity_tool("pause", minutes=value or 60)
+        elif action == "resume":
+            res = tools.activity_tool("resume")
+        elif action == "wipe":
+            res = tools.activity_tool("forget", when="all")
+            res = "Kept it." if res == tools.DENIED else res
+        else:
+            return
+        self.emit({"type": "toast", "text": res})
+        self._emit_activity()
 
     # ================================================================ background jobs
     def _start_jobs(self):
@@ -1788,7 +1936,7 @@ class Core:
 
     def save_keys(self, anthropic="", groq="", blender="", unreal=""):
         """The first-run card: the Claude key, plus optional Groq, Blender and Unreal keys (blank = skip)."""
-        changes = {"ANTHROPIC_API_KEY": anthropic, "GROQ_API_KEY": groq, "BLENDER_AI_KEY": blender,
+        changes = {"ANTHROPIC_API_KEY": anthropic, "GROQ_API_KEY": groq, "MESHY_API_KEY": blender,
                    "UNREAL_AI_KEY": unreal}
         if not any(str(v or "").strip() for v in changes.values()):
             if self._has_key():                      # nothing new, but he's already set up: just close the card
@@ -1800,16 +1948,13 @@ class Core:
         ok, errors = settings.save(changes)
         if not ok:
             k, err = next(iter(errors.items()))
-            label = {"ANTHROPIC_API_KEY": "Claude key", "GROQ_API_KEY": "Groq key", "BLENDER_AI_KEY": "Blender key",
+            label = {"ANTHROPIC_API_KEY": "Claude key", "GROQ_API_KEY": "Groq key", "MESHY_API_KEY": "Meshy key",
                      "UNREAL_AI_KEY": "Unreal key"}.get(k, k)
             return self.emit({"type": "keys_result", "ok": False, "error": f"{label}: {err}", "field": k})
-        needs_restart = any(str(changes[k] or "").strip() for k in ("ANTHROPIC_API_KEY", "GROQ_API_KEY"))
-        self.emit({"type": "keys_result", "ok": True, "restart": needs_restart})
-        self.emit_studio()
-        if needs_restart:
-            print("[setup] keys saved; restarting")
-            time.sleep(1.5)
-            self._restart()
+        self.emit({"type": "keys_result", "ok": True, "restart": True})
+        print("[setup] keys saved; restarting")          # anything saved: restart so all of him picks it up
+        time.sleep(1.5)
+        self._restart()
 
     # ================================================================ Studio: the Blender and Unreal modes
     def emit_studio(self, probe=False):
@@ -1817,7 +1962,8 @@ class Core:
         self.emit({"type": "studio", "modes": experts.view(probe=probe)})
 
     def studio_save(self, mode, key="", model=None):
-        """Unlock (or change) a mode from the Studio panel. Live: no restart. The key never goes back to the screen."""
+        """Unlock (or change) a mode from the Studio panel, then restart so everything picks it up.
+        The key never goes back to the screen."""
         import experts
         if mode not in experts.MODES:
             return
@@ -1826,10 +1972,10 @@ class Core:
         if str(key or "").strip():
             changes[m["key"]] = key
         clear = []
-        if model is not None:
+        if model is not None and m["model"]:
             if str(model).strip():
                 changes[m["model"]] = model
-            else:
+            elif os.environ.get(m["model"]):
                 clear.append(m["model"])
         if not changes and not clear:
             return self.emit({"type": "studio_result", "mode": mode, "ok": False, "error": "Paste a key first."})
@@ -1838,19 +1984,21 @@ class Core:
         ok, errors = settings.save(changes, clear)
         if not ok:
             return self.emit({"type": "studio_result", "mode": mode, "ok": False, "error": next(iter(errors.values()))})
-        print(f"[studio] {m['name']} mode {'unlocked' if m['key'] in changes else 'updated'}")
-        self.emit({"type": "studio_result", "mode": mode, "ok": True})
-        self.emit_studio(probe=True)
+        print(f"[studio] {m['name']} mode {'unlocked' if m['key'] in changes else 'updated'}; restarting")
+        self.emit({"type": "studio_result", "mode": mode, "ok": True, "restart": True})
+        time.sleep(1.5)
+        self._restart()
 
     def studio_remove(self, mode):
         import experts
         if mode not in experts.MODES:
             return
         m = experts.MODES[mode]
-        settings.save({}, [m["key"], m["model"]])
-        print(f"[studio] {m['name']} mode locked (key removed)")
-        self.emit({"type": "studio_result", "mode": mode, "ok": True, "removed": True})
-        self.emit_studio()
+        settings.save({}, [k for k in (m["key"], m["model"]) if k])
+        print(f"[studio] {m['name']} mode locked (key removed); restarting")
+        self.emit({"type": "studio_result", "mode": mode, "ok": True, "removed": True, "restart": True})
+        time.sleep(1.5)
+        self._restart()
 
     def studio_install_addon(self):
         out = tools.blender("install_addon")
@@ -1913,13 +2061,9 @@ class Core:
         if not ok:
             self.emit({"type": "settings_result", "ok": False, "errors": errors})
             return
-        import experts
         changed = [k for k, v in (changes or {}).items() if str(v or "").strip()] + list(clear or [])
-        restart = [k for k in changed if k not in experts.LIVE_KEYS]      # Blender/Unreal keys apply live
-        self.emit({"type": "settings_result", "ok": True, "restart": bool(restart)})
-        if any(k in experts.LIVE_KEYS for k in changed):
-            self.emit_studio()
-        if restart:
+        self.emit({"type": "settings_result", "ok": True, "restart": bool(changed)})
+        if changed:                                    # anything saved: restart so all of him picks it up
             print(f"[settings] saved {', '.join(sorted(changed))}; restarting")
             time.sleep(1.5)
             self._restart()
@@ -2534,6 +2678,7 @@ class Core:
             "desktop": lambda: tools.window_control("show_desktop"),
             "dark_mode": lambda: tools.dark_mode(),
             "status": tools.system_status,
+            "calendar_mode": lambda: threading.Timer(1.0, self.switch_mode, args=("calendar",)).start() or "Switching to calendar mode...",
             "reset": lambda: (self.brain.reset() if self.brain else None) or "Memory wiped.",
         }
         fn = actions.get(name)
@@ -2578,8 +2723,48 @@ class Core:
 
     def _emit_knowledge(self):
         self._emit_permissions()
+        self._emit_watchers(force=True)
+        self._emit_activity()
         self.emit({"type": "memory", "items": tools.memories()[-50:]})
         self.emit({"type": "routines", "items": [{"name": k, "steps": v["steps"]} for k, v in tools.routines().items()]})
+
+    def _start_calendar(self):
+        """Jarvis's calendar + connected ones; alerts are spoken; today's events go in the briefing."""
+        try:
+            import calendar_service
+            self.calendar = calendar_service.CalendarService(
+                tools.REMINDERS, on_alert=lambda text, kind, data: self.events.put(("cal_alert", text)),
+                confirm=self.confirm, on_change=self._emit_agenda)
+            tools.set_calendar(self.calendar)
+            intents.SWITCH_MODE = self.switch_mode
+            briefing.CALENDAR_LINE = self.calendar.today_line
+            self.calendar.start()
+            self._emit_agenda()
+        except Exception as e:
+            print(f"[calendar] not available: {type(e).__name__}: {e}")
+
+    def _emit_agenda(self):
+        cal = getattr(self, "calendar", None)
+        if cal is None:
+            return
+        import cal_store as cs
+        now = datetime.now()
+        a = datetime.combine(now.date(), datetime.min.time())
+        items = []
+        for ev, st in cal.between(a, a + timedelta(days=7)):
+            if not ev.get("all_day") and st + (cs.to_dt(ev["end"]) - cs.to_dt(ev["start"])) < now:
+                continue
+            items.append({"id": ev["id"], "title": ev["title"], "start": cs.iso(st), "all_day": bool(ev.get("all_day")),
+                          "day": cs.nice_day(st, now.date()), "time": "" if ev.get("all_day") else cs.nice_time(st),
+                          "cal": cal.label(ev)})
+        self.emit({"type": "agenda", "items": items[:30]})
+
+    def switch_mode(self, mode):
+        """'calendar': restart as calendar mode (just the calendar and reminders). 'full': the whole Jarvis."""
+        import updater
+        updater.NEXT_ARGS = ["--calendar"] if mode == "calendar" else ["--full"]
+        print(f"[mode] switching to {mode} mode")
+        self._restart()
 
     def _emit_reminders(self):
         items = [{"id": r["id"], "message": r["message"], "due": r["due"]} for r in tools.REMINDERS.items]
