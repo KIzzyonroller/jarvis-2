@@ -16,6 +16,11 @@ import time
 from collections import deque
 from pathlib import Path
 
+# Speech recognition's worker threads sleep while waiting instead of spinning (spinning shows up as CPU spikes
+# that do no work). Must be set before the recognizer loads.
+os.environ.setdefault("OMP_WAIT_POLICY", "PASSIVE")
+os.environ.setdefault("KMP_BLOCKTIME", "0")
+
 import numpy as np
 
 import config

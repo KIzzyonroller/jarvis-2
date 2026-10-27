@@ -148,12 +148,30 @@ def make_kokoro(model, voices):
         import onnxruntime as ort
         opts = ort.SessionOptions()
         opts.log_severity_level = 3
+        # Less spiky: a few cores instead of all of them, and the worker threads sleep between sentences
+        # instead of spinning (spinning keeps cores busy doing nothing and is most of the spike you see).
+        n = voice_threads()
+        if n > 0:
+            opts.intra_op_num_threads = n
+        opts.inter_op_num_threads = 1
+        opts.add_session_config_entry("session.intra_op.allow_spinning", "0")
+        opts.add_session_config_entry("session.inter_op.allow_spinning", "0")
         sess = ort.InferenceSession(str(model), sess_options=opts, providers=["CPUExecutionProvider"])
         if hasattr(Kokoro, "from_session"):
             return Kokoro.from_session(sess, str(voices))
     except Exception as e:
         print(f"[tts] couldn't pin the voice to the CPU ({e}); using the library default")
     return Kokoro(str(model), str(voices))
+
+
+def voice_threads():
+    n = getattr(config, "KOKORO_THREADS", -1)
+    if n >= 0:
+        return n
+    return max(2, min(4, (os.cpu_count() or 4) // 2))
+
+
+_SYNTH_LOCK = threading.Lock()     # one voice at a time (both AIs at once would double the spike)
 
 
 def _kokoro_model_name():
@@ -198,7 +216,8 @@ class KokoroEngine:
             voice = "bm_george"
         pitch = float(p.get("pitch") or 1.0)
         speed = min(max(float(p["speed"]) / pitch, 0.5), 2.0)
-        samples, sr = self.k.create(text, voice=voice, speed=speed, lang=_lang_for(voice, p["lang"]))
+        with _SYNTH_LOCK:
+            samples, sr = self.k.create(text, voice=voice, speed=speed, lang=_lang_for(voice, p["lang"]))
         pcm = np.asarray(samples, dtype=np.float32)
         peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
         if peak > 0.95:                      # some voices overshoot full scale and would crackle
@@ -652,6 +671,7 @@ _NO_SPLIT_BEFORE = re.compile(r"(\b(mr|mrs|ms|dr|st|vs|no|approx|jr|sr|etc)|\be\
 
 
 class SpeechStream:
+    AHEAD = 2           # sentences made ahead of the one playing
     def __init__(self, speaker, max_words=None, after=None):
         self.sp = speaker
         self.after = after
@@ -776,6 +796,10 @@ class SpeechStream:
             if s is None or self.cancelled.is_set():
                 self.audio.put(None)
                 return
+            # stay just ahead of what he's saying instead of making the whole reply at once: same work,
+            # spread out, so it's not one long burst at full CPU
+            while self.audio.qsize() >= self.AHEAD and not self.cancelled.is_set():
+                time.sleep(0.05)
             audio = self.sp.synth(s, self.persona)
             self.audio.put((s, audio))
 

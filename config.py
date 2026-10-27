@@ -145,6 +145,9 @@ MODELS_DIR = DATA_DIR / "models"
 KOKORO_VOICE = os.environ.get("JARVIS_VOICE", "bm_george")
 KOKORO_SPEED = float(os.environ.get("JARVIS_VOICE_SPEED", "1.05"))
 KOKORO_LANG = "en-gb"
+# How many CPU cores his voice may use while it's being generated. All of them makes each sentence a big spike
+# (and barely faster); about half, at most 4, keeps it smooth. 0 = let the library decide.
+KOKORO_THREADS = int(os.environ.get("JARVIS_VOICE_THREADS", "-1"))
 
 ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
 SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")     # optional: real Spotify control (README explains)
