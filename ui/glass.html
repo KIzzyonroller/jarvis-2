@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glass</title>
+<style>
+@font-face{font-family:Jost;src:url(/fonts/jost-latin-400-normal.woff2) format("woff2");font-weight:400}
+@font-face{font-family:Jost;src:url(/fonts/jost-latin-500-normal.woff2) format("woff2");font-weight:500}
+@font-face{font-family:Jost;src:url(/fonts/jost-latin-300-normal.woff2) format("woff2");font-weight:300}
+@font-face{font-family:Michroma;src:url(/fonts/michroma-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Big Shoulders";src:url(/fonts/big-shoulders-display-latin-700-normal.woff2) format("woff2");font-weight:700}
+:root{--c:#7fe7ff;--crgb:127,231,255;--hot:#dff6ff;--ink:#e8f7fb;--dim:#8fb3c2;--deep:#06222c;--alarm:#ff9d2e;--head:Michroma,sans-serif;--glass:rgba(8,22,30,.46)}
+body.ultron{--c:#ff3046;--crgb:255,48,70;--hot:#ff8a3d;--ink:#f8ebe7;--dim:#c09aa0;--deep:#2a0509;--head:"Big Shoulders",sans-serif;--glass:rgba(30,6,10,.5)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#02060b;color:var(--ink);font:400 15px/1.5 Jost,system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:brightness(.62) saturate(.85) contrast(1.05)}
+#veil{position:fixed;inset:0;pointer-events:none;background:radial-gradient(120% 90% at 50% 45%,rgba(2,6,11,0) 40%,rgba(2,6,11,.75) 100%),linear-gradient(rgba(2,6,11,.35),rgba(2,6,11,0) 25%,rgba(2,6,11,0) 75%,rgba(2,6,11,.55))}
+body.nocam #veil{background:radial-gradient(80% 70% at 50% 40%,rgba(var(--crgb),.07),rgba(2,6,11,0) 70%),#02060b}
+#board{position:fixed;inset:0}
+#hands{position:fixed;inset:0;pointer-events:none;z-index:50}
+
+/* ---- cards */
+.card{position:absolute;left:0;top:0;width:340px;max-height:420px;overflow:hidden;padding:18px 20px 18px;border:1px solid rgba(var(--crgb),.34);
+  background:var(--glass);backdrop-filter:blur(12px) saturate(1.25);-webkit-backdrop-filter:blur(12px) saturate(1.25);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 18px 50px rgba(0,0,0,.45);transform-origin:50% 50%;will-change:transform;
+  transition:opacity .35s,border-color .2s,box-shadow .2s;cursor:grab;touch-action:none}
+.card::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg,rgba(255,255,255,.07),rgba(255,255,255,0) 38%)}
+.card::after{content:"";position:absolute;left:0;right:0;bottom:0;height:46px;pointer-events:none;background:linear-gradient(rgba(0,0,0,0),var(--glass));opacity:0;transition:opacity .2s}
+.card.long::after{opacity:1}
+.card.hover{border-color:rgba(var(--crgb),.7)}
+.card.held{border-color:var(--c);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 0 0 1px rgba(var(--crgb),.35),0 26px 70px rgba(0,0,0,.55);cursor:grabbing}
+.card.stage{width:580px;max-height:72vh}
+.card.dim{opacity:.42}
+.card.kind-image{padding:10px;width:360px}
+.card.kind-image.stage{width:min(760px,70vw)}
+.card header{display:flex;gap:10px;align-items:baseline;margin-bottom:8px}
+.card .tag{font:10px/1 var(--head);letter-spacing:.12em;color:var(--c);opacity:.8}
+.card h2{font:500 17px/1.25 Jost,sans-serif;letter-spacing:.01em;color:var(--hot)}
+body.ultron .card h2{font:700 21px/1.1 "Big Shoulders",sans-serif;letter-spacing:.04em;text-transform:uppercase}
+.card.stage h2{font-size:22px}
+body.ultron .card.stage h2{font-size:28px}
+.card .body{color:var(--ink);font-weight:300;font-size:14.5px}
+.card.stage .body{font-size:16.5px}
+.card .body p+p,.card .body p+ul,.card .body ul+p,.card .body p+ol{margin-top:8px}
+.card .body ul,.card .body ol,.card ol.items{padding-left:20px}
+.card .body li,.card ol.items li{margin:3px 0}
+.card ol.items{counter-reset:i;list-style:none;padding-left:0}
+.card ol.items li{counter-increment:i;display:grid;grid-template-columns:26px 1fr;gap:4px;padding:5px 0;border-top:1px solid rgba(var(--crgb),.12)}
+.card ol.items li:first-child{border-top:0}
+.card ol.items li::before{content:counter(i,decimal-leading-zero);font:11px/1.9 var(--head);color:var(--c)}
+.card strong{font-weight:500;color:var(--hot)}
+.card img{display:block;width:100%;height:auto;max-height:62vh;object-fit:contain}
+.card .cap{margin-top:8px;font-size:13px;color:var(--dim)}
+.card .x{position:absolute;top:8px;right:8px;width:26px;height:26px;opacity:0;color:var(--dim);font-size:18px;line-height:26px;transition:opacity .15s}
+body.mouse .card.hover .x{opacity:1}
+.card .x:hover,.card .x:focus-visible{color:var(--ink);outline:1px solid rgba(var(--crgb),.5)}
+.card.crumple{transition:transform .45s cubic-bezier(.5,0,.9,.4),opacity .45s,filter .45s;opacity:0;filter:blur(3px)}
+.card.gone{transition:opacity .3s;opacity:0}
+
+/* ---- him */
+#him{position:fixed;top:16px;left:50%;transform:translateX(-50%);display:grid;justify-items:center;gap:2px;z-index:40;pointer-events:none}
+#ring{width:84px;height:84px}
+#him-state{font:10px/1 var(--head);letter-spacing:.24em;text-transform:uppercase;color:var(--c);opacity:.85}
+body.ultron #him-state{font-size:13px;letter-spacing:.14em}
+#caption{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);max-width:min(860px,80vw);text-align:center;font:300 19px/1.4 Jost,sans-serif;
+  color:var(--ink);text-shadow:0 2px 14px rgba(0,0,0,.8);opacity:0;transition:opacity .4s;z-index:40;pointer-events:none}
+#caption.on{opacity:1}
+
+/* ---- status + help */
+#status{position:fixed;right:18px;bottom:14px;font-size:12.5px;color:var(--dim);z-index:45;text-align:right;max-width:44vw}
+#status b{font-weight:500;color:var(--ink)}
+#help{position:fixed;left:18px;bottom:14px;z-index:45;font-size:13px;color:var(--dim);background:rgba(2,6,11,.55);border:1px solid rgba(var(--crgb),.18);
+  padding:12px 14px;max-width:330px;transition:opacity .5s}
+#help.off{opacity:0;pointer-events:none}
+#help h3{font:10px/1 var(--head);letter-spacing:.2em;text-transform:uppercase;color:var(--c);margin-bottom:8px}
+#help dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+#help dt{color:var(--ink);font-weight:500}
+#help p{margin-top:8px;font-size:12px}
+#empty{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:var(--dim);font-weight:300;font-size:16px;line-height:1.6;transition:opacity .4s;pointer-events:none}
+#empty.off{opacity:0}
+#empty b{display:block;font:11px/1 var(--head);letter-spacing:.24em;text-transform:uppercase;color:var(--c);margin-bottom:12px;font-weight:400}
+#gate{position:fixed;inset:0;display:grid;place-items:center;background:#02060b;z-index:100;text-align:center;padding:24px}
+#gate[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.card{transition:none}}
+</style>
+</head>
+<body class="jarvis">
+<video id="cam" autoplay playsinline muted></video>
+<div id="veil"></div>
+<div id="board"></div>
+<canvas id="hands"></canvas>
+<div id="him"><canvas id="ring" width="168" height="168"></canvas><span id="him-state">Standby</span></div>
+<div id="empty"><b>Glass</b>Ask him to show you something.<br>Things he puts up appear here, and your hands can move them.</div>
+<div id="caption"></div>
+<div id="status">Starting...</div>
+<aside id="help" aria-label="Gestures">
+  <h3>Your hands</h3>
+  <dl>
+    <dt>Pinch and move</dt><dd>drag a card</dd>
+    <dt>Let go mid-swing</dt><dd>throw it (off the screen closes it)</dd>
+    <dt>Quick pinch</dt><dd>bring it up close, or send it back</dd>
+    <dt>Both hands pinch</dt><dd>stretch, shrink, tilt</dd>
+    <dt>Fist, hold</dt><dd>crumple a card</dd>
+    <dt>Open hand sweep</dt><dd>clear the glass</dd>
+  </dl>
+  <p>The mouse works too: drag, throw, click, scroll to resize, right-click to crumple. Press H to hide this.</p>
+</aside>
+<div id="gate" hidden></div>
+
+<script type="module">
+// =============================================================== setup
+const $ = (q) => document.querySelector(q);
+const Q = new URLSearchParams(location.search), TOKEN = Q.get("t") || "", FAKE = Q.has("fake");
+const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
+const MODEL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+let W = innerWidth, H = innerHeight;
+const cv = $("#hands"), g = cv.getContext("2d");
+function resize() { W = innerWidth; H = innerHeight; const d = Math.min(devicePixelRatio || 1, 2); cv.width = W * d; cv.height = H * d; g.setTransform(d, 0, 0, d, 0, 0); cards.forEach(measure); layout(); }
+addEventListener("resize", resize);
+const store = { get(k, d) { try { const v = localStorage.getItem("glass." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("glass." + k, JSON.stringify(v)); } catch (e) {} } };
+let persona = "jarvis", himState = "idle", voice = 0, voiceAt = 0;
+const rgb = () => persona === "ultron" ? [255, 48, 70] : [127, 231, 255];
+const hot = () => persona === "ultron" ? [255, 138, 61] : [223, 246, 255];
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${clamp(a, 0, 1).toFixed(3)})`;
+
+// =============================================================== cards
+const cards = new Map();            // id -> card
+let z = 10, closedSince = [], dirty = true;
+function md(text) {                   // a little markdown, built as DOM (never HTML from outside)
+  const frag = document.createDocumentFragment();
+  const inline = (el, s) => { s.split(/(\*\*[^*]+\*\*)/).forEach((part) => { if (/^\*\*[^*]+\*\*$/.test(part)) { const b = document.createElement("strong"); b.textContent = part.slice(2, -2); el.appendChild(b); } else if (part) el.appendChild(document.createTextNode(part)); }); };
+  let list = null;
+  text.split("\n").forEach((line) => {
+    const l = line.trim();
+    const bullet = l.match(/^[-*•]\s+(.*)/), num = l.match(/^\d+[.)]\s+(.*)/);
+    if (bullet || num) {
+      const want = bullet ? "UL" : "OL";
+      if (!list || list.tagName !== want) { list = document.createElement(want); frag.appendChild(list); }
+      const li = document.createElement("li"); inline(li, (bullet || num)[1]); list.appendChild(li); return;
+    }
+    list = null;
+    if (!l) return;
+    const p = document.createElement("p"); inline(p, l); frag.appendChild(p);
+  });
+  return frag;
+}
+function build(c) {
+  const el = document.createElement("article");
+  el.className = `card kind-${c.kind}`; el.dataset.id = c.id;
+  if (c.kind === "image") {
+    const img = document.createElement("img"); img.alt = c.title || "Picture"; img.src = c.image; img.draggable = false;
+    img.referrerPolicy = "no-referrer"; img.onload = () => { measure(cards.get(c.id)); };
+    el.appendChild(img);
+    if (c.title) { const cap = document.createElement("div"); cap.className = "cap"; cap.textContent = c.title; el.appendChild(cap); }
+  } else {
+    const hd = document.createElement("header"), tag = document.createElement("span"), h2 = document.createElement("h2");
+    tag.className = "tag"; tag.textContent = String(c.id).padStart(2, "0"); h2.textContent = c.title || "";
+    hd.append(tag, h2); el.appendChild(hd);
+    if (c.image) { const img = document.createElement("img"); img.src = c.image; img.alt = ""; img.draggable = false; img.referrerPolicy = "no-referrer"; img.style.marginBottom = "10px"; img.onload = () => measure(cards.get(c.id)); el.appendChild(img); }
+    if (c.body) { const b = document.createElement("div"); b.className = "body"; b.appendChild(md(c.body)); el.appendChild(b); }
+    if (c.items && c.items.length) { const ol = document.createElement("ol"); ol.className = "items"; c.items.forEach((it) => { const li = document.createElement("li"); const sp = document.createElement("span"); md(it).childNodes.forEach((n) => sp.append(...n.childNodes)); li.appendChild(sp); ol.appendChild(li); }); el.appendChild(ol); }
+  }
+  const x = document.createElement("button"); x.className = "x"; x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "Close this card");
+  x.addEventListener("pointerdown", (e) => e.stopPropagation()); x.onclick = (e) => { e.stopPropagation(); dismiss(cards.get(c.id), "closed"); };
+  el.appendChild(x);
+  $("#board").appendChild(el);
+  return el;
+}
+function measure(c) { if (!c) return; c.w = c.el.offsetWidth; c.h = c.el.offsetHeight; c.el.classList.toggle("long", c.el.scrollHeight > c.el.clientHeight + 4); }
+function addCard(d) {
+  if (cards.has(d.id)) return;
+  const el = build(d);
+  const c = { id: d.id, d, el, x: W / 2, y: 70, vx: 0, vy: 0, s: .2, rot: 0, held: new Map(), stage: !!d.stage, target: null, thrown: false,
+    big: false, born: performance.now(), userS: 1, slot: null, w: 340, h: 200, dead: false, hover: false };
+  cards.set(d.id, c); el.style.zIndex = ++z;
+  if (c.stage) cards.forEach((o) => { if (o !== c) setStage(o, false); });
+  measure(c); setStage(c, c.stage); layout(); dirty = true; $("#empty").classList.add("off");
+}
+function setStage(c, on) {
+  c.stage = on; c.el.classList.toggle("stage", on); measure(c);          // its new size, right away
+  if (on) { c.el.style.zIndex = ++z; c.target = [W / 2, H * .53]; c.userS = 1; }
+  else if (!c.held.size) c.target = c.slot ? [...c.slot] : null;
+  const anyStage = [...cards.values()].some((o) => o.stage && !o.dead);
+  cards.forEach((o) => o.el.classList.toggle("dim", anyStage && !o.stage && !o.held.size));
+  dirty = true;
+}
+function layout() {                   // where cards rest when nobody's moving them: rows under his ring
+  const list = [...cards.values()].filter((c) => !c.dead && !c.stage);
+  const cols = Math.max(1, Math.floor((W - 80) / 370)), gapX = (W - 80) / cols;
+  list.forEach((c, i) => {
+    if (c.moved) return;               // you put it somewhere: it stays there
+    const col = i % cols, row = Math.floor(i / cols);
+    c.slot = [40 + gapX * (col + .5), 170 + (c.h || 200) / 2 + row * 250];
+    if (!c.held.size) c.target = [...c.slot];
+  });
+}
+function dismiss(c, why) {
+  if (!c || c.dead) return;
+  c.dead = true; c.held.clear(); closedSince.push(c.id); dirty = true;
+  if (why === "crumple") { c.el.classList.add("crumple"); c.s *= .15; c.rot += 1.2; }
+  else c.el.classList.add("gone");
+  setTimeout(() => { c.el.remove(); cards.delete(c.id); layout(); if (!cards.size) $("#empty").classList.remove("off"); }, 480);
+  if (c.stage) setStage(c, false);
+}
+function removeCard(id) { const c = cards.get(id); if (!c || c.dead) return; c.dead = true; c.el.classList.add("gone"); setTimeout(() => { c.el.remove(); cards.delete(id); layout(); if (!cards.size) $("#empty").classList.remove("off"); }, 350); }
+function hitTest(p, pad = 14) {        // topmost card under a point (rotation and size included)
+  let best = null, bz = -1;
+  cards.forEach((c) => {
+    if (c.dead) return;
+    const dx = p[0] - c.x, dy = p[1] - c.y, cs = Math.cos(-c.rot), sn = Math.sin(-c.rot);
+    const lx = (dx * cs - dy * sn) / c.s, ly = (dx * sn + dy * cs) / c.s;
+    if (Math.abs(lx) <= c.w / 2 + pad && Math.abs(ly) <= c.h / 2 + pad) { const zz = +c.el.style.zIndex || 0; if (zz > bz) { bz = zz; best = c; } }
+  });
+  return best;
+}
+
+// =============================================================== hands: shape -> gesture
+// A hand is 21 points on the screen. Everything is measured against the hand's own size (wrist to the base
+// of the middle finger), so it works near or far from the camera.
+const HANDS = new Map();             // id -> per-hand memory
+const TIP = [8, 12, 16, 20];
+let sweepAt = 0;
+function handShape(pts) {
+  const size = Math.max(20, dist(pts[0], pts[9]));
+  const pinchR = dist(pts[4], pts[8]) / size;
+  const ext = TIP.map((i) => dist(pts[i], pts[0]) / size);
+  return { size, pinchR, open: ext.every((e) => e > 1.55), fist: ext.every((e) => e < 1.08) && pinchR > .22,
+    palm: [(pts[0][0] + pts[5][0] + pts[17][0]) / 3, (pts[0][1] + pts[5][1] + pts[17][1]) / 3] };
+}
+function updateHands(list, now) {
+  const seen = new Set();
+  list.forEach((pts) => {
+    // match to the hand we saw last frame (closest wrist), so each hand keeps its memory
+    let id = null, bd = 1e9;
+    HANDS.forEach((h, k) => { if (seen.has(k)) return; const d = dist(h.wrist, pts[0]); if (d < bd && d < 260) { bd = d; id = k; } });
+    if (id == null) { id = "h" + Math.random().toString(36).slice(2, 7); HANDS.set(id, { trail: [], palmTrail: [], pinch: false, p: null, fistT: 0, card: null }); }
+    seen.add(id);
+    const h = HANDS.get(id), sh = handShape(pts);
+    h.wrist = pts[0]; h.pts = pts; h.shape = sh; h.lastSeen = now;
+    const was = h.pinch;
+    h.pinch = was ? sh.pinchR < .48 : sh.pinchR < .32;            // a little give, so it doesn't flicker
+    const raw = h.pinch || sh.pinchR < .6 ? [(pts[4][0] + pts[8][0]) / 2, (pts[4][1] + pts[8][1]) / 2] : pts[8];
+    if (!h.p) h.p = raw;
+    const sp = dist(raw, h.p) / Math.max(.001, (now - (h.t || now)) / 1000 || .016);
+    const a = clamp(.3 + sp / 2600, .3, .9);                       // steady when still, quick when moving
+    h.p = [h.p[0] + (raw[0] - h.p[0]) * a, h.p[1] + (raw[1] - h.p[1]) * a]; h.t = now;
+    h.trail.push([now, h.p[0], h.p[1]]); while (h.trail.length && now - h.trail[0][0] > 140) h.trail.shift();
+    if (!was && h.pinch) pinchStart(h, id, now);
+    if (was && !h.pinch) pinchEnd(h, id, now);
+    gestureExtras(h, id, now);
+  });
+  HANDS.forEach((h, k) => { if (!seen.has(k) && now - h.lastSeen > 250) { if (h.pinch) pinchEnd(h, k, now); HANDS.delete(k); } });
+  holdUpdate(now);
+}
+function pinchStart(h, id, now) {
+  h.t0 = now; h.p0 = [...h.p];
+  const c = hitTest(h.p);
+  if (!c) return;
+  h.card = c.id;
+  c.held.set(id, h); c.target = null; c.thrown = false; c.vx = c.vy = 0; c.el.style.zIndex = ++z; c.el.classList.add("held"); c.el.classList.remove("dim");
+  h.off = [c.x - h.p[0], c.y - h.p[1]];
+  if (c.held.size === 2) {           // both hands: remember where we started stretching from
+    const [a, b] = [...c.held.values()];
+    c.two = { d0: dist(a.p, b.p), s0: c.s * c.userS / c.s, a0: Math.atan2(b.p[1] - a.p[1], b.p[0] - a.p[0]), r0: c.rot,
+      off: [c.x - (a.p[0] + b.p[0]) / 2, c.y - (a.p[1] + b.p[1]) / 2], u0: c.userS };
+  }
+  dirty = true;
+}
+function pinchEnd(h, id, now) {
+  const c = h.card != null ? cards.get(h.card) : null; h.card = null;
+  if (!c || c.dead) return;
+  c.held.delete(id); c.two = null;
+  if (c.held.size === 1) { const [o] = c.held.values(); o.off = [c.x - o.p[0], c.y - o.p[1]]; return; }
+  c.el.classList.remove("held");
+  const dt = (now - h.t0) / 1000, moved = dist(h.p, h.p0);
+  if (dt < .3 && moved < 24) { setStage(c, !c.stage); return; }             // a quick pinch
+  // throw: how fast the hand was going over the last moment
+  const tr = h.trail, f = tr[0], l = tr[tr.length - 1], span = tr.length > 1 ? (l[0] - f[0]) / 1000 : 0;
+  if (span > .02) { c.vx = (l[1] - f[1]) / span; c.vy = (l[2] - f[2]) / span; }
+  const speed = Math.hypot(c.vx, c.vy);
+  c.thrown = speed > 1300;
+  c.moved = true; if (c.stage && moved > 40) setStage(c, false);
+  if (!c.thrown) { c.vx *= .35; c.vy *= .35; }
+  dirty = true;
+}
+function gestureExtras(h, id, now) {
+  const sh = h.shape;
+  // fist held over a card: crumple it
+  if (sh.fist && !h.pinch) {
+    const c = hitTest(sh.palm, 0);
+    if (c && c.id === h.fistCard) { h.fistT += (now - (h.fistLast || now)) / 1000; if (h.fistT > .8) { dismiss(c, "crumple"); h.fistT = 0; h.fistCard = null; } }
+    else { h.fistCard = c ? c.id : null; h.fistT = 0; }
+    h.fistLast = now;
+  } else { h.fistT = 0; h.fistCard = null; h.fistLast = now; }
+  // an open hand swept fast across the screen: clear the glass
+  if (sh.open && !h.pinch) {
+    h.palmTrail.push([now, sh.palm[0]]); while (h.palmTrail.length && now - h.palmTrail[0][0] > 380) h.palmTrail.shift();
+    const f = h.palmTrail[0], l = h.palmTrail[h.palmTrail.length - 1], dx = l[1] - f[1], dt = (l[0] - f[0]) / 1000;
+    if (dt > .08 && Math.abs(dx) > W * .36 && Math.abs(dx) / dt > W * 1.2 && now - sweepAt > 1200) { sweepAt = now; sweep(Math.sign(dx)); h.palmTrail = []; }
+  } else h.palmTrail = [];
+}
+function sweep(dir) {
+  cards.forEach((c) => { if (c.dead || c.held.size) return; c.target = null; c.vx = dir * (2600 + Math.random() * 900); c.vy = (Math.random() - .5) * 500; c.thrown = true; c.rot += dir * .05; if (c.stage) setStage(c, false); });
+}
+function holdUpdate() {
+  cards.forEach((c) => {
+    if (c.dead || !c.held.size) return;
+    const hs = [...c.held.values()];
+    if (hs.length === 1) { const h = hs[0]; c.x = h.p[0] + h.off[0]; c.y = h.p[1] + h.off[1]; }
+    else if (c.two) {
+      const [a, b] = hs, d = dist(a.p, b.p), ang = Math.atan2(b.p[1] - a.p[1], b.p[0] - a.p[0]);
+      c.userS = clamp(c.two.u0 * d / Math.max(30, c.two.d0), .45, 2.8);
+      c.rot = c.two.r0 + clamp(ang - c.two.a0, -.6, .6) * .7;
+      c.x = (a.p[0] + b.p[0]) / 2 + c.two.off[0]; c.y = (a.p[1] + b.p[1]) / 2 + c.two.off[1];
+      c.big = c.userS > 1.15; c.moved = true; dirty = true;
+    }
+  });
+}
+
+// =============================================================== motion
+let lastT = performance.now();
+function tick(now) {
+  const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
+  cards.forEach((c) => {
+    if (c.dead) { render(c); return; }
+    const grow = Math.min(1, (now - c.born) / 450);
+    const want = (c.stage ? 1 : 1) * c.userS;
+    c.s += (want * (.2 + .8 * easeOut(grow)) - c.s) * (1 - Math.exp(-dt * 10));
+    if (!c.held.size) {
+      if (c.target && !c.thrown) {
+        const k = 1 - Math.exp(-dt * 7); c.x += (c.target[0] - c.x) * k; c.y += (c.target[1] - c.y) * k; c.rot *= Math.exp(-dt * 6);
+        if (Math.abs(c.vx) + Math.abs(c.vy) > 5) { c.x += c.vx * dt; c.y += c.vy * dt; c.vx *= Math.exp(-dt * 6); c.vy *= Math.exp(-dt * 6); }
+      } else {
+        c.x += c.vx * dt; c.y += c.vy * dt;
+        const fr = c.thrown ? .5 : 5; c.vx *= Math.exp(-dt * fr); c.vy *= Math.exp(-dt * fr);
+        if (c.thrown) c.rot += c.vx * dt * .00025;
+        const hw = c.w * c.s / 2, hh = c.h * c.s / 2;
+        if (c.thrown) { if (c.x + hw < -20 || c.x - hw > W + 20 || c.y + hh < -20 || c.y - hh > H + 20) dismiss(c, "thrown"); }
+        else {                         // a gentle nudge back if it was left hanging off the edge
+          if (c.x < hw * .3) c.vx += (hw * .3 - c.x) * dt * 30; if (c.x > W - hw * .3) c.vx -= (c.x - (W - hw * .3)) * dt * 30;
+          if (c.y < hh * .3) c.vy += (hh * .3 - c.y) * dt * 30; if (c.y > H - hh * .3) c.vy -= (c.y - (H - hh * .3)) * dt * 30;
+        }
+      }
+    }
+    render(c);
+  });
+  // hover
+  const pts = [...HANDS.values()].map((h) => h.p).concat(mouse.on ? [mouse.p] : []);
+  cards.forEach((c) => { const hv = !c.dead && pts.some((p) => p && hitTest(p) === c); if (hv !== c.hover) { c.hover = hv; c.el.classList.toggle("hover", hv); } });
+  drawHands(now); drawRing(now);
+  if (dirty || now - reportAt > 4000) report(now);
+  requestAnimationFrame(tick);
+}
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+function render(c) {
+  c.el.style.transform = `translate(${(c.x - c.w / 2).toFixed(1)}px,${(c.y - c.h / 2).toFixed(1)}px) rotate(${c.rot.toFixed(4)}rad) scale(${c.s.toFixed(4)})`;
+  const age = performance.now() - c.born;                         // fade in as it arrives, then leave opacity to the CSS
+  if (age < 320 && !c.dead) c.el.style.opacity = (age / 320).toFixed(2); else if (c.el.style.opacity) c.el.style.opacity = "";
+}
+
+// =============================================================== drawing: hands and his ring
+function drawHands(now) {
+  g.clearRect(0, 0, W, H);
+  const col = rgb(), hc = hot();
+  HANDS.forEach((h) => {
+    if (!h.pts || now - h.lastSeen > 200) return;
+    const pts = h.pts;
+    g.fillStyle = rgba(col, .45);
+    [4, 8, 12, 16, 20].forEach((i) => { g.beginPath(); g.arc(pts[i][0], pts[i][1], 2.6, 0, 6.283); g.fill(); });
+    const near = clamp((.75 - h.shape.pinchR) / .45, 0, 1);
+    if (near > 0) { g.strokeStyle = rgba(col, .25 + .5 * near); g.lineWidth = 1; g.beginPath(); g.moveTo(pts[4][0], pts[4][1]); g.lineTo(pts[8][0], pts[8][1]); g.stroke(); }
+    const r = h.pinch ? 9 : 15 - 5 * near;
+    g.lineWidth = 1.6; g.strokeStyle = rgba(h.pinch ? hc : col, h.pinch ? .95 : .7); g.beginPath(); g.arc(h.p[0], h.p[1], r, 0, 6.283); g.stroke();
+    if (h.pinch) { g.fillStyle = rgba(hc, .35); g.fill(); }
+    if (h.fistT > 0) { g.lineWidth = 3; g.strokeStyle = rgba([255, 157, 46], .9); g.beginPath(); g.arc(h.shape.palm[0], h.shape.palm[1], 28, -Math.PI / 2, -Math.PI / 2 + 6.283 * Math.min(1, h.fistT / .8)); g.stroke(); }
+  });
+}
+const rc = $("#ring"), rg = rc.getContext("2d");
+let spinA = 0;
+function drawRing(now) {
+  const t = now / 1000, S = 168, cx = S / 2, col = rgb(), hc = hot();
+  if (now - voiceAt > 200) voice *= .85;
+  const v = voice, think = himState === "thinking" || himState === "transcribing", listen = himState === "listening";
+  spinA += (think ? 2.6 : .5) / 60;
+  rg.clearRect(0, 0, S, S);
+  const gr = rg.createRadialGradient(cx, cx, 0, cx, cx, 60);
+  gr.addColorStop(0, rgba(hc, .55 + .4 * v)); gr.addColorStop(.25, rgba(col, .25 + .2 * v)); gr.addColorStop(1, rgba(col, 0));
+  rg.fillStyle = gr; rg.beginPath(); rg.arc(cx, cx, 60, 0, 6.283); rg.fill();
+  const R = 40 + (listen ? 3 * Math.sin(t * 4) : 0) + v * 8;
+  rg.lineWidth = 2; rg.strokeStyle = rgba(col, .85);
+  const n = persona === "ultron" ? 6 : 3;
+  for (let i = 0; i < n; i++) { const a = spinA + i * 6.283 / n; rg.beginPath(); rg.arc(cx, cx, R, a, a + (persona === "ultron" ? .7 : 1.6)); rg.stroke(); }
+  rg.lineWidth = 1; rg.strokeStyle = rgba(col, .35); rg.beginPath(); rg.arc(cx, cx, R + 12, 0, 6.283); rg.stroke();
+  if (himState === "speaking") for (let i = 0; i < 48; i++) { const a = i / 48 * 6.283, l = 3 + v * 16 * (.5 + .5 * Math.sin(t * 13 + i * 2.1)); rg.beginPath(); rg.moveTo(cx + Math.cos(a) * (R + 14), cx + Math.sin(a) * (R + 14)); rg.lineTo(cx + Math.cos(a) * (R + 14 + l), cx + Math.sin(a) * (R + 14 + l)); rg.strokeStyle = rgba(col, .5); rg.stroke(); }
+}
+const STATE_WORD = { idle: "Standby", listening: "Listening", transcribing: "Hearing you", thinking: "Thinking", speaking: "Speaking", awaiting: "Your call", booting: "Starting" };
+let capTimer = null;
+function onHim(e) {
+  if (e.type === "state") { himState = e.state; $("#him-state").textContent = STATE_WORD[e.state] || e.state; }
+  if (e.type === "persona") { persona = e.key === "ultron" ? "ultron" : "jarvis"; document.body.classList.toggle("ultron", persona === "ultron"); document.body.classList.toggle("jarvis", persona !== "ultron"); document.title = (e.name || "Jarvis") + " Glass"; cards.forEach(measure); }
+  if (e.type === "voice") { voice = Math.max(voice, +e.v || 0); voiceAt = performance.now(); }
+  if (e.type === "caption" && e.text) { const c = $("#caption"); c.textContent = e.text; c.classList.add("on"); clearTimeout(capTimer); capTimer = setTimeout(() => c.classList.remove("on"), 5000); }
+  if (e.type === "turn_end") { clearTimeout(capTimer); capTimer = setTimeout(() => $("#caption").classList.remove("on"), 2500); }
+}
+
+// =============================================================== mouse (no camera, or just easier)
+const mouse = { on: false, p: [0, 0], h: null };
+addEventListener("pointermove", (e) => { mouse.on = true; mouse.p = [e.clientX, e.clientY]; document.body.classList.add("mouse");
+  if (mouse.h) { const h = mouse.h, now = performance.now(); h.p = [...mouse.p]; h.trail.push([now, h.p[0], h.p[1]]); while (h.trail.length && now - h.trail[0][0] > 140) h.trail.shift(); holdUpdate(now); } });
+$("#board").addEventListener("pointerdown", (e) => {
+  if (e.button === 2) return;
+  const now = performance.now(); mouse.p = [e.clientX, e.clientY];
+  mouse.h = { trail: [[now, e.clientX, e.clientY]], p: [...mouse.p], pinch: true };
+  pinchStart(mouse.h, "mouse", now); if (mouse.h.card == null) mouse.h = null;
+});
+addEventListener("pointerup", () => { if (!mouse.h) return; const now = performance.now(); mouse.h.trail.push([now, mouse.p[0], mouse.p[1]]); pinchEnd(mouse.h, "mouse", now); mouse.h = null; });
+$("#board").addEventListener("wheel", (e) => { const c = hitTest([e.clientX, e.clientY]); if (!c) return; e.preventDefault(); c.userS = clamp(c.userS * (e.deltaY < 0 ? 1.08 : 1 / 1.08), .45, 2.8); c.big = c.userS > 1.15; c.moved = true; dirty = true; }, { passive: false });
+$("#board").addEventListener("contextmenu", (e) => { e.preventDefault(); const c = hitTest([e.clientX, e.clientY]); if (c) dismiss(c, "crumple"); });
+addEventListener("keydown", (e) => {
+  if (e.key === "h" || e.key === "H" || e.key === "?") { const on = $("#help").classList.toggle("off"); store.set("help", !on); }
+  if (e.key === "Escape") cards.forEach((c) => c.stage && setStage(c, false));
+  if (e.key === "Delete") { const c = hitTest(mouse.p); if (c) dismiss(c, "closed"); }
+});
+
+// =============================================================== talking to Jarvis
+let seq = -1, reportAt = 0, alive = true;
+async function poll() {
+  while (alive) {
+    try {
+      const r = await fetch(`/events?t=${encodeURIComponent(TOKEN)}&since=${seq}`, { cache: "no-store" });
+      if (r.status === 403) { gate("This window's link is old. Ask Jarvis to open glass mode again."); return; }
+      const j = await r.json();
+      j.events.forEach(handle); seq = j.seq;
+    } catch (e) { await new Promise((r) => setTimeout(r, 1500)); }
+  }
+}
+function handle(e) {
+  if (e.type === "sync") { const ids = new Set(e.cards.map((c) => c.id)); cards.forEach((c, id) => { if (!ids.has(id)) removeCard(id); }); (e.snap || []).forEach(onHim); e.cards.forEach(addCard); return; }
+  if (e.type === "card") return addCard(e.card);
+  if (e.type === "remove") return removeCard(e.id);
+  if (e.type === "clear") { cards.forEach((c) => removeCard(c.id)); return; }
+  if (e.type === "bye") { alive = false; window.close(); gate("Glass mode is closed. You can close this window."); return; }
+  onHim(e);
+}
+async function report(now) {
+  reportAt = now; dirty = false;
+  const body = { cards: [...cards.values()].filter((c) => !c.dead).map((c) => ({ id: c.id, held: c.held.size > 0, stage: c.stage, big: c.big })),
+    closed: closedSince.splice(0), hands: [...HANDS.values()].length, mode: camOK ? "hands" : "mouse" };
+  try { await fetch("/board", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": TOKEN }, body: JSON.stringify(body) }); }
+  catch (e) { closedSince.unshift(...body.closed); }
+}
+function gate(text) { const g2 = $("#gate"); g2.textContent = text; g2.hidden = false; }
+
+// =============================================================== camera + hand tracking
+let camOK = false, tracker = null;
+const status = (html) => { $("#status").innerHTML = ""; $("#status").append(...(Array.isArray(html) ? html : [html])); };
+const b = (t) => { const x = document.createElement("b"); x.textContent = t; return x; };
+async function startCamera() {
+  if (FAKE) { document.body.classList.add("nocam"); status([b("Test hands"), " (no camera)"]); window.__hands = (list) => updateHands(list, performance.now()); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, audio: false });
+    const v = $("#cam"); v.srcObject = stream; await v.play(); camOK = true;
+  } catch (e) {
+    document.body.classList.add("nocam", "mouse");
+    status([b("Mouse mode."), e && e.name === "NotAllowedError" ? " Allow the camera (the icon in the address bar, or Settings) to use your hands." : " No camera found."]);
+    return;
+  }
+  status("Loading hand tracking...");
+  try {
+    const { FilesetResolver, HandLandmarker } = await import(`${MP}/vision_bundle.mjs`);
+    const files = await FilesetResolver.forVisionTasks(`${MP}/wasm`);
+    const opts = (delegate) => ({ baseOptions: { modelAssetPath: MODEL, delegate }, runningMode: "VIDEO", numHands: 2,
+      minHandDetectionConfidence: .6, minHandPresenceConfidence: .6, minTrackingConfidence: .5 });
+    try { tracker = await HandLandmarker.createFromOptions(files, opts("GPU")); } catch (e) { tracker = await HandLandmarker.createFromOptions(files, opts("CPU")); }
+  } catch (e) { status([b("Hand tracking didn't load."), " Check your internet connection (it downloads once), then reopen. The mouse still works."]); document.body.classList.add("mouse"); return; }
+  status([b("Hands ready."), " Show him your hands."]);
+  const v = $("#cam");
+  let lastVT = -1, seenAny = 0;
+  const step = () => {
+    if (!document.hidden && v.readyState >= 2 && v.currentTime !== lastVT) {
+      lastVT = v.currentTime;
+      const now = performance.now(), res = tracker.detectForVideo(v, now);
+      const vw = v.videoWidth, vh = v.videoHeight, k = Math.max(W / vw, H / vh), dw = vw * k, dh = vh * k, ox = (dw - W) / 2, oy = (dh - H) / 2;
+      const list = (res.landmarks || []).map((lm) => lm.map((p) => [W - (p.x * dw - ox), p.y * dh - oy]));   // mirrored, like a mirror
+      updateHands(list, now);
+      if (list.length) { seenAny = now; status([b(list.length === 2 ? "2 hands" : "1 hand")]); }
+      else if (now - seenAny > 1500) status("No hands in view");
+    }
+    if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(step); else requestAnimationFrame(step);
+  };
+  step();
+}
+
+// =============================================================== go
+if (!store.get("help", true)) $("#help").classList.add("off"); else setTimeout(() => { if (cards.size) $("#help").classList.add("off"); }, 15000);
+resize(); requestAnimationFrame(tick); poll(); startCamera();
+window.__glass = { cards, HANDS, hitTest };
+</script>
+</body>
+</html>

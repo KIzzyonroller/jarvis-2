@@ -120,6 +120,39 @@ He supports **MCP**, the standard way of connecting AI assistants to apps. Lots 
 - Servers that run on your PC often need Node.js (for `npx`) or uv (for `uvx`) installed. If one won't connect, `Documents\Jarvis\logs\mcp-<name>.log` says why.
 - Only add servers you trust: a connector can do whatever its app allows.
 
+## Glass mode (your hands, your webcam)
+
+Say **"open glass mode"** or press **Glass mode** in the System panel. A window opens with your camera behind glass. Then ask him to show you things ("show me the top 5 budget mics", "put my week up on the glass", "show me a screenshot of my screen") and they float in as cards you move with your hands. No gloves or headset: just a webcam.
+
+| Do this | It does |
+|---|---|
+| Pinch (thumb and index together) on a card, move | Drag it |
+| Let go mid-swing | Throw it; off the screen closes it |
+| Quick pinch | Bring it up close, or send it back |
+| Both hands pinch one card, pull apart / push together | Bigger / smaller (twist to tilt) |
+| Fist over a card, hold a second | Crumple it |
+| Sweep an open hand fast across the screen | Clear the glass |
+
+- The mouse does the same: drag, throw, click, scroll to resize, right-click to crumple.
+- He knows what's up and which card you're holding or made bigger, so "what's this one?" and "close the mic list" work.
+- The first time, the window asks to use the camera: click **Allow**. The hand tracking (Google's MediaPipe) downloads once from the internet, then runs inside the window. **Your camera picture never leaves your PC**; Jarvis only learns which cards are up.
+- The window is only reachable from your own PC, with a secret link that changes every time he starts.
+- Works best with your hands about an arm's length from the camera, in decent light.
+
+## Faces
+
+Pick how he looks in the System panel under **Face**, or say "Jarvis, change your face", "switch to the ferro face" or "go back to your normal face". Both AIs change together, each in their own colors, and every face reacts to the same things: listening, thinking, talking and waiting for your OK.
+
+| Face | What it is |
+|---|---|
+| Classic | The gyroscope (Jarvis) and the crystal shards (Ultron). The default. |
+| Scope | An oscilloscope trace that swells with his voice and flattens into a line your voice shakes |
+| Lattice | A wireframe geodesic sphere; light runs along its edges while he thinks |
+| Contour | A topographic map whose peaks rise when he talks |
+| Ferro | A drop of ferrofluid that bristles into spikes in time with his voice |
+
+The choice is remembered on that PC.
+
 ## Sounds
 
 Quiet synthesized sound effects: a chime when he hears his name, a low hum while he thinks, a whoosh as panels open, a tone for approvals. Ultron's are darker and harsher. Switch them off or change the volume under Controls in the System panel.

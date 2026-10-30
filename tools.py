@@ -2235,6 +2235,48 @@ def activity_tool(action="summary", when=None, query=None, days=None, minutes=No
     return "action must be summary, search, reopen, status, pause, resume, forget, on or off."
 
 
+_GLASS = {"get": None}
+
+
+def set_glass(getter):
+    _GLASS["get"] = getter
+
+
+def glass_tool(action="show", title=None, body=None, items=None, image=None, id=None):
+    if _GLASS["get"] is None:
+        return "Glass mode isn't available."
+    hub = _GLASS["get"]()
+    if hub is None or not hub.running:
+        return "Glass mode couldn't start (see the log)."
+    a = (action or "show").lower()
+    first = "The first time, the window asks to use the camera: they should click Allow."
+    if a == "open":
+        if hub.connected():
+            return "Glass mode is already open."
+        hub.open_window()
+        return f"Opening glass mode. {first}"
+    if a in ("show", "add"):
+        card, err = hub.put(title, body, items, image, stage=a == "show")
+        if err:
+            return err
+        if hub.connected():
+            return f"Put #{card['id']} on the glass" + (" centre stage." if a == "show" else ".")
+        hub.open_window()
+        return f"Opening glass mode with #{card['id']} on it. {first}"
+    if a == "list":
+        return hub.board_text()
+    if a == "remove":
+        gone = hub.remove(id if id is not None else (title or ""))
+        return f"Took {len(gone)} card{'s' if len(gone) != 1 else ''} off the glass." if gone else "No card like that."
+    if a == "clear":
+        n = hub.clear()
+        return f"Cleared {n} card{'s' if n != 1 else ''}." if n else "The glass was already empty."
+    if a == "close":
+        hub.bye()
+        return "Closed glass mode."
+    return "action must be open, show, add, list, remove, clear or close."
+
+
 def blender_expert(task):
     import experts
     return experts.run("blender", task)
@@ -2316,15 +2358,49 @@ def open_thing(target, kind="auto", front=False, new_window=False, wait=True):
     return open_app(t, front=front, wait=wait, new_window=bool(new_window))
 
 
-def self_control(action, minutes=None, window=None):
+FACES = {"classic": "Classic", "scope": "Scope", "lattice": "Lattice", "contour": "Contour", "ferro": "Ferro"}
+FACE_WORDS = {"default": "classic", "normal": "classic", "original": "classic", "usual": "classic", "gyroscope": "classic",
+              "oscilloscope": "scope", "signal": "scope", "wave": "scope", "waveform": "scope",
+              "sphere": "lattice", "geodesic": "lattice", "globe": "lattice", "wireframe": "lattice", "ball": "lattice",
+              "map": "contour", "topographic": "contour", "topo": "contour", "terrain": "contour", "mountain": "contour",
+              "ferrofluid": "ferro", "liquid": "ferro", "blob": "ferro", "fluid": "ferro", "spiky": "ferro"}
+_FACE = {"emit": None, "cur": "classic"}
+
+
+def set_face_handler(fn):
+    _FACE["emit"] = fn
+
+
+def change_face(name):
+    q = re.sub(r"[^a-z ]", "", str(name or "").lower()).replace(" face", "").strip()
+    keys = list(FACES)
+    if q in ("next", "another", "different", "new", "random", "something else", "other"):
+        import random
+        pick = (keys[(keys.index(_FACE["cur"]) + 1) % len(keys)] if q == "next"
+                else random.choice([k for k in keys if k != _FACE["cur"]]))
+    else:
+        pick = q if q in FACES else FACE_WORDS.get(q) or next((v for w, v in FACE_WORDS.items() if w in q), None) \
+            or next((k for k in FACES if k in q), None)
+    if not pick:
+        return f"No face called '{name}'. The faces are: {', '.join(FACES.values())}."
+    if _FACE["emit"] is None:
+        return "Can't change faces without the app window."
+    _FACE["cur"] = pick
+    _FACE["emit"](pick)
+    return f"Switched to the {FACES[pick]} face."
+
+
+def self_control(action, minutes=None, window=None, face=None):
     a = (action or "").lower()
+    if a == "face":
+        return change_face(face or window or "next")
     if a in ("hide", "show"):
         return own_window(a)
     if a == "mute":
         return mute_mic(minutes)
     if a == "dictate":
         return start_dictation(window)
-    return "action must be hide, show, mute or dictate."
+    return "action must be hide, show, mute, dictate or face."
 
 
 def display(action, value=None):
@@ -2629,8 +2705,11 @@ TOOL_SPECS = [
     _spec("self_control", "Control yourself. hide/show: minimize or restore YOUR OWN window (when told to close, exit, go away "
                           "or hide: you minimize, you never quit; only the user saying 'quit' shuts you down). mute: turn the "
                           "mic off (optional minutes); you can't unmute yourself. dictate: type everything the user says into "
-                          "an app until they say stop (window = part of its title, omit for the one they were using).",
-          {"action": {"type": "string", "enum": ["hide", "show", "mute", "dictate"]}, "minutes": N, "window": S}, ["action"]),
+                          "an app until they say stop (window = part of its title, omit for the one they were using). face: change how "
+                          "you look in the app (face = classic, scope (an oscilloscope), lattice (a geodesic sphere), "
+                          "contour (a topographic map), ferro (ferrofluid), or next / random); both AIs share the face.",
+          {"action": {"type": "string", "enum": ["hide", "show", "mute", "dictate", "face"]}, "minutes": N, "window": S,
+           "face": S}, ["action"]),
     _spec("window_control", "Manage windows. action: list, focus, minimize, maximize, restore, close, snap_left, snap_right, show_desktop, minimize_all, restore_all, switch. title = part of the window title (omit to use the active window).",
           {"action": {"type": "string", "enum": ["list", "focus", "minimize", "maximize", "restore", "close", "snap_left",
                                                  "snap_right", "show_desktop", "minimize_all", "restore_all", "switch"]},
@@ -2839,6 +2918,19 @@ TOOL_SPECS = [
                                                                   "finishes"]},
            "value": S, "question": S, "every_minutes": N, "for_hours": N, "repeat": B, "then": S, "label": S,
            "id": N}, ["action"]),
+    _spec("glass", "Glass mode: cards floating over the user's webcam that they move, throw, stretch and close with "
+                   "their hands (or the mouse). Use it when they ask to SEE something, to show/put something up, or "
+                   "when glass mode is open and the answer is a list, a comparison, steps, an image or anything "
+                   "easier to look at than to hear. show: one card centre stage (title, body = short text, a little "
+                   "markdown: - bullets, 1. steps, **bold**; items = a list of short lines; image = a web link, "
+                   "'screenshot', or a picture file path). add: another card without taking the stage (use it "
+                   "several times for several results, one per card). list: what's on the glass and which card "
+                   "they're holding or made bigger (look before talking about 'this one'). remove (id or title), "
+                   "clear, open (just the window), close. Keep cards short and scannable (under about 60 words, "
+                   "or up to 8 items); say only a few words out loud, like 'Up on the glass.' If the window "
+                   "wasn't open, showing a card opens it.",
+          {"action": {"type": "string", "enum": ["open", "show", "add", "list", "remove", "clear", "close"]},
+           "title": S, "body": S, "items": {"type": "array", "items": S}, "image": S, "id": N}, ["action"]),
     _spec("activity", "Activity memory: which apps and windows the user had in front, logged on this PC (titles "
                       "only, never screenshots or typing), if they've switched it on. summary (when: today, "
                       "yesterday, this morning, yesterday afternoon, last 2 hours, friday, last week, 2026-10-20): "
@@ -2865,7 +2957,7 @@ FUNCS = {
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "history": history_tool, "background": background_tool,
-    "watch": watch_tool, "activity": activity_tool,
+    "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
 
 assert set(FUNCS) == {s["name"] for s in TOOL_SPECS}, "TOOL_SPECS and FUNCS are out of sync"

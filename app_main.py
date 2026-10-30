@@ -59,7 +59,7 @@ SELFTEST_MODULES = [
     "config", "core", "brain", "tools", "speech", "voice", "vad", "aec", "intents", "personas", "permissions",
     "spotify", "youtube", "notifications", "briefing", "history", "connectors", "usage", "jobs", "discord_bot",
     "app_update", "autostart", "phone", "mini", "health", "cloud_stt", "download_models", "email_reader", "netflix",
-    "settings", "secretbox", "voice_settings", "changelog", "apple_music", "media_buttons", "discord_typing", "app_ready", "providers", "experts", "unreal_bridge", "closer", "folder_access", "rgb", "openrgb", "meshy", "cal_store", "cal_sync", "calendar_service", "calendar_mode", "watchers", "activity", "icalendar", "recurring_ical_events", "caldav",
+    "settings", "secretbox", "voice_settings", "changelog", "apple_music", "media_buttons", "discord_typing", "app_ready", "providers", "experts", "unreal_bridge", "closer", "folder_access", "rgb", "openrgb", "meshy", "cal_store", "cal_sync", "calendar_service", "calendar_mode", "watchers", "activity", "glass", "icalendar", "recurring_ical_events", "caldav",
     "anthropic", "numpy", "onnxruntime", "faster_whisper", "ctranslate2", "kokoro_onnx", "sounddevice", "webview",
     "edge_tts", "pygame", "requests", "psutil", "PIL", "cv2", "yt_dlp", "mcp", "discord", "velopack",
     "espeakng_loader", "phonemizer",

@@ -241,6 +241,8 @@ GAME_MODE = os.environ.get("JARVIS_GAME_MODE", "true").lower() != "false"
 # Phone remote: type to him from your phone on the same Wi-Fi. Off unless you turn it on.
 PHONE = os.environ.get("JARVIS_PHONE", "false").lower() == "true"
 PHONE_PORT = int(os.environ.get("JARVIS_PHONE_PORT", "8766"))
+# Glass mode (cards over your webcam that you move with your hands). Only ever on this PC (127.0.0.1).
+GLASS_PORT = int(os.environ.get("JARVIS_GLASS_PORT", "8767"))
 
 # Say a pre-recorded "On it." the instant a slow request starts (web search, screen, Blender...)
 INSTANT_ACK = os.environ.get("JARVIS_INSTANT_ACK", "true").lower() != "false"

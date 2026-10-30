@@ -210,6 +210,11 @@ class Bridge:
     def folder_revoke(self, path):
         threading.Thread(target=self._core.folder_revoke, args=(str(path),), daemon=True).start()
 
+    def face_seen(self, name):
+        import tools
+        if str(name) in tools.FACES:
+            tools._FACE["cur"] = str(name)
+
     def watch_remove(self, wid):
         threading.Thread(target=self._core.watch_remove, args=(str(wid),), daemon=True).start()
 

@@ -257,6 +257,14 @@ body.booting #subs,body.booting #chips{display:none}
 
 
 #watchers li.col>span.note{white-space:normal}
+.facepick{display:grid;gap:2px;padding:4px 0 12px}
+.facepick b{font-weight:500;font-size:13.5px}
+.facepick>span{font-size:12px;color:var(--dim);line-height:1.4}
+.seg{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.seg button{font-size:12.5px;padding:5px 10px;border:1px solid rgba(var(--crgb),.16);color:var(--dim);transition:border-color .15s,color .15s}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-checked=true]{border-color:var(--c);color:var(--ink);background:rgba(var(--crgb),.08)}
+.seg button:focus-visible{outline:1px solid var(--c);outline-offset:2px}
 #act-sec .perm{padding-top:0}
 #folders .fold{display:flex;align-items:center;gap:10px;justify-content:space-between}
 #folders .fold>div{display:grid;min-width:0}
@@ -548,6 +556,7 @@ body.swap #stage{animation:swap .6s steps(6)}
         <button data-act="mute" id="mute" aria-label="Mute sound"><svg viewBox="0 0 20 20"><path d="M3 8h3l4-4v12l-4-4H3z" fill="currentColor"/><path d="M13 7c1.3 1.6 1.3 4.4 0 6M15.5 5c2.5 3 2.5 7 0 10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       </div>
       <label class="slider"><span>Volume</span><input type="range" id="vol" min="0" max="100" value="50"><output id="vol-out">50</output></label>
+      <div class="facepick"><b>Face</b><span>How he looks. Or say “Jarvis, change your face”.</span><div class="seg" role="radiogroup" aria-label="His face" id="face-pick"></div></div>
       <div class="perm" style="padding:2px 0 10px"><b>Living background</b><button class="sw" role="switch" id="bg-sw" aria-checked="true" aria-label="Animated background"></button><span>Faint equations for Jarvis, something worse for Ultron.</span></div>
       <div class="perm" style="padding:2px 0 10px"><b>Holographic panels</b><button class="sw" role="switch" id="holo-sw" aria-checked="true" aria-label="Show holographic panels while he works"></button><span>Pop-up visuals beside him while he works.</span></div>
       <div class="perm" style="padding:2px 0 6px"><b>Sound effects</b><button class="sw" role="switch" id="sfx-sw" aria-checked="true" aria-label="Sound effects"></button><span>Chimes and hums as he listens, thinks and works.</span></div>
@@ -562,6 +571,7 @@ body.swap #stage{animation:swap .6s steps(6)}
         <button data-act="dark_mode"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 12.5A6.5 6.5 0 017.5 5a6.5 6.5 0 107.5 7.5z"/></svg>Dark mode</button>
         <button data-act="status"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 10h4l2-5 4 10 2-5h4"/></svg>Diagnostics</button>
         <button id="keys-btn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"/></svg>Settings</button>
+        <button data-act="glass" title="Cards over your camera that you move with your hands"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3.5" y="5" width="9" height="11" transform="rotate(-8 8 10.5)"/><rect x="8" y="3.5" width="9" height="11" transform="rotate(7 12.5 9)"/></svg>Glass mode</button>
         <button data-act="calendar_mode" title="Just the calendar and reminders, using very little of your PC"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="14" height="13"/><path d="M3 8h14M7 2.5v3M13 2.5v3"/><path d="M6.5 11h2M11.5 11h2M6.5 14h2" stroke-width="1.8"/></svg>Calendar mode</button>
         <button id="wn-btn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2.5l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 7.8l5-.7z"/></svg>What's new</button>
         <button data-act="reset"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10a6 6 0 106-6H6M8 1L5 4l3 3"/></svg>New chat</button>
@@ -859,11 +869,223 @@ function drawUltron(x, y, R, A, t, b) {
   g.restore();
 }
 
-function drawFX(x, y, R, key, A, dt, t) {
+// ================================================================ faces: other looks for the same two AIs
+// Every face reads the same live signals as the classic one (voiceS = his voice, micS = yours, state,
+// spin, alarmT for the approval prompt, muteT for mic-off) and draws both Jarvis and Ultron in their colors.
+const FS = { listen: 0, think: 0, speak: 0 };          // smoothed: how much he's listening / thinking / talking
+function faceStep(dt) {
+  const k = 1 - Math.exp(-dt * 4);
+  FS.listen += ((state === "listening" || state === "dictating" ? 1 : 0) - FS.listen) * k;
+  FS.think += ((state === "thinking" || state === "transcribing" ? 1 : 0) - FS.think) * k;
+  FS.speak += ((state === "speaking" ? 1 : 0) - FS.speak) * k;
+}
+function faceCol(k) {
+  const C = COL[k], col = mix(mix(C.c, C.alarm, alarmT), C.dim, muteT * .8);
+  const hot = k === "ultron" ? mix(C.hot, C.alarm, alarmT) : mix(C.hot, [255, 226, 180], alarmT);
+  return { C, col, hot, deep: C.deep, v: voiceS * (speaker === k || !duoOn ? 1 : .2), m: micS };
+}
+
+// ---- Scope: a phosphor oscilloscope. Idle it traces a slow figure; listening it becomes a flat line that
+// your voice shakes; thinking the figure sweeps through shapes; talking it swells with every syllable.
+const SCOPE = { jarvis: [], ultron: [] };
+function drawScope(x, y, R, A, t, b, k) {
+  const F = faceCol(k), U = k === "ultron", Rb = R * 1.18 * ease(b * 1.4), n = 220;
+  g.save(); g.globalAlpha = A * (1 - muteT * .5);
+  g.fillStyle = rgba(F.deep, U ? .22 : .16); g.beginPath(); g.arc(x, y, Rb, 0, TAU); g.fill();
+  const grid = new Path2D(), step = Rb / 4;
+  for (let i = -3; i <= 3; i++) { const d = i * step, h = Math.sqrt(Rb * Rb - d * d);
+    grid.moveTo(x + d, y - h); grid.lineTo(x + d, y + h); grid.moveTo(x - h, y + d); grid.lineTo(x + h, y + d); }
+  g.lineWidth = 1; g.strokeStyle = rgba(F.col, .07); g.stroke(grid);
+  const tk = new Path2D();
+  for (let i = -20; i <= 20; i++) { const p = i * step / 5; tk.moveTo(x + p, y - 3); tk.lineTo(x + p, y + 3); tk.moveTo(x - 3, y + p); tk.lineTo(x + 3, y + p); }
+  g.strokeStyle = rgba(F.col, .16); g.stroke(tk);
+  // the figure
+  const th = FS.think, li = FS.listen, v = F.v, amp = Rb * (.42 + .38 * v + .06 * th);
+  const fa = 1 + th * (1.5 + Math.sin(t * .6)), fb = 2 + th * (1.2 * Math.sin(t * .45) + .8), ph = t * (.35 + th * 2.2) + spin[k] * .2;
+  const pts = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) {
+    const s = i / (n - 1) * TAU;
+    let fx = Math.sin(fa * s + ph), fy = Math.sin(fb * s);
+    fy += v * .22 * Math.sin(s * 11 + t * 23) * noise(i % 9, t);
+    if (U) { fx = Math.tanh(2.6 * fx) / Math.tanh(2.6); fy = Math.tanh(2.2 * fy) / Math.tanh(2.2); }
+    // listening: blend toward a sweep line that your voice moves
+    const sx = i / (n - 1) * 2 - 1, sy = F.m * .9 * Math.sin(sx * 9 + t * 15) * Math.sin((sx + 1) * Math.PI / 2) + .02 * Math.sin(sx * 30 + t * 40);
+    fx = fx + (sx - fx) * li; fy = fy + (sy - fy) * li;
+    pts[i * 2] = x + fx * amp; pts[i * 2 + 1] = y + fy * amp * (U ? .92 : 1);
+  }
+  const trail = SCOPE[k]; trail.unshift(pts); if (trail.length > 3) trail.pop();
+  for (let j = trail.length - 1; j >= 0; j--) {
+    const p = trail[j], path = new Path2D(); path.moveTo(p[0], p[1]);
+    for (let i = 1; i < n; i++) {
+      if (U && i % 37 === 0 && Math.random() < .15 + v * .4) path.moveTo(p[i * 2] + (Math.random() - .5) * 9, p[i * 2 + 1]);   // Ultron's signal breaks up
+      path.lineTo(p[i * 2], p[i * 2 + 1]);
+    }
+    const fade = 1 - j / trail.length;
+    if (j === 0) { g.lineWidth = 5; g.strokeStyle = rgba(F.col, .1 + .1 * v); g.stroke(path); }
+    g.lineWidth = j === 0 ? 1.6 : 1; g.strokeStyle = rgba(j === 0 ? F.hot : F.col, (j === 0 ? .9 : .28) * fade); g.stroke(path);
+  }
+  // bezel with a readout that moves with the signal
+  g.lineWidth = 1.4; g.strokeStyle = rgba(F.col, .45); g.beginPath(); g.arc(x, y, Rb, 0, TAU); g.stroke();
+  if (b > .7) {
+    const ticks = new Path2D();
+    for (let i = 0; i < 60; i++) { const a = i / 60 * TAU, l = i % 5 ? 3 : 7, c = Math.cos(a), s = Math.sin(a); ticks.moveTo(x + c * (Rb + 4), y + s * (Rb + 4)); ticks.lineTo(x + c * (Rb + 4 + l), y + s * (Rb + 4 + l)); }
+    g.lineWidth = 1; g.strokeStyle = rgba(F.col, .4); g.stroke(ticks);
+    const a0 = -Math.PI / 2 + spin[k] * .3; g.lineWidth = 2.4; g.strokeStyle = rgba(F.hot, .7);
+    g.beginPath(); g.arc(x, y, Rb + 16, a0, a0 + .25 + v * 1.6 + th * .6); g.stroke();
+  }
+  g.restore();
+}
+
+// ---- Lattice: a geodesic sphere. Its points push out when he talks, light runs along its edges while he
+// thinks, and it pulls in tight to listen. Ultron's grows spikes.
+const LAT = (() => {
+  const p = (1 + Math.sqrt(5)) / 2, V = [[-1, p, 0], [1, p, 0], [-1, -p, 0], [1, -p, 0], [0, -1, p], [0, 1, p], [0, -1, -p], [0, 1, -p], [p, 0, -1], [p, 0, 1], [-p, 0, -1], [-p, 0, 1]]
+    .map(([a, b2, c]) => { const l = Math.hypot(a, b2, c); return [a / l, b2 / l, c / l]; });
+  const Fc = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+  const mid = new Map(), edges = new Set();
+  const half = (i, j) => { const key = i < j ? i + "," + j : j + "," + i; if (mid.has(key)) return mid.get(key);
+    const a = V[i], c = V[j], m = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2, (a[2] + c[2]) / 2], l = Math.hypot(...m);
+    V.push([m[0] / l, m[1] / l, m[2] / l]); mid.set(key, V.length - 1); return V.length - 1; };
+  const add = (i, j) => edges.add(i < j ? i + "," + j : j + "," + i);
+  Fc.forEach(([a, b2, c]) => { const ab = half(a, b2), bc = half(b2, c), ca = half(c, a);
+    [[a, ab, ca], [b2, bc, ab], [c, ca, bc], [ab, bc, ca]].forEach(([q, r, s]) => { add(q, r); add(r, s); add(s, q); }); });
+  return { V, E: [...edges].map((s) => s.split(",").map(Number)), pulses: { jarvis: [], ultron: [] } };
+})();
+function drawLattice(x, y, R, A, t, b, k) {
+  const F = faceCol(k), U = k === "ultron", v = F.v, th = FS.think, li = FS.listen;
+  const ay = spin[k] * (U ? .5 : .7), ax = .45 + .1 * Math.sin(t * .35), grow = ease(b * 1.3);
+  g.save(); g.globalAlpha = A * (1 - muteT * .5);
+  let gr = g.createRadialGradient(x, y, 0, x, y, R * 1.15);
+  gr.addColorStop(0, rgba(F.hot, .22 + .3 * v)); gr.addColorStop(.35, rgba(F.col, .08 + .08 * v)); gr.addColorStop(1, rgba(F.col, 0));
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, R * 1.15, 0, TAU); g.fill();
+  const P = LAT.V.map((p0, i) => {
+    let d = .86 * grow * (1 - li * .1) + v * .26 * noise(i, t) + li * F.m * .12 * Math.sin(t * 12 + i * 1.3) + th * .02 * Math.sin(t * 6 + i);
+    if (U) d *= i < 12 ? 1.22 + v * .5 : .9;                      // Ultron: the 12 corners stab outward
+    const q = rot([p0[0] * d, p0[1] * d, p0[2] * d], ax, ay, 0), s = persp(q[2] * .9);
+    return [x + q[0] * R * s, y + q[1] * R * s, q[2]];
+  });
+  const back = new Path2D(), front = new Path2D();
+  LAT.E.forEach(([i, j]) => { const p = P[i], q = P[j], path = p[2] + q[2] > 0 ? back : front; path.moveTo(p[0], p[1]); path.lineTo(q[0], q[1]); });
+  g.lineWidth = 1; g.strokeStyle = rgba(F.col, .14); g.stroke(back);
+  g.lineWidth = 1.2; g.strokeStyle = rgba(F.col, .6 + .3 * v); g.stroke(front);
+  P.forEach((p, i) => { if (p[2] > 0) return; const r = (i < 12 ? 2.4 : 1.5) + v * 2.2 * noise(i, t);
+    g.fillStyle = rgba(i < 12 ? F.hot : F.col, .85); g.beginPath(); g.arc(p[0], p[1], r, 0, TAU); g.fill(); });
+  // thinking: light runs along the edges
+  const pl = LAT.pulses[k];
+  if (th > .3 && pl.length < 26 && Math.random() < .5) pl.push({ e: (Math.random() * LAT.E.length) | 0, u: 0, sp: .8 + Math.random() * 1.4 });
+  for (let i = pl.length - 1; i >= 0; i--) {
+    const q = pl[i]; q.u += .016 * q.sp * (1 + th);
+    if (q.u >= 1) { if (th > .2 && Math.random() < .7) { const [, j] = LAT.E[q.e], nx = LAT.E.findIndex(([a, c]) => (a === j || c === j) && Math.random() < .3); q.e = nx >= 0 ? nx : q.e; q.u = 0; } else { pl.splice(i, 1); continue; } }
+    const [a, c] = LAT.E[q.e], p = P[a], r2 = P[c], px = p[0] + (r2[0] - p[0]) * q.u, py = p[1] + (r2[1] - p[1]) * q.u, fr = p[2] + r2[2] <= 0;
+    g.fillStyle = rgba(F.hot, fr ? .95 : .35); g.beginPath(); g.arc(px, py, fr ? 2.6 : 1.6, 0, TAU); g.fill();
+  }
+  // orbit ring
+  if (b > .7) { g.lineWidth = 1; g.strokeStyle = rgba(F.col, .2); g.beginPath(); g.ellipse(x, y, R * 1.32, R * 1.32 * (.28 + .05 * Math.sin(t * .5)), -.3, 0, TAU); g.stroke();
+    const a = spin[k] * 1.4; g.fillStyle = rgba(F.hot, .8); g.beginPath();
+    g.arc(x + Math.cos(a) * R * 1.32 * Math.cos(-.3) - Math.sin(a) * R * 1.32 * .3 * Math.sin(-.3), y + Math.cos(a) * R * 1.32 * Math.sin(-.3) + Math.sin(a) * R * 1.32 * .3 * Math.cos(-.3), 2.4, 0, TAU); g.fill(); }
+  g.restore();
+}
+
+// ---- Contour: a topographic map of a mountain. His voice raises the peaks, thinking makes the land turn,
+// and when you talk ripples run down the slopes. Ultron's is broken, jagged terrain.
+const CONTOUR_N = 9;
+function drawContour(x, y, R, A, t, b, k) {
+  const F = faceCol(k), U = k === "ultron", v = F.v, th = FS.think, li = FS.listen, n = 120;
+  g.save(); g.globalAlpha = A * (1 - muteT * .5);
+  for (let j = 0; j < CONTOUR_N; j++) {
+    const vis = clamp(b * 6 - (CONTOUR_N - j) * .45); if (vis <= 0) continue;
+    const base = R * (.14 + j * .135), turn = spin[k] * (j % 2 ? .25 : -.18) * (1 + th * 2), path = new Path2D();
+    const amp = .05 + .16 * v * (1 - j / (CONTOUR_N + 3)) + th * .03;
+    for (let i = 0; i <= n; i++) {
+      const a = i / n * TAU, q = a + turn;
+      let f = .55 * Math.sin(3 * q + t * .4 + j * .3) + .3 * Math.sin(5 * q - t * .7 + j) + .15 * Math.sin(2 * q + 1.7);
+      if (U) f = 1 - 2 * Math.abs(Math.sin(2.5 * q + t * .5 + j * .4)) * .9 + .25 * Math.sin(7 * q - t);
+      f += v * .5 * Math.sin(9 * q + t * 18) * noise(j, t);
+      const rip = li * F.m * .14 * Math.sin(t * 9 - j * 1.1);
+      const r = base * (1 + amp * f + rip) * vis;
+      const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * .94;
+      i ? path.lineTo(px, py) : path.moveTo(px, py);
+    }
+    const index = j % 3 === 2;
+    g.setLineDash(U ? [6 + j, 4 + (j % 3) * 3] : []);
+    g.lineWidth = index ? 1.7 : 1; g.strokeStyle = rgba(index ? F.hot : F.col, (index ? .75 : .45) + .2 * v); g.stroke(path);
+  }
+  g.setLineDash([]);
+  // summit, and a few spot heights on the index lines
+  const peak = 1 + .5 * v;
+  g.fillStyle = rgba(F.hot, .9); g.beginPath(); g.moveTo(x, y - 5 * peak); g.lineTo(x + 4.5 * peak, y + 3); g.lineTo(x - 4.5 * peak, y + 3); g.closePath(); g.fill();
+  if (b > .8) {
+    g.font = "10px Jost, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = rgba(F.col, .6);
+    for (let j = 2; j < CONTOUR_N; j += 3) { const a = -.9 + j * .55 + spin[k] * .05, r = R * (.14 + j * .135) * 1.0;
+      g.fillText(String(Math.round((CONTOUR_N - j) * 120 + v * 300 + th * 40 * Math.sin(t * 3))), x + Math.cos(a) * r, y + Math.sin(a) * r * .94 - 8); }
+    g.lineWidth = 1; g.strokeStyle = rgba(F.col, .2); g.beginPath(); g.arc(x, y, R * 1.42, 0, TAU); g.stroke();
+    const cr = new Path2D();
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + spin[k] * .08; cr.moveTo(x + Math.cos(a) * R * 1.36, y + Math.sin(a) * R * 1.36); cr.lineTo(x + Math.cos(a) * R * 1.5, y + Math.sin(a) * R * 1.5); }
+    g.lineWidth = 1.5; g.strokeStyle = rgba(F.col, .5); g.stroke(cr);
+  }
+  g.restore();
+}
+
+// ---- Ferro: a drop of ferrofluid on a magnet. Calm it wobbles; when he talks it bristles into spikes in time
+// with his voice; when you talk ripples run around it; thinking it churns. Ultron's spikes are longer and meaner.
+let FERRO_R = new Float32Array(0);
+const FERRO = { jarvis: { n: 22, w: .07, len: .5 }, ultron: { n: 30, w: .045, len: .75 } };
+function drawFerro(x, y, R, A, t, b, k) {
+  const F = faceCol(k), U = k === "ultron", cfg = FERRO[k], v = F.v, th = FS.think, li = FS.listen, n = 240, grow = ease(b * 1.3);
+  const r0 = R * .62 * grow;
+  g.save(); g.globalAlpha = A * (1 - muteT * .5);
+  let gr = g.createRadialGradient(x, y, r0 * .8, x, y, R * 1.2);
+  gr.addColorStop(0, rgba(F.col, .16 + .2 * v)); gr.addColorStop(1, rgba(F.col, 0));
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, R * 1.2, 0, TAU); g.fill();
+  const rotS = spin[k] * (.15 + th * .6), rr = FERRO_R.length === n + 1 ? FERRO_R : (FERRO_R = new Float32Array(n + 1));
+  for (let i = 0; i <= n; i++) {
+    const a = i / n * TAU;
+    rr[i] = 1 + .035 * Math.sin(3 * a + t * 1.1) + .025 * Math.sin(5 * a - t * 1.7) + li * F.m * .07 * Math.sin(14 * a - t * 11);
+  }
+  const reach = Math.ceil(cfg.w * 3 / TAU * n);
+  for (let s = 0; s < cfg.n; s++) {                     // each spike only bends the points near it
+    const h = v * cfg.len * Math.pow(.5 + .5 * Math.sin(t * (U ? 9 : 7) + s * 2.3), 2) + th * .05 * (.5 + .5 * Math.sin(t * 5 + s));
+    if (h < .002) continue;
+    const c = ((s / cfg.n * TAU + rotS) % TAU + TAU) % TAU, ci = Math.round(c / TAU * n);
+    for (let o = -reach; o <= reach; o++) { const i = ((ci + o) % n + n) % n, z = (i / n * TAU - c + (o < 0 && ci + o < 0 ? TAU : 0) - (ci + o >= n ? TAU : 0)) / cfg.w;
+      const add = h * Math.exp(-z * z); rr[i] += add; if (i === 0) rr[n] += add; }
+  }
+  const path = new Path2D();
+  for (let i = 0; i <= n; i++) { const a = i / n * TAU, px = x + Math.cos(a) * r0 * rr[i], py = y + Math.sin(a) * r0 * rr[i]; i ? path.lineTo(px, py) : path.moveTo(px, py); }
+  path.closePath();
+  const ink = U ? "rgba(14,3,5,.98)" : "rgba(5,9,13,.98)";
+  gr = g.createRadialGradient(x, y, r0 * .1, x, y, r0 * 1.5);
+  gr.addColorStop(0, ink); gr.addColorStop(.62, ink); gr.addColorStop(1, rgba(F.deep, .9));
+  g.fillStyle = gr; g.fill(path);
+  g.lineWidth = 1.6; g.strokeStyle = rgba(F.col, .7 + .3 * v); g.stroke(path);
+  // gloss: a glint of light on the wet surface, and the magnet's field turning underneath
+  gr = g.createRadialGradient(x - r0 * .36, y - r0 * .42, 0, x - r0 * .36, y - r0 * .42, r0 * .34);
+  gr.addColorStop(0, "rgba(255,255,255,.3)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr; g.beginPath(); g.ellipse(x - r0 * .36, y - r0 * .42, r0 * .34, r0 * .22, -.6, 0, TAU); g.fill();
+  g.lineWidth = 2; g.strokeStyle = rgba(F.hot, .18 + .2 * v); g.beginPath(); g.arc(x, y, r0 * .82, Math.PI * 1.05, Math.PI * 1.45); g.stroke();
+  if (b > .7) {                                        // the magnet's field lines, turning slowly (faster while he thinks)
+    const fl = new Path2D();
+    for (let i = 1; i <= 3; i++) { const rf = R * (1.12 + i * .13) + Math.sin(t * 2 + i) * 2, off = t * (.05 + th * .25) * (i % 2 ? 1 : -1);
+      for (let d = 0; d < 36; d++) { const a = off + d / 36 * TAU; fl.moveTo(x + Math.cos(a) * rf, y + Math.sin(a) * rf); fl.arc(x, y, rf, a, a + .05); } }
+    g.lineWidth = 1; g.strokeStyle = rgba(F.col, .16 + .1 * th); g.stroke(fl);
+  }
+  g.restore();
+}
+
+const FACES = {
+  classic: { name: "Classic", draw: { jarvis: (...a) => drawJarvis(...a), ultron: (...a) => drawUltron(...a) }, fx: true },
+  scope: { name: "Scope", draw: { jarvis: (...a) => drawScope(...a, "jarvis"), ultron: (...a) => drawScope(...a, "ultron") } },
+  lattice: { name: "Lattice", draw: { jarvis: (...a) => drawLattice(...a, "jarvis"), ultron: (...a) => drawLattice(...a, "ultron") } },
+  contour: { name: "Contour", draw: { jarvis: (...a) => drawContour(...a, "jarvis"), ultron: (...a) => drawContour(...a, "ultron") } },
+  ferro: { name: "Ferro", draw: { jarvis: (...a) => drawFerro(...a, "jarvis"), ultron: (...a) => drawFerro(...a, "ultron") } },
+};
+let faceKey = (() => { const f = store.get("face", "classic"); return FACES[f] ? f : "classic"; })();
+
+function drawFX(x, y, R, key, A, dt, t, lite) {
   const C = COL[key], col = mix(C.c, C.alarm, alarmT);
   // listening: your voice ripples out from him
   g.save(); g.globalAlpha = A;
-  ripples.forEach((r) => {
+  if (!lite) ripples.forEach((r) => {
     const a = r.a * (1 - (r.r - 1.05) / .95);
     g.lineWidth = 1.2; g.strokeStyle = rgba(col, a * .6); g.beginPath();
     if (key === "ultron") { for (let i = 0; i <= 6; i++) { const ang = i / 6 * TAU + r.r; const px = x + Math.cos(ang) * R * r.r, py = y + Math.sin(ang) * R * r.r; i ? g.lineTo(px, py) : g.moveTo(px, py); } }
@@ -873,7 +1095,7 @@ function drawFX(x, y, R, key, A, dt, t) {
   // thinking: light streams into the core
   const hot = key === "ultron" ? C.hot : C.hot;
   g.lineWidth = 1.3;
-  PARTS.forEach((p) => {
+  if (!lite) PARTS.forEach((p) => {
     if (!p.live) return;
     const c = Math.cos(p.a), s = Math.sin(p.a), r0 = p.r * R, r1 = (p.r + .1 + .1 * p.v) * R, a = clamp((2.5 - p.r) / 1.2) * clamp(p.r * 2);
     g.strokeStyle = rgba(hot, a * .8); g.beginPath(); g.moveTo(x + c * r1, y + s * r1); g.lineTo(x + c * r0, y + s * r0); g.stroke();
@@ -926,7 +1148,7 @@ function frame(now) {
   alarmT += ((state === "awaiting" ? 1 : 0) - alarmT) * (1 - Math.exp(-dt * 6));
   muteT += ((muted && (state === "idle" || state === "listening") ? 1 : 0) - muteT) * (1 - Math.exp(-dt * 4));
   awaitFrac = askT0 ? clamp(1 - (performance.now() - askT0) / 1000 / askSecs) : null;
-  targets(); step(look.jarvis, dt); step(look.ultron, dt);
+  targets(); step(look.jarvis, dt); step(look.ultron, dt); faceStep(dt);
   if (!reduced && micS > .12 && t - lastRipple > .2 && ripples.length < 7) { ripples.push({ r: 1.05, a: clamp(micS * 1.6) }); lastRipple = t; }
   ripples.forEach((r) => r.r += dt * .85); ripples = ripples.filter((r) => r.r < 2);
   PARTS.forEach((p) => {
@@ -948,8 +1170,9 @@ function frame(now) {
   for (const k of ["ultron", "jarvis"].sort((p) => (p === speaker ? 1 : -1))) {
     const L = look[k]; if (L.a < .01) continue;
     const x = cx + L.x * dd, r = R * L.s;
-    if (k === "jarvis") drawJarvis(x, cy, r, L.a, t, b); else drawUltron(x, cy, r, L.a, t, b);
-    if (k === (duoOn ? speaker : aiKey || "jarvis")) drawFX(x, cy, r, k, L.a, dt, t);
+    const face = FACES[faceKey] || FACES.classic;
+    face.draw[k](x, cy, r, L.a, t, b);
+    if (k === (duoOn ? speaker : aiKey || "jarvis")) drawFX(x, cy, r, k, L.a, dt, t, !face.fx);
   }
   raf = requestAnimationFrame(frame);
 }
@@ -1696,6 +1919,7 @@ window.J = {
       case "connectors": renderConnectors(e); break;
       case "jobs": renderJobs(e.items || []); break;
       case "watchers": renderWatchers(e.items || []); break;
+      case "face": setFace(e.name); break;
       case "activity_mem": renderActivity(e); break;
       case "job_done": sfx.play(e.ok ? "yes" : "fail"); toast(e.ok ? `Background job done: ${e.goal}` : `Background job failed: ${e.goal}`); break;
       case "discord": {
@@ -2048,6 +2272,7 @@ resize(); renderRem(); renderMemory([]); renderRoutines([]); placeholder(); kick
 window.addEventListener("pywebviewready", async () => {
   api = window.pywebview.api;
   try { await api.ready(); } catch (e) { console.error(e); }
+  call("face_seen", faceKey);
   $("#input").focus();
 });
 if (document.fonts) document.fonts.ready.then(() => { sizeSpark(); kick(); });
@@ -2376,6 +2601,16 @@ const BG = (() => {
   resize(); c.hidden = !on; start();
   return { set, get on() { return on; }, kick: start };
 })();
+function setFace(k, quiet) {
+  if (!FACES[k]) return;
+  faceKey = k; store.set("face", k); SCOPE.jarvis.length = 0; SCOPE.ultron.length = 0; call("face_seen", k);
+  $("#face-pick").querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.face === k)));
+  if (!quiet) kick();
+}
+Object.entries(FACES).forEach(([k, f]) => {
+  const b = mk("button", { type: "button", role: "radio", "data-face": k, "aria-checked": String(k === faceKey), text: f.name });
+  b.onclick = () => setFace(k); $("#face-pick").appendChild(b);
+});
 $("#bg-sw").setAttribute("aria-checked", String(BG.on));
 $("#bg-sw").onclick = () => { BG.set(!BG.on); $("#bg-sw").setAttribute("aria-checked", String(BG.on)); };
 })();

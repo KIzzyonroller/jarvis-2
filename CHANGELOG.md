@@ -3,6 +3,22 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.15
+- **Glass mode: things you can grab.** Say "open glass mode" (or press Glass mode in the System panel) and a window opens with your camera behind glass. Ask him to show you something ("show me the top 5 budget mics", "put my week up", "show me a screenshot") and it floats in as glass cards you handle with your hands:
+  - pinch a card and move to drag it, let go mid-swing to throw it (off the screen closes it)
+  - a quick pinch brings it up close, another sends it back
+  - pinch one card with both hands and pull apart to make it bigger (twist to tilt it)
+  - make a fist over a card and hold it to crumple it
+  - sweep an open hand fast across the screen to clear everything
+  The mouse works too. He knows what's on the glass and which card you're holding, so "what's this one?" works. Your camera picture never leaves your PC: the hand tracking runs inside that window. The first time, allow the camera when it asks.
+
+- **New faces.** Pick how he looks in the System panel under Face, or say "Jarvis, change your face" (or "switch to the ferro face"). Both of them change together, each in their own colors:
+  - **Scope:** an oscilloscope. A slow figure at rest, a flat line your voice shakes while he listens, shapes sweeping while he thinks, and a trace that swells as he talks. Ultron's signal is squarer and breaks up.
+  - **Lattice:** a wireframe geodesic sphere. It pushes out when he talks, light runs along its edges while he thinks, and it pulls in to listen. Ultron's grows spikes.
+  - **Contour:** a topographic map of a mountain. His voice raises the peaks, thinking turns the land, and ripples run down the slopes when you talk. Ultron's is broken, jagged ground.
+  - **Ferro:** a drop of ferrofluid on a magnet. It wobbles at rest and bristles into spikes in time with his voice. Ultron's spikes are longer and meaner.
+  - **Classic** is the one you know, and it's still the default.
+
 ## 1.0.14
 - **Smaller CPU spikes when he talks.** Making his voice used every core on your PC in bursts, with the cores spinning even between sentences. Now it uses a few cores, they rest between sentences, it stays just ahead of what he's saying instead of making the whole reply at once, and when both of them talk they take turns making their voices. Speech recognition's threads rest between bits of listening too. Same voice, same speed.
 

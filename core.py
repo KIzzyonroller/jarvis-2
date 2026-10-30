@@ -358,6 +358,10 @@ class Core:
         tools.set_dictation_handler(lambda window=None: self.events.put(("dictate", window)))
         tools.set_mute_handler(lambda minutes: self.set_muted(True, minutes=minutes, speak=False))
         tools.set_self_window_handler(lambda show: self.on_restore() if show else self.on_minimize())
+        tools.set_face_handler(lambda name: self.emit({"type": "face", "name": name}))
+        self.glass = None
+        self._glass_lock = threading.Lock()
+        tools.set_glass(self.glass_hub)
 
     # ================================================================ persona
     @property
@@ -420,6 +424,13 @@ class Core:
         if self.listener:
             self.listener.stop()
         tools.REMINDERS.stop()
+        if getattr(self, "glass", None) is not None:
+            try:
+                self.glass.bye()
+                time.sleep(0.2)
+                self.glass.stop()
+            except Exception:
+                pass
         for part in (getattr(self, "watchers", None), getattr(self, "activity", None)):
             if part is not None:
                 try:
@@ -1704,6 +1715,9 @@ class Core:
     def emit(self, ev):
         """Everything shown in the app goes through here; what's said is also kept in conversation memory."""
         self._emit_out(ev)
+        gl = getattr(self, "glass", None)
+        if gl is not None:
+            gl.feed(ev)
         h = self.history
         if h is None:
             return
@@ -1777,6 +1791,31 @@ class Core:
             self.emit({"type": "activity_mem", **tools.activity_status()})
         except Exception as e:
             print(f"[activity] {e}")
+
+    def glass_hub(self):
+        """Glass mode's little local server, started the first time it's needed."""
+        with self._glass_lock:
+            if self.glass is None:
+                import glass
+                hub = glass.GlassHub(self, log=print)
+                err = hub.start()
+                if err:
+                    print(f"[glass] {err}")
+                    return None
+                for t in ("persona", "state"):            # so a page that opens now knows who's there
+                    if t == "persona":
+                        hub.feed({"type": "persona", "key": self.persona_key, "name": self.persona["name"]})
+                    else:
+                        hub.feed({"type": "state", "state": self.state})
+                self.glass = hub
+            return self.glass
+
+    def glass_open(self):
+        hub = self.glass_hub()
+        if hub is None:
+            return "Glass mode couldn't start."
+        hub.open_window()
+        return "Opening glass mode."
 
     def watch_remove(self, wid):
         ws = getattr(self, "watchers", None)
@@ -2678,6 +2717,7 @@ class Core:
             "desktop": lambda: tools.window_control("show_desktop"),
             "dark_mode": lambda: tools.dark_mode(),
             "status": tools.system_status,
+            "glass": self.glass_open,
             "calendar_mode": lambda: threading.Timer(1.0, self.switch_mode, args=("calendar",)).start() or "Switching to calendar mode...",
             "reset": lambda: (self.brain.reset() if self.brain else None) or "Memory wiped.",
         }
