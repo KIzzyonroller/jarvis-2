@@ -1976,6 +1976,17 @@ $("#send").onclick = send;
 $("#input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); send(); } });
 $("#mic").onclick = () => call("toggle_mute");
 $("#presence").onclick = () => call("ptt");
+// the secret: up up down down left right left right B A Enter, anywhere in the HUD (not while typing)
+const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a", "Enter"];
+let konami = 0;
+document.addEventListener("keydown", (e) => {
+  const t = document.activeElement, k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA") && t.value && konami < 8) { konami = 0; return; }
+  const next = k === KONAMI[konami] ? konami + 1 : (k === KONAMI[0] ? 1 : 0);
+  if (konami >= 8 && next > konami) { e.preventDefault(); e.stopImmediatePropagation(); }   // B, A, Enter: don't type or send them
+  konami = next;
+  if (konami === KONAMI.length) { konami = 0; call("secret_code"); }
+}, true);
 document.addEventListener("keydown", (e) => {
   if (!$("#settings").hidden || !$("#wn").hidden) {           // a pop-up is open: keys belong to it
     if (e.key === "Escape") { if (!$("#wn").hidden) hideWhatsNew(); else closeSettings(); }

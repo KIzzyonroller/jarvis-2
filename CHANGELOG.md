@@ -3,6 +3,9 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.16
+- **Someone new is hiding in here.** Old-school gamers know the code. Say it out loud, or type it.
+
 ## 1.0.15
 - **Glass mode: things you can grab.** Say "open glass mode" (or press Glass mode in the System panel) and a window opens with your camera behind glass. Ask him to show you something ("show me the top 5 budget mics", "put my week up", "show me a screenshot") and it floats in as glass cards you handle with your hands:
   - pinch a card and move to drag it, let go mid-swing to throw it (off the screen closes it)

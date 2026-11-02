@@ -210,6 +210,9 @@ class Bridge:
     def folder_revoke(self, path):
         threading.Thread(target=self._core.folder_revoke, args=(str(path),), daemon=True).start()
 
+    def secret_code(self):
+        threading.Thread(target=self._core.secret_code, args=("keys",), daemon=True).start()
+
     def face_seen(self, name):
         import tools
         if str(name) in tools.FACES:
@@ -249,6 +252,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     from mini import Mini
     emitter = Emitter()
     mini = Mini(Emitter) if config.MINI_HUD and sys.platform == "win32" else None
+    from companion import Companion
+    comp = Companion(Emitter) if sys.platform == "win32" else None
 
     phone = []
 
@@ -256,6 +261,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         emitter(ev)
         if mini:
             mini.feed(ev)
+        if comp:
+            comp.feed(ev)
         if phone:
             phone[0].feed(ev)
 
@@ -279,11 +286,19 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         except Exception as e:
             print(f"[mini] couldn't create the mini HUD: {e}")
             mini = None
+    if comp:
+        try:
+            comp.create(webview)
+        except Exception as e:
+            print(f"[companion] couldn't create her window: {e}")
+            comp = None
 
     def on_closing():
         emitter.close()     # stop talking to the window before it's torn down
         if mini:
             mini.close()    # otherwise the hidden widget keeps the app alive
+        if comp:
+            comp.close()
         core.shutdown()
 
     window.events.closing += on_closing
@@ -350,11 +365,17 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         mini.on_expand = restore
         mini.bridge._core = core
         threading.Thread(target=mini.settle, args=("J.A.R.V.I.S.",), daemon=True, name="mini-settle").start()
+    if comp:
+        core.companion_toggle = comp.toggle
+        threading.Thread(target=comp.settle, args=("J.A.R.V.I.S.", bool(core._state_flag("companion"))),
+                         daemon=True, name="companion-settle").start()
     core.start()
     webview.start()
     emitter.close()
     if mini:
         mini.close()
+    if comp:
+        comp.close()
     core.shutdown()
 
 

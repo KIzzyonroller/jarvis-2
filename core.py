@@ -48,6 +48,7 @@ import permissions
 import tools
 import settings
 import voice_settings
+import companion
 from voice import Speaker
 
 # Only "quit" really shuts him down. Everything that sounds like "close" just hides the window.
@@ -756,6 +757,9 @@ class Core:
         if self._is_echo(text, started):
             print(f"[heard own voice, ignored] {text}")
             return
+        if companion.is_code(text):                 # the secret: works with or without his name
+            self.secret_code("voice")
+            return
         if self._dictation:
             if audio is not None and self.listener:
                 text = self.listener.refine(audio) or text       # accuracy matters when it's being typed
@@ -956,6 +960,9 @@ class Core:
         if pending and (is_always(text) or is_yes(text) or is_no(text) or not pending.get("job")):
             self.emit({"type": "msg", "role": "user", "text": text})
             self.resolve_confirm(pending["id"], is_always(text) or is_yes(text), always=is_always(text))
+            return
+        if companion.is_code(text):
+            self.secret_code(source)
             return
         low = " ".join(_words(text))
         if low in ("unmute", "unmute yourself", "mic on", "start listening", "listen"):
@@ -1791,6 +1798,24 @@ class Core:
             self.emit({"type": "activity_mem", **tools.activity_status()})
         except Exception as e:
             print(f"[activity] {e}")
+
+    def secret_code(self, source="voice"):
+        """Up up down down left right left right B A start: she appears (or goes away again)."""
+        fn = getattr(self, "companion_toggle", None)
+        if fn is None:
+            self.emit({"type": "toast", "text": "Nothing happens. (She only lives in the full app on Windows.)"})
+            return
+        on = fn()
+        self._state_flag("companion", on)
+        print(f"[companion] {'on' if on else 'off'} ({source})")
+        self.emit({"type": "toast", "text": "Unlocked: she's in the bottom-right corner. Double-click her to tuck "
+                   "her away; say the code again to send her off." if on else "She's gone dark."})
+        lines = (["There you are.", "Took you long enough.", "Found me."] if on else ["Going dark.", "Fine. I'll watch from the dark."])
+        line = random.choice(lines)
+        if self.persona_key == "ultron":
+            self.say_line(line)
+        else:
+            self.emit({"type": "msg", "role": "system", "text": line})
 
     def glass_hub(self):
         """Glass mode's little local server, started the first time it's needed."""
