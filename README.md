@@ -139,6 +139,51 @@ Say **"open glass mode"** or press **Glass mode** in the System panel. A window 
 - The window is only reachable from your own PC, with a secret link that changes every time he starts.
 - Works best with your hands about an arm's length from the camera, in decent light.
 
+## On your desktop (Jarvis, Ultron, and the merged one)
+Turn on **Show them on the desktop** in the System panel under **Options** (or say "come out"). Whoever's talking
+stands on top of your taskbar as a see-through figure, walks it, sits on the window you're using (riding along
+when you drag it), peeks in from the screen edges, naps when you're away and dances when your PC plays music.
+They vanish during fullscreen games and video. Clicks always go straight through them; hold **Ctrl** to grab one
+and move it, **Ctrl + double-click** opens his window.
+
+- **Opening apps:** whatever he opens gets an entrance. Ultron reaches out and the window tears open behind
+  crimson drapes; Jarvis throws a ring of light from his staff and the window fills in behind it.
+- **Just him:** set **His window** to *Just him* and there's no window at all, only the figure. When he has to
+  show you something (an approval, or you Ctrl + double-click him) he throws it open.
+- **Who's out:** whoever's talking, Jarvis, Ultron or both. Small, medium or large.
+- **Clones:** switch on **Clones**, then "clone yourself" (or "make three clones"). "Clones away" sends them off.
+- **The secret:** there's a code. Old-school gamers know it.
+
+The figures run in their own process (`buddies_qt.py`), so if they ever crash, Jarvis carries on.
+
+## Graphics card: hearing and voice
+Options > **Graphics card**:
+- **Hearing runs on:** NVIDIA cards can do speech recognition much faster than the processor. It needs NVIDIA's
+  CUDA libraries (about 1.2 GB): press **Set up graphics card hearing** once, restart, and he tests the card.
+  If the test fails he quietly stays on the processor.
+- **His voice runs on:** any DirectX 12 card. He tests it first with a real sentence (some cards can't run one of
+  the voice's layers); *Auto* only switches if the card passed **and** was faster.
+
+## Small brain on this PC (optional)
+Options > **Brain**. Install [Ollama](https://ollama.com/download), switch on **Small brain on this PC**, press
+**Download the model** (Qwen3 1.7B, about 1.5 GB, fits a 4 GB graphics card). Small talk, jokes, thanks, quick
+definitions and maths are then answered on your PC for free; anything that does something, needs the web or real
+thinking still goes to Claude. It unloads itself while you're in a fullscreen game.
+
+## Extras (each one on/off in Options)
+- **Comments on what you're doing:** now and then a one-liner about what's in front of you (window names only,
+  never screenshots; never in games, fullscreen video or calls). Rarely / sometimes / often.
+- **Safety:** *Careful* asks about everything that changes something, *Balanced* is your own "always allow"
+  choices, *Relaxed* stops asking about undoable things (Recycle Bin, editing files, calendar, Blender/Unreal).
+  Shutting down, deleting for good and the other hard stops always ask, whatever this says. He can make it
+  stricter when you ask, never looser: that's only from the panel.
+- **Other languages:** he understands and answers in Spanish, French, Italian, Portuguese or Hindi (or whatever
+  you speak), in a matching voice. Hearing switches the next time he starts.
+- **His own pointer:** when he clicks for you he presses buttons through Windows itself where the app allows, so
+  your pointer doesn't move; when it doesn't, he borrows it for a split second and puts it back.
+- **Speak into my mic:** plays his voice into [VB-CABLE](https://vb-audio.com/Cable/) (free) so Discord, games
+  and calls hear him. Pick "CABLE Output" as the microphone there.
+
 ## Faces
 
 Pick how he looks in the System panel under **Face**, or say "Jarvis, change your face", "switch to the ferro face" or "go back to your normal face". Both AIs change together, each in their own colors, and every face reacts to the same things: listening, thinking, talking and waiting for your OK.
@@ -616,6 +661,10 @@ Every ability is a plain Python function in `tools.py`. Write the function, add 
 - `netflix.py` opening Netflix (web or app) and the watch log
 - `apple_music.py` finding songs in Apple's catalog and opening them in the app or on the web
 - `settings.py`, `secretbox.py` the Settings panel and encrypted key storage
+- `prefs.py`, `extras.py` the Options section (live on/off options) and what they switch
+- `buddies.py`, `buddies_qt.py`, `ui/buddies.html`, `ui/_figures.js` the desktop characters
+- `gpu.py` hearing and voice on the graphics card; `localbrain.py` the small local brain; `comments.py` screen
+  comments; `langs.py` other languages; `pointer.py` his own pointer; `mic_voice.py` his voice into the mic
 - `voice_settings.py` changing their voices live; `changelog.py` + `CHANGELOG.md` the What's new pop-up
 - `discord_bot.py` the optional Discord bot (chatting, reading channels, sending when allowed)
 - `app_main.py`, `app_update.py` the installed app's entry point and self-updating (Velopack)

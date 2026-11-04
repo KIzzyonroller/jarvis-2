@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Jarvis on the desktop</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:transparent}canvas{position:fixed;inset:0;width:100%;height:100%}</style>
+</head><body>
+<canvas id="c" aria-hidden="true"></canvas>
+<script>
+// One page, two jobs (set by ?role=):
+//   figure: one character in its own small see-through window. buddies_qt.py moves the window around the desktop
+//           and feeds this page what's going on (talking, listening, walking, napping, dancing, reaching out...).
+//   fx:     a see-through overlay over one monitor, only shown while something's being opened: the thread or ring
+//           flying from the figure to the window, and the curtains or frame of light around the real window.
+// Messages come in through B.feed({...}); this page talks back with console.log("@@{json}").
+const cv = document.getElementById("c"), g = cv.getContext("2d"), TAU = Math.PI * 2;
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+function glow(x, y, r, c, a) { if (r <= 0) return; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, rgba(c, a)); gr.addColorStop(1, rgba(c, 0)); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+function ell(x, y, rx, ry, rot, c, a, w, a0 = 0, a1 = TAU) { rx = Math.max(.5, Math.abs(rx)); ry = Math.max(.5, Math.abs(ry)); g.strokeStyle = rgba(c, a); g.lineWidth = w; g.beginPath(); g.ellipse(x, y, rx, ry, rot, a0, a1); g.stroke(); }
+let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const clamp01 = (x) => Math.max(0, Math.min(1, x)), seg = (p, a, b) => clamp01((p - a) / (b - a));
+const easeOut = (x) => 1 - Math.pow(1 - x, 3), easeInOut = (x) => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+
+const Q = new URLSearchParams(location.search);
+const ROLE = Q.get("role") || "figure";
+const INFIG_FX = false;                 // the figures' own long-range flights are drawn by the fx overlay instead
+const S = { listen: 0, think: 0, speak: 0, v: 0 };
+const out = (o) => console.log("@@" + JSON.stringify(o));
+let W = 0, H = 0, DPR = 1;
+function size() { DPR = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); }
+addEventListener("resize", size); size();
+
+// ------------------------------------------------------------------ figure state
+const F = { who: Q.get("who") || "jarvis", sc: +(Q.get("sc") || .22), dir: 1, state: "idle", motion: "stand", speed: 0,
+            fade: 1, fadeTo: 1, dance: 0, danceTo: 0, nap: 0, napTo: 0, lean: 0, leanTo: 0, sleep: false, clone: Q.get("clone") === "1",
+            env: null, mic: 0, alpha: 0, alphaTo: 1, flash: 0 };
+let ACT = null;
+const DUR = { ultron: 1.9, jarvis: 1.8, fused: 1.6 }, HOLD = { ultron: .3, jarvis: .24, fused: .2 };
+function actRaw(t) {
+  if (!ACT) return -1;
+  const d = DUR[ACT.who] || 1.8;
+  return ACT.go == null ? Math.min(HOLD[ACT.who] || .25, (t - ACT.t0) / d) : Math.min(1, ACT.pGo + (t - ACT.go) / d);
+}
+const actP = (who, t) => (ACT && ACT.who === who) ? actRaw(t) : -1;
+const actWho = () => F.who === "merged" ? "fused" : F.who;
+
+function voiceLevel(t) {
+  const e = F.env;
+  if (!e) return 0;
+  const i = Math.floor((t - e.t0) / e.step);
+  if (i < 0) return 0;
+  if (i >= e.env.length) { F.env = null; return 0; }
+  return e.env[i] || 0;
+}
+
+const B = window.B = {
+  feed(m) {
+    const t = performance.now() / 1000;
+    switch (m.k) {
+      case "who": F.who = m.who; break;
+      case "scale": F.sc = m.sc; break;
+      case "state": F.state = m.state; break;
+      case "env": F.env = { env: m.env, step: m.step, t0: t + (m.delay || 0) }; break;
+      case "mic": F.mic = m.v; break;
+      case "motion": F.motion = m.m; F.speed = m.speed || 0; if (m.dir) F.dir = m.dir; F.leanTo = m.lean || 0; break;
+      case "face": F.dir = m.dir; break;
+      case "fade": F.fadeTo = m.on ? .22 : 1; break;
+      case "dance": F.danceTo = Math.max(0, Math.min(1, m.v)); break;
+      case "nap": F.napTo = m.on ? 1 : 0; break;
+      case "sleep": { const was = F.sleep; F.sleep = !!m.on; if (was && !F.sleep) requestAnimationFrame(frame); break; }
+      case "show": F.alphaTo = m.on ? 1 : 0; break;
+      case "flash": F.flash = 1; break;
+      // reaching out: start (target known only roughly), go (the window is there), cancel (it never came)
+      case "act_start": ACT = { who: actWho(), t0: t, local: m.local || [F.dir * 600, -900], go: null, pGo: 0 }; break;
+      case "act_target": if (ACT) ACT.local = m.local; break;
+      case "act_go": if (ACT && ACT.go == null) { ACT.pGo = actRaw(t); ACT.go = t; } break;
+      case "act_cancel": if (ACT) { const p = actRaw(t); ACT.pGo = Math.max(p, .78); ACT.go = t; } break;
+      // the fx overlay
+      case "fx": FX.push({ ...m, t0: t }); fxClear = false; break;
+      case "fx_clear": FX.length = 0; break;
+    }
+  },
+};
+
+// ------------------------------------------------------------------ figure drawing
+let last = 0, lastFrame = 0;
+let fxClear = false;
+function frame(now) {
+  const t = now / 1000;
+  if (ROLE === "figure" && F.sleep) return;
+  if (ROLE === "fx" && !FX.length) {            // nothing being opened: clear once, then barely tick
+    if (!fxClear) { g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H); fxClear = true; }
+    setTimeout(() => requestAnimationFrame(frame), 250);
+    return;
+  }
+  // Light on the PC: 30 frames a second while something's happening, 10 when he's just standing there
+  const busy = ACT || FX.length || F.motion !== "stand" || F.state !== "idle" || F.env || F.dance > .03 || F.danceTo > 0 ||
+               Math.abs(F.fade - F.fadeTo) > .01 || Math.abs(F.alpha - F.alphaTo) > .01 || F.flash > 0;
+  if (t - lastFrame < (busy ? 1 / 32 : 1 / 10)) { requestAnimationFrame(frame); return; }
+  const dt = Math.min(.1, t - (last || t)); last = t; lastFrame = t;
+  if (ROLE === "fx") drawFX(t, dt); else drawFigure(t, dt);
+  requestAnimationFrame(frame);
+}
+
+function drawFigure(t, dt) {
+  const k = 1 - Math.exp(-dt * 4);
+  S.listen += ((F.state === "listening" ? 1 : 0) - S.listen) * k;
+  S.think += ((F.state === "thinking" || F.state === "working" ? 1 : 0) - S.think) * k;
+  S.speak += ((F.state === "speaking" || F.env ? 1 : 0) - S.speak) * k;
+  const want = voiceLevel(t);
+  S.v += (want - S.v) * (1 - Math.exp(-dt * (want > S.v ? 25 : 8)));
+  F.fade += (F.fadeTo - F.fade) * (1 - Math.exp(-dt * 6));
+  F.alpha += (F.alphaTo - F.alpha) * (1 - Math.exp(-dt * 5));
+  F.dance += (F.danceTo - F.dance) * (1 - Math.exp(-dt * 3));
+  F.nap += (F.napTo - F.nap) * (1 - Math.exp(-dt * 1.5));
+  F.lean += (F.leanTo - F.lean) * (1 - Math.exp(-dt * 4));
+  F.flash = Math.max(0, F.flash - dt * 1.2);
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
+  if (F.alpha < .01) return;
+  g.globalAlpha = F.alpha * F.fade * (1 - F.nap * .25);
+  const sc = F.sc, tt = t * (1 - F.nap * .6);                            // napping: everything slows down
+  const bob = Math.sin(t * 7) * 14 * F.dance + (F.who !== "jarvis" ? Math.sin(t * 1.3) * 6 : 0) + F.nap * 30;
+  const sway = Math.sin(t * 3.5) * .05 * F.dance;
+  g.translate(W / 2, H - 180 * sc);
+  g.rotate(F.lean * .09 + sway + F.nap * .05);
+  g.scale(sc * F.dir, sc);
+  g.translate(0, bob);
+  const v = S.v * (1 - F.nap), th = S.think * (1 - F.nap), li = Math.max(S.listen, F.mic * .5) * (1 - F.nap);
+  if (F.who === "ultron") drawUltron(tt, dt, v, th, li);
+  else if (F.who === "merged") drawMerged(tt, dt, v, th, li);
+  else drawJarvis(tt, dt, v, th, li);
+  if (F.nap > .05) {                                                      // little z's drifting off the head
+    g.globalAlpha = F.alpha * F.nap;
+    g.fillStyle = F.who === "ultron" ? "rgba(255,120,110,.9)" : F.who === "merged" ? "rgba(230,200,255,.9)" : "rgba(200,240,255,.9)";
+    g.font = "700 90px sans-serif";
+    for (let i = 0; i < 3; i++) { const p = ((t * .25 + i / 3) % 1); g.globalAlpha = F.alpha * F.nap * Math.sin(p * Math.PI);
+      g.save(); g.scale(F.dir, 1); g.fillText("z", 120 + p * 160 + i * 10, -1000 - p * 260); g.restore(); }
+  }
+  if (F.flash > 0) { g.globalAlpha = 1; glow(0, -700, 900 * (1 - F.flash) + 200, [255, 255, 255], .8 * F.flash); }
+  g.globalAlpha = 1;
+  if (ACT && actRaw(t) >= 1) { ACT = null; out({ e: "act_done" }); }
+}
+
+// ------------------------------------------------------------------ the fx overlay
+const FX = [];
+const COL = {
+  ultron: { a: [255, 48, 70], b: [255, 120, 60], c: [255, 214, 200] },
+  jarvis: { a: [127, 231, 255], b: [255, 222, 168], c: [228, 248, 255] },
+  merged: { a: [170, 112, 255], b: [255, 92, 214], c: [244, 232, 255] },
+};
+function fromPoint(f) {            // where on the figure the effect leaves from (screen px, this monitor)
+  const [ox, oy] = f.origin, sc = f.sc, d = f.dir || 1, [rx, ry, rw, rh] = f.rect, tx = rx + rw / 2, ty = ry + rh / 2;
+  if (f.who === "ultron") {
+    const side = tx < ox ? -1 : 1, sx = ox + side * 200 * sc, sy = oy - 690 * sc, dx = tx - sx, dy = ty - sy, dl = Math.hypot(dx, dy) || 1;
+    const reach = Math.min(560 * sc, dl * .6);
+    return [sx + dx / dl * reach, sy + dy / dl * reach];
+  }
+  if (f.who === "merged") return [ox + 230 * sc * d, oy - 1030 * sc];
+  return [ox + 240 * sc * d, oy - 1000 * sc];
+}
+const bez = (a, m, b, f) => [(1 - f) * (1 - f) * a[0] + 2 * (1 - f) * f * m[0] + f * f * b[0], (1 - f) * (1 - f) * a[1] + 2 * (1 - f) * f * m[1] + f * f * b[1]];
+
+function drawFX(t, dt) {
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
+  for (let i = FX.length - 1; i >= 0; i--) {
+    const f = FX[i], age = t - f.t0;
+    const done = f.kind === "flash" ? flashFX(f, age) : f.kind === "pointer" ? pointerFX(f, age, t)
+               : f.who === "ultron" ? curtainFX(f, age, t) : lightFX(f, age, t);
+    if (done) { FX.splice(i, 1); out({ e: "fx_done", id: f.id }); }
+  }
+}
+
+// his own pointer: a small glowing arrow that glides to the spot, then a ripple as it clicks
+function pointerFX(f, age, t) {
+  const C = COL[f.who] || COL.jarvis, p = age / 1.1;
+  if (p >= 1) return true;
+  const m = easeInOut(seg(p, 0, .35)), [x0, y0] = f.from || f.at, [x1, y1] = f.at;
+  const x = x0 + (x1 - x0) * m, y = y0 + (y1 - y0) * m, fade = 1 - seg(p, .75, 1);
+  g.save(); g.globalAlpha = fade; g.translate(x, y);
+  glow(0, 0, 26, C.a, .5);
+  g.fillStyle = rgba(C.c, .95); g.strokeStyle = rgba(C.a, .9); g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 20); g.lineTo(5, 15); g.lineTo(9, 23); g.lineTo(12, 21); g.lineTo(8, 14); g.lineTo(15, 14); g.closePath(); g.fill(); g.stroke();
+  g.restore();
+  const r = seg(p, .35, .8);
+  if (r > 0 && f.click !== false) { ell(x1, y1, 6 + r * 34, 6 + r * 34, 0, C.c, .8 * (1 - r), 2); ell(x1, y1, 4 + r * 20, 4 + r * 20, 0, C.a, .6 * (1 - r), 1.5); }
+  return false;
+}
+
+function flashFX(f, age) {
+  const p = age / 1.1;
+  if (p >= 1) return true;
+  const [x, y] = f.at, s = Math.sin(p * Math.PI);
+  glow(x, y, 60 + 500 * p, [255, 255, 255], .85 * s); glow(x - 30, y, 400 * p + 30, [127, 231, 255], .35 * s); glow(x + 30, y, 400 * p + 30, [255, 48, 70], .35 * s);
+  glow(x, y, 300 * p + 40, [170, 112, 255], .5 * s);
+  ell(x, y, 700 * p + 10, 240 * p + 4, 0, [255, 255, 255], .7 * (1 - p), 2.5);
+  return false;
+}
+
+// Ultron: a crimson thread from the hand, the window covered by drapes, a seam of light, then the drapes tear open
+function curtainFX(f, age, t) {
+  const C = COL.ultron, [rx, ry, rw, rh] = f.rect, cx = rx + rw / 2, cy = ry + rh / 2, T = 1.6;
+  const p = age / T;
+  if (p >= 1) return true;
+  const hand = fromPoint(f), th = seg(p, 0, .22), thFade = 1 - seg(p, .3, .45);
+  const cover = Math.min(1, seg(p, 0, .12) * 1.4), part = easeInOut(seg(p, .34, .78)), gone = seg(p, .7, 1);
+  // drapes over the window, opening from a seam in the middle
+  const o = part * (rw / 2 + 60);
+  if (cover > 0 && gone < 1) {
+    g.save(); g.beginPath(); g.rect(rx - 4, ry - 4, rw + 8, rh + 8); g.clip();
+    [-1, 1].forEach((d) => {
+      const edge = cx + d * o, far = d < 0 ? rx - 4 : rx + rw + 4, x0 = Math.min(edge, far), x1 = Math.max(edge, far);
+      if (x1 - x0 > .5) {
+        const gr = g.createLinearGradient(edge, 0, far, 0);
+        gr.addColorStop(0, `rgba(150,12,32,${(.97 * cover * (1 - gone)).toFixed(3)})`); gr.addColorStop(.4, `rgba(96,6,22,${(.97 * cover * (1 - gone)).toFixed(3)})`);
+        gr.addColorStop(1, `rgba(40,0,10,${(.97 * cover * (1 - gone) * (1 - part * .6)).toFixed(3)})`);
+        g.fillStyle = gr; g.fillRect(x0, ry - 4, x1 - x0, rh + 8);
+        g.strokeStyle = `rgba(0,0,0,${(.3 * cover * (1 - gone)).toFixed(3)})`; g.lineWidth = 3;
+        for (let k = 1; k < 6; k++) { const x = edge + (far - edge) * k / 6; g.beginPath(); g.moveTo(x, ry); g.lineTo(x + d * 6, ry + rh); g.stroke(); }
+      }
+      if (part > 0 && gone < 1) {                     // the torn gilt edge, and embers coming off it
+        g.strokeStyle = rgba([196, 150, 92], .85 * (1 - gone)); g.lineWidth = 2; g.beginPath(); g.moveTo(edge, ry);
+        for (let y = 0; y <= 14; y++) g.lineTo(edge + d * Math.sin(y * 2.1 + t * 7) * 5, ry + rh * y / 14); g.stroke();
+        for (let k = 0; k < 16; k++) { const q = (t * 1.2 + k * .37) % 1; g.fillStyle = rgba(k % 3 ? C.b : C.a, .8 * (1 - gone) * (1 - q));
+          g.beginPath(); g.arc(edge + d * (6 + q * 60), ry + ((k * 61) % Math.max(1, rh)) - q * 30, 2, 0, TAU); g.fill(); }
+      }
+    });
+    g.restore();
+  }
+  // the seam of light before it opens
+  const seam = seg(p, .18, .34);
+  if (seam > 0 && part < 1) { glow(cx, cy, rh * .5 * seam * (1 - part), C.a, .6); g.fillStyle = `rgba(255,220,210,${(seam * (1 - part)).toFixed(3)})`; g.fillRect(cx - 1.5 - o, cy - rh / 2 * seam, 3, rh * seam); g.fillRect(cx - 1.5 + o, cy - rh / 2 * seam, 3, rh * seam); }
+  // the thread
+  if (th > 0 && thFade > 0) {
+    const e = [hand[0] + (cx - hand[0]) * easeOut(th), hand[1] + (cy - hand[1]) * easeOut(th)], m = [(hand[0] + e[0]) / 2 + Math.sin(t * 50) * 6, (hand[1] + e[1]) / 2 - 50];
+    g.save(); g.globalCompositeOperation = "lighter"; g.lineCap = "round";
+    g.strokeStyle = rgba(C.b, .3 * thFade); g.lineWidth = 14; g.beginPath(); g.moveTo(hand[0], hand[1]); g.quadraticCurveTo(m[0], m[1], e[0], e[1]); g.stroke();
+    g.strokeStyle = rgba(C.a, .95 * thFade); g.lineWidth = 3.5; g.stroke(); g.strokeStyle = rgba(C.c, .8 * thFade); g.lineWidth = 1.2; g.stroke();
+    glow(e[0], e[1], 50, C.a, .8 * thFade); glow(hand[0], hand[1], 40, C.a, .6 * thFade); g.restore();
+  }
+  return false;
+}
+
+// Jarvis (and the merged one): a ring off the staff, a frame of light that opens round the window, a sweep across it
+function lightFX(f, age, t) {
+  const C = COL[f.who] || COL.jarvis, [rx, ry, rw, rh] = f.rect, cx = rx + rw / 2, cy = ry + rh / 2, T = 1.5;
+  const p = age / T;
+  if (p >= 1) return true;
+  const from = fromPoint(f), fl = easeInOut(seg(p, 0, .32)), land = seg(p, .3, .4), fr = easeInOut(seg(p, .32, .6));
+  const sweep = seg(p, .5, .85), gone = seg(p, .8, 1);
+  // the window covered with light until the sweep passes over it
+  if (land > 0 && sweep < 1) {
+    const sx = rx + rw * sweep, a = Math.min(1, land * 2) * .92;
+    g.fillStyle = f.who === "merged" ? `rgba(40,16,70,${a.toFixed(3)})` : `rgba(8,30,42,${a.toFixed(3)})`;
+    g.fillRect(sx, ry, rx + rw - sx, rh);
+    if (sweep > 0) { const gr = g.createLinearGradient(sx - 80, 0, sx + 10, 0); gr.addColorStop(0, rgba(C.c, 0)); gr.addColorStop(1, rgba(C.c, .7)); g.fillStyle = gr; g.fillRect(sx - 80, ry, 90, rh); }
+  }
+  // the frame
+  if (land > 0 && gone < 1) {
+    const fw = 40 + (rw - 40) * fr, fh = 14 + (rh - 14) * fr;
+    g.save(); g.globalCompositeOperation = "lighter";
+    g.strokeStyle = rgba(C.c, .9 * (1 - gone)); g.lineWidth = 2; g.strokeRect(cx - fw / 2, cy - fh / 2, fw, fh);
+    g.strokeStyle = rgba(f.who === "merged" ? C.b : C.a, .4 * (1 - gone)); g.lineWidth = 9; g.strokeRect(cx - fw / 2, cy - fh / 2, fw, fh);
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([a, b]) => glow(cx + a * fw / 2, cy + b * fh / 2, 30, f.who === "merged" ? C.b : C.c, .7 * (1 - gone)));
+    if (fr < 1) glow(cx, cy, 90 * (1 - fr) + 20, C.c, .6 * land);
+    g.restore();
+  }
+  // the ring in flight, with a short trail
+  if (fl > 0 && fl < 1) {
+    const mid = [(from[0] + cx) / 2, Math.min(from[1], cy) - 140], [x, y] = bez(from, mid, [cx, cy], fl);
+    g.save(); g.globalCompositeOperation = "lighter";
+    for (let k = 1; k < 7; k++) { const [a, b] = bez(from, mid, [cx, cy], Math.max(0, fl - k * .035)); glow(a, b, 26 - k * 3, C.a, .35 - k * .045); }
+    glow(x, y, 70, C.c, .55); ell(x, y, 30, 11, t * 9, C.b, .95, 3); ell(x, y, 30, 11, -t * 9, C.a, .9, 2.4); g.restore();
+  }
+  if (p < .2) glow(from[0], from[1], 120 * Math.sin(seg(p, 0, .2) * Math.PI), C.c, .6);
+  return false;
+}
+
+addEventListener("load", () => { out({ e: "ready", role: ROLE }); requestAnimationFrame(frame); });
+addEventListener("dblclick", () => out({ e: "dblclick" }));
+</script>
+<script src="_figures.js"></script>
+</body></html>

@@ -38,6 +38,13 @@ if (-not $SkipInstall) {
     if ($LASTEXITCODE) { throw "pip install failed" }
 }
 
+# The DirectML build of onnxruntime (processor included), so his voice can run on the graphics card once it
+# passes its test (gpu.py). Same package name as the plain one, so swap it in; --no-deps: its needs are installed.
+# Runs even with -SkipInstall, since the release workflow installs the plain one first.
+python -m pip uninstall -y onnxruntime
+python -m pip install --no-deps --force-reinstall onnxruntime-directml
+if ($LASTEXITCODE) { throw "onnxruntime-directml install failed" }
+
 # 1. Bake in where updates come from
 if ($UpdateSource) { Set-Content -Path update_source.txt -Value $UpdateSource -NoNewline -Encoding utf8 }
 elseif (Test-Path update_source.txt) { Write-Host "Using existing update_source.txt: $(Get-Content update_source.txt)" }

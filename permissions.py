@@ -66,9 +66,38 @@ def can_always(category):
     return category in CATEGORIES
 
 
+# Safety presets (the Safety option). Hard stops are not categories, so no preset can ever skip them.
+#   careful:  every category asks every time, even ones you once said "always" to
+#   balanced: your own "always allow" choices
+#   relaxed:  your choices, plus the categories below never ask (they're undoable or stay inside one app)
+PRESETS = ("careful", "balanced", "relaxed")
+RELAXED_FREE = {"files", "delete", "blender", "addon", "calendar", "unreal"}
+_PRESET = {"name": "balanced"}
+
+
+def apply_preset(name):
+    _PRESET["name"] = name if name in PRESETS else "balanced"
+
+
+def preset():
+    return _PRESET["name"]
+
+
+def stricter(a, b):
+    """True if preset a asks about more than preset b."""
+    return PRESETS.index(a if a in PRESETS else "balanced") < PRESETS.index(b if b in PRESETS else "balanced")
+
+
 def allowed(category):
+    if not category:
+        return False
+    p = _PRESET["name"]
+    if p == "careful":
+        return False
+    if p == "relaxed" and category in RELAXED_FREE:
+        return True
     with _LOCK:
-        return bool(category) and _load().get(category, False)
+        return _load().get(category, False)
 
 
 def set_always(category, on=True):

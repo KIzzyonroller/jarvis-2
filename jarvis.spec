@@ -13,6 +13,8 @@ hiddenimports = [
     # loaded by name at runtime, so PyInstaller can't see them
     "pyttsx3.drivers", "pyttsx3.drivers.sapi5", "comtypes.stream", "pycaw.pycaw",
     "edge_tts", "sounddevice", "send2trash", "screen_brightness_control",
+    # the desktop characters' process (Jarvis.exe --buddies ...)
+    "buddies_qt", "PySide6.QtWebEngineWidgets", "PySide6.QtWebEngineCore", "PySide6.QtWidgets",
 ]
 # Packages that ship data files, native libraries or plugins next to their code
 for pkg in ["faster_whisper", "ctranslate2", "onnxruntime", "kokoro_onnx", "espeakng_loader", "phonemizer",

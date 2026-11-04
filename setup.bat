@@ -25,9 +25,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-rem A GPU experiment can leave two versions of ONNX Runtime fighting each other. Put it back to one.
-pip show onnxruntime-directml >nul 2>nul && (pip uninstall -y onnxruntime-directml onnxruntime & pip install onnxruntime)
-pip show onnxruntime-gpu >nul 2>nul && (pip uninstall -y onnxruntime-gpu onnxruntime & pip install onnxruntime)
+rem One ONNX Runtime only: the DirectML build (processor included), so his voice can use the graphics card
+rem once it passes its test. Two builds installed at once fight each other.
+pip show onnxruntime-gpu >nul 2>nul && pip uninstall -y onnxruntime-gpu
+pip uninstall -y onnxruntime onnxruntime-directml >nul 2>nul
+pip install --no-deps --force-reinstall onnxruntime-directml
 
 python download_models.py
 

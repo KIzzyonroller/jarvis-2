@@ -224,6 +224,16 @@ class Bridge:
     def activity(self, action, value=None):
         threading.Thread(target=self._core.activity_action, args=(str(action), value), daemon=True).start()
 
+    def set_pref(self, key, value):
+        ex = getattr(self._core, "extras", None)
+        if ex is not None:
+            threading.Thread(target=lambda: print("[options]", ex.set_option(str(key), value)), daemon=True).start()
+
+    def options_action(self, action):
+        import tools
+        threading.Thread(target=lambda: self._core.emit({"type": "toast", "text": tools.options_tool(str(action))}),
+                         daemon=True).start()
+
     def set_permission(self, key, on):
         threading.Thread(target=self._core.set_permission, args=(str(key), bool(on)), daemon=True).start()
 
@@ -252,8 +262,6 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     from mini import Mini
     emitter = Emitter()
     mini = Mini(Emitter) if config.MINI_HUD and sys.platform == "win32" else None
-    from companion import Companion
-    comp = Companion(Emitter) if sys.platform == "win32" else None
 
     phone = []
 
@@ -261,8 +269,6 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         emitter(ev)
         if mini:
             mini.feed(ev)
-        if comp:
-            comp.feed(ev)
         if phone:
             phone[0].feed(ev)
 
@@ -286,27 +292,27 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         except Exception as e:
             print(f"[mini] couldn't create the mini HUD: {e}")
             mini = None
-    if comp:
-        try:
-            comp.create(webview)
-        except Exception as e:
-            print(f"[companion] couldn't create her window: {e}")
-            comp = None
 
     def on_closing():
         emitter.close()     # stop talking to the window before it's torn down
         if mini:
             mini.close()    # otherwise the hidden widget keeps the app alive
-        if comp:
-            comp.close()
         core.shutdown()
 
     window.events.closing += on_closing
 
+    def just_him():
+        try:
+            import prefs
+            return bool(prefs.get("desktop") and prefs.get("hud_mode") == "character")
+        except Exception:
+            return False
+
     def went_away():
-        # Stop all HUD animation while minimized and show the corner widget instead
+        # Stop all HUD animation while minimized and show the corner widget instead (not in "Just him" mode:
+        # then he's out on the desktop and that's the widget)
         emitter({"type": "window", "visible": False})
-        if mini:
+        if mini and not just_him():
             mini.show()
 
     def came_back():
@@ -351,8 +357,21 @@ def run_gui(voice, start_hidden=False, show_hook=None):
             print(f"[window] restore failed: {e}")
             return False
 
+    def hide():
+        """'Just him' mode: the window goes away completely (no taskbar button, no corner widget)."""
+        try:
+            window.hide()
+            emitter({"type": "window", "visible": False})
+            if mini:
+                mini.hide()
+            return True
+        except Exception as e:
+            print(f"[window] hide failed: {e}")
+            return False
+
     core.on_minimize = minimize
     core.on_restore = restore
+    core.on_hide = hide
     if show_hook is not None:
         show_hook["fn"] = restore              # someone launched Jarvis again: bring this copy forward
     if start_hidden:
@@ -365,17 +384,11 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         mini.on_expand = restore
         mini.bridge._core = core
         threading.Thread(target=mini.settle, args=("J.A.R.V.I.S.",), daemon=True, name="mini-settle").start()
-    if comp:
-        core.companion_toggle = comp.toggle
-        threading.Thread(target=comp.settle, args=("J.A.R.V.I.S.", bool(core._state_flag("companion"))),
-                         daemon=True, name="companion-settle").start()
     core.start()
     webview.start()
     emitter.close()
     if mini:
         mini.close()
-    if comp:
-        comp.close()
     core.shutdown()
 
 

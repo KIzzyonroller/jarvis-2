@@ -3,6 +3,21 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.18
+- **They're on your desktop now.** Turn on *Show them on the desktop* in the System panel under Options (or say "come out, Jarvis"). Whoever's talking stands on your taskbar, walks it, sits on the window you're using, peeks in from the edges, naps when you're away and dances when music plays. Gone during fullscreen games and video. Clicks go straight through them; hold Ctrl to grab one, Ctrl + double-click to open his window.
+- **Entrances.** Whatever he opens gets one: Ultron reaches out and tears the window open behind crimson drapes, Jarvis throws a ring of light off his staff.
+- **Just him.** Set *His window* to *Just him* and there's no window, only the figure. He throws it open when there's something you have to see.
+- **Clones,** if you switch them on: "clone yourself", "clones away".
+- **The secret code does something new.** Try it with them out.
+- **Graphics card.** *Set up graphics card hearing* downloads NVIDIA's libraries (1.2 GB, once) so hearing can use your NVIDIA card. His voice can run on the graphics card too, once it passes a test; *Auto* only switches if it's also faster.
+- **Small brain on this PC.** With Ollama installed, small talk, jokes and quick questions are answered on your PC for free. Everything else still goes to Claude. It steps aside while you game.
+- **New options, each one on or off:** comments on what you're doing, safety (Careful / Balanced / Relaxed; hard stops always ask), other languages (he understands and answers in Spanish, French, Italian, Portuguese or Hindi, in a matching voice), his own pointer (he clicks without moving yours where he can), and his voice into your mic through VB-CABLE.
+- New quick commands: "how's my battery", "CPU usage", "come out", "go back in".
+
+## 1.0.17
+- **The little desktop companion is gone.** The secret code still works, but it does something new now. It'll make sense once Jarvis and Ultron can walk around your desktop.
+- Every app he opens for you will get its own entrance animation once the desktop characters land (Ultron reaches out and tears it open, Jarvis throws a ring of light from his staff).
+
 ## 1.0.16
 - **Someone new is hiding in here.** Old-school gamers know the code. Say it out loud, or type it.
 

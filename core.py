@@ -48,7 +48,7 @@ import permissions
 import tools
 import settings
 import voice_settings
-import companion
+import secret
 from voice import Speaker
 
 # Only "quit" really shuts him down. Everything that sounds like "close" just hides the window.
@@ -432,7 +432,7 @@ class Core:
                 self.glass.stop()
             except Exception:
                 pass
-        for part in (getattr(self, "watchers", None), getattr(self, "activity", None)):
+        for part in (getattr(self, "watchers", None), getattr(self, "activity", None), getattr(self, "extras", None)):
             if part is not None:
                 try:
                     part.stop()
@@ -575,6 +575,7 @@ class Core:
         self._start_jobs()
         self._start_watchers()
         self._start_activity()
+        self._start_extras()
         for old in (config.BASE_DIR / "creator.id", config.JARVIS_DIR / "voiceprint.json"):
             try:                                # left over from removed features (owner PC, voice lock)
                 old.unlink()
@@ -757,7 +758,7 @@ class Core:
         if self._is_echo(text, started):
             print(f"[heard own voice, ignored] {text}")
             return
-        if companion.is_code(text):                 # the secret: works with or without his name
+        if secret.is_code(text):                 # the secret: works with or without his name
             self.secret_code("voice")
             return
         if self._dictation:
@@ -961,7 +962,7 @@ class Core:
             self.emit({"type": "msg", "role": "user", "text": text})
             self.resolve_confirm(pending["id"], is_always(text) or is_yes(text), always=is_always(text))
             return
-        if companion.is_code(text):
+        if secret.is_code(text):
             self.secret_code(source)
             return
         low = " ".join(_words(text))
@@ -1725,6 +1726,9 @@ class Core:
         gl = getattr(self, "glass", None)
         if gl is not None:
             gl.feed(ev)
+        ex = getattr(self, "extras", None)
+        if ex is not None:
+            ex.feed(ev)
         h = self.history
         if h is None:
             return
@@ -1742,6 +1746,16 @@ class Core:
                     h.add(who, ev["text"])
         except Exception as e:
             print(f"[history] couldn't save: {e}")
+
+    # ================================================================ options, graphics card, desktop characters...
+    def _start_extras(self):
+        try:
+            import extras
+            self.extras = extras.Extras(self)
+            tools.set_extras(lambda: self.extras)
+            self.extras.start()
+        except Exception as e:
+            print(f"[extras] {e}")
 
     # ================================================================ watchers + activity memory
     def _start_watchers(self):
@@ -1800,22 +1814,17 @@ class Core:
             print(f"[activity] {e}")
 
     def secret_code(self, source="voice"):
-        """Up up down down left right left right B A start: she appears (or goes away again)."""
-        fn = getattr(self, "companion_toggle", None)
-        if fn is None:
-            self.emit({"type": "toast", "text": "Nothing happens. (She only lives in the full app on Windows.)"})
-            return
-        on = fn()
-        self._state_flag("companion", on)
-        print(f"[companion] {'on' if on else 'off'} ({source})")
-        self.emit({"type": "toast", "text": "Unlocked: she's in the bottom-right corner. Double-click her to tuck "
-                   "her away; say the code again to send her off." if on else "She's gone dark."})
-        lines = (["There you are.", "Took you long enough.", "Found me."] if on else ["Going dark.", "Fine. I'll watch from the dark."])
-        line = random.choice(lines)
-        if self.persona_key == "ultron":
-            self.say_line(line)
-        else:
-            self.emit({"type": "msg", "role": "system", "text": line})
+        """Up up down down left right left right B A start: the two of them merge into one being (or split again).
+        The merged one shows on the desktop when the desktop characters are on."""
+        import prefs
+        on = not prefs.get("merged")
+        prefs.set("merged", on)
+        print(f"[secret] merged {'on' if on else 'off'} ({source})")
+        desk = prefs.get("desktop")
+        self.emit({"type": "toast", "text": ("Code accepted." + ("" if desk else " Turn on \"Show them on the desktop\" "
+                                             "in Options to see what it did.")) if on else "Split again."})
+        line = random.choice(["Two minds. One body.", "Interesting choice."] if on else ["Back to two of us."])
+        self.say_line(line) if self.persona_key == "ultron" else self.emit({"type": "msg", "role": "system", "text": line})
 
     def glass_hub(self):
         """Glass mode's little local server, started the first time it's needed."""
@@ -2694,8 +2703,17 @@ class Core:
             if quick:
                 print(f"[brain] quick model for {text[:50]!r}")
             tools._CTX.persona = getattr(brain, "persona_key", self.persona_key)
-            reply = brain.ask(prompt or text, on_text=on_text, on_event=on_event, cancel=turn["cancel"],
-                              allow_tools=allow_tools, quick=quick)
+            lane = self.extras.part("localbrain") if getattr(self, "extras", None) else None
+            if (lane is not None and brain is self.brain and source != "duo" and allow_tools and not gaming
+                    and lane.wants(text)):
+                print(f"[brain] small local brain for {text[:50]!r}")
+                reply = lane.ask(text, self.persona_key, config.ADDRESS_AS, on_text, turn["cancel"])
+                if reply:
+                    brain.note(f"(That last exchange was answered by the small local model: they said {text!r} "
+                               f"and you replied {reply!r}.)")
+            if reply is None and not turn["cancel"].is_set():
+                reply = brain.ask(prompt or text, on_text=on_text, on_event=on_event, cancel=turn["cancel"],
+                                  allow_tools=allow_tools, quick=quick)
             if reply is not None and not turn["interrupted"]:
                 if not turn["text"].strip():
                     self.emit({"type": "reply_delta", "id": tid, "text": reply})
