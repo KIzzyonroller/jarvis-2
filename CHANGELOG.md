@@ -3,6 +3,10 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.19
+- **Juno is back.** The purple one is called Juno now, so he no longer wipes anything that mentions her when he starts.
+- New look in the works: Jarvis, Ultron and Juno as cyberpunk synthetic beings (the preview is in `design/cyber-cast`). They take over the desktop characters in an upcoming update.
+
 ## 1.0.18
 - **They're on your desktop now.** Turn on *Show them on the desktop* in the System panel under Options (or say "come out, Jarvis"). Whoever's talking stands on your taskbar, walks it, sits on the window you're using, peeks in from the edges, naps when you're away and dances when music plays. Gone during fullscreen games and video. Clicks go straight through them; hold Ctrl to grab one, Ctrl + double-click to open his window.
 - **Entrances.** Whatever he opens gets one: Ultron reaches out and tears the window open behind crimson drapes, Jarvis throws a ring of light off his staff.

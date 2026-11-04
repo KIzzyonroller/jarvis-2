@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Juno, Jarvis and Ultron</title>
+<style>
+:root{--ink:#f1ecff;--dim:#a9a0c4;--line:rgba(255,255,255,.14)}
+html,body{margin:0;height:100%;overflow:hidden;background:#0d0b18;color:var(--ink);font:14px/1.4 system-ui,"Segoe UI",sans-serif}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+.bar{position:fixed;left:50%;top:12px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:4px;padding:5px;background:rgba(14,10,26,.82);border:1px solid var(--line);backdrop-filter:blur(8px);max-width:calc(100vw - 32px)}
+.bar button{font:inherit;color:var(--dim);background:none;border:1px solid transparent;padding:6px 11px;cursor:pointer}
+.bar button:hover{color:var(--ink)}
+.bar button[aria-pressed=true]{color:var(--ink);border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.06)}
+.bar button:focus-visible{outline:1px solid #c7a4ff;outline-offset:2px}
+.bar .sep{width:1px;background:var(--line);margin:4px}
+</style></head>
+<body>
+<canvas id="c" aria-label="Juno, Jarvis and Ultron, animated"></canvas>
+<div class="bar" role="group" aria-label="Preview controls" id="bar"></div>
+<script src="rig.js"></script>
+<script src="cyber.js"></script>
+<script src="anims.js"></script>
+<script src="startup.js"></script>
+<script src="scene.js"></script>
+</body></html>

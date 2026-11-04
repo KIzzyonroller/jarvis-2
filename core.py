@@ -448,32 +448,8 @@ class Core:
         print(line)
         self.emit({"type": "boot", "line": line})
 
-    def _purge_retired(self):
-        """Juno was retired: remove every trace she left on disk (memories about her, her cached
-        voice, and the saved 'last persona' if it was her). Safe to run every boot."""
-        removed = []
-        try:
-            mem = tools.memories()
-            keep = [m for m in mem if not re.search(r"\b(juno|juneau)\b", m.get("text", ""), re.I)]
-            if len(keep) != len(mem):
-                tools.MEMORY.save(keep)
-                removed.append(f"{len(mem) - len(keep)} memories")
-            r = tools.routines()
-            keep_r = {k: v for k, v in r.items() if not re.search(r"\b(juno|juneau)\b", f"{k} {v.get('steps', '')}", re.I)}
-            if len(keep_r) != len(r):
-                tools.ROUTINES.save(keep_r)
-                removed.append(f"{len(r) - len(keep_r)} routines")
-            for f in config.CACHE_DIR.glob("wake_juno_*"):
-                f.unlink(missing_ok=True)
-                removed.append(f.name)
-        except Exception as e:
-            print(f"[purge] {e}")
-        if removed:
-            print(f"[purge] removed Juno data: {', '.join(removed)}")
-
     def _boot(self):
         config.JARVIS_DIR.mkdir(parents=True, exist_ok=True)
-        self._purge_retired()
         if any(os.environ.get(k) for k in settings.RETIRED):     # Blender mode takes a Meshy key now
             try:
                 settings.write_env({k: "" for k in settings.RETIRED})
