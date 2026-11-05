@@ -3,6 +3,13 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.21
+- **They're your desktop now.** Jarvis, Juno and Ultron live on your wallpaper across both monitors, with the new look. Whoever you're talking to listens, thinks and talks with you, raises his sword (or tears the air open) when he opens something for you, and squares up when he needs your OK. The second monitor gets a visualizer that moves with his voice.
+- **Juno takes the screen when he starts.** Her hands grab the edges, she opens her eyes, grins, and your old screen shatters into her world.
+- Your desktop icons are hidden while he runs and come back the moment you close him. Everything else on your desktop is untouched.
+- It stops drawing while a fullscreen game or video is in front, so it costs nothing while you play.
+- Don't want it? Settings > Desktop: turn off the takeover, or just Juno's intro.
+
 ## 1.0.20
 - **Rolled back.** 1.0.18 made a mess of him, so this puts Jarvis back exactly how he was in 1.0.17: the desktop characters, the Options panel, graphics card setup and the small local brain are gone for now. Everything you had before 1.0.18 works like it did.
 - Anything you saved about Juno stays put. He no longer wipes it at start.

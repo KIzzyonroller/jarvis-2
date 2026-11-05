@@ -37,6 +37,11 @@ FIELDS = [
      [("everyone", "Everyone (rate limited)"), ("owner", "Only me"), ("off", "Nobody (read and send only)")]),
     ("Spotify", "SPOTIFY_CLIENT_ID", "Spotify Client ID", "text",
      "Needs Spotify Premium. developer.spotify.com > your app > Settings. Not the secret.", None),
+    ("Desktop", "JARVIS_LIVING_DESKTOP", "Jarvis, Juno and Ultron take over the desktop", "bool",
+     "They become your wallpaper on every monitor, and your desktop icons are hidden while he runs. "
+     "Turn it off to get your normal desktop back.", None),
+    ("Desktop", "JARVIS_DESK_INTRO", "Juno grabs the screen when he starts", "bool",
+     "The startup animation. Off: they just appear.", None),
     ("Netflix", "JARVIS_NETFLIX", "Open Netflix in", "choice", "",
      [("auto", "The app if installed"), ("web", "The website"), ("app", "The app")]),
     ("Netflix", "JARVIS_NETFLIX_TRACK", "Keep a log of what I watch", "bool", "Stays on this PC.", None),
@@ -96,7 +101,8 @@ DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir", "DISCORD_BOT
             "JARVIS_APPLE_MUSIC": "auto", "JARVIS_DISCORD_TYPE": "false",
             "JARVIS_READ_ANYWHERE": "true", "JARVIS_CAL_DEFAULT": "jarvis", "JARVIS_CAL_ALERT": "10",
             "JARVIS_START_MODE": "full", "JARVIS_CAL_SPEAK": "true",
-            "JARVIS_ACTIVITY": "false", "JARVIS_ACTIVITY_DAYS": "14"}
+            "JARVIS_ACTIVITY": "false", "JARVIS_ACTIVITY_DAYS": "14",
+            "JARVIS_LIVING_DESKTOP": "true", "JARVIS_DESK_INTRO": "true"}
 
 
 def _current(key):

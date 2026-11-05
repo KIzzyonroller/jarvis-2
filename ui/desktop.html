@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Jarvis Desktop</title>
+<style>
+/* The living desktop: this page IS the wallpaper (livedesk.py puts its window behind the desktop icons).
+   It spans every monitor; livedesk tells it where each monitor sits. Nothing here takes clicks. */
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0d0a16;cursor:default;user-select:none}
+svg,canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+canvas{pointer-events:none}
+</style></head>
+<body>
+<svg id="desk" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+<canvas id="intro"></canvas>
+<script src="cast.js"></script>
+<script src="cast_anim.js"></script>
+<script src="desktop.js"></script>
+</body></html>

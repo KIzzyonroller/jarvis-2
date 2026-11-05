@@ -252,6 +252,9 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     from mini import Mini
     emitter = Emitter()
     mini = Mini(Emitter) if config.MINI_HUD and sys.platform == "win32" else None
+    import livedesk
+    livedesk.recover_icons()                       # a crash last time may have left the desktop icons hidden
+    desk = livedesk.LiveDesk(Emitter) if config.LIVING_DESKTOP and sys.platform == "win32" else None
 
     phone = []
 
@@ -259,6 +262,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         emitter(ev)
         if mini:
             mini.feed(ev)
+        if desk:
+            desk.feed(ev)
         if phone:
             phone[0].feed(ev)
 
@@ -266,6 +271,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     core = Core(emit, voice=voice)
     _start_phone(core, phone, emitter)
     bridge = Bridge(core, emitter)
+    if desk:
+        desk.core = core
     window = webview.create_window(
         "J.A.R.V.I.S.",
         url=str(config.RES_DIR / "ui" / "index.html"),
@@ -283,8 +290,17 @@ def run_gui(voice, start_hidden=False, show_hook=None):
             print(f"[mini] couldn't create the mini HUD: {e}")
             mini = None
 
+    if desk:
+        try:
+            desk.create(webview)
+        except Exception as e:
+            print(f"[desktop] couldn't create the living desktop: {e}")
+            desk = None
+
     def on_closing():
         emitter.close()     # stop talking to the window before it's torn down
+        if desk:
+            desk.close()    # icons back, normal wallpaper back
         if mini:
             mini.close()    # otherwise the hidden widget keeps the app alive
         core.shutdown()
@@ -311,6 +327,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
 
     def quit_app():
         emitter.close()
+        if desk:
+            desk.close()
         if mini:
             mini.hide()
         threading.Timer(2.0, window.destroy).start()
@@ -353,9 +371,13 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         mini.on_expand = restore
         mini.bridge._core = core
         threading.Thread(target=mini.settle, args=("J.A.R.V.I.S.",), daemon=True, name="mini-settle").start()
+    if desk:
+        threading.Thread(target=desk.start, daemon=True, name="living-desktop").start()
     core.start()
     webview.start()
     emitter.close()
+    if desk:
+        desk.close()
     if mini:
         mini.close()
     core.shutdown()
