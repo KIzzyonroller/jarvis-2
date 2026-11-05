@@ -16,6 +16,18 @@
   --panel-top:158px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+#bubble{position:absolute;left:196px;top:22px;width:62px;height:44px;display:grid;place-items:center;
+  background:var(--night);border:1.5px solid var(--glow);box-shadow:inset 0 0 14px rgba(183,156,255,.25);
+  opacity:0;transform:scale(.6) translateY(6px);transform-origin:0 100%;transition:opacity .18s,transform .22s cubic-bezier(.3,1.6,.5,1);pointer-events:none}
+#bubble::after{content:"";position:absolute;left:-1.5px;bottom:-1.5px;width:12px;height:12px;background:var(--glow);clip-path:polygon(0 0,100% 100%,0 100%)}
+#bubble.on{opacity:1;transform:none}
+#bubble span{font:600 22px/1 "Jost","Segoe UI Symbol","Segoe UI",sans-serif;color:var(--glow);letter-spacing:.04em}
+#bubble.heart span{color:#ff6fae}
+#bubble.cheer span{color:#ffd45c}
+#bubble.pout span{color:#ff7a7a;font-size:15px}
+#bubble.sleepy span{color:#9fb7ff;font-size:17px;font-style:italic}
+#bubble.perk span,#bubble.note span{color:var(--mint)}
+@media (prefers-reduced-motion:reduce){#bubble{transition:opacity .15s;transform:none}}
 html,body{width:400px;height:360px;overflow:hidden;background:var(--night);color:var(--ink);
   font:400 13px/1.3 "Jost","Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;cursor:default}
 
@@ -96,6 +108,9 @@ body.paused .np{color:var(--dim)} body.paused .np i{background:var(--faint);box-
 </div>
 <div class="lip"></div>
 <div id="px"></div>
+
+<!-- her reaction bubble, beside her head (the window grows to include it only while it shows) -->
+<div id="bubble" aria-hidden="true"><span></span></div>
 
 <!-- Juno, from her sitting picture, bent on the graphics card: head nods, hair sways, both shins kick -->
 <canvas id="juno"></canvas>
@@ -297,8 +312,53 @@ const her = (() => {
     },
   };
 })();
+// ---------------------------------------------------------------- reactions: a pose for a moment + a bubble
+const GLYPH = { cheer: "★", heart: "♥", pout: "hmph", sleepy: "z z z", perk: "!", think: "…", note: "♪" };
+const LASTS = { cheer: 1.8, heart: 2.6, pout: 2.6, sleepy: 8, perk: 1.1, think: 30, note: 2.4 };
+let R = null, baseRuns = null, bubbleTimer = 0;
+const bubble = $("#bubble");
+function reshape(withBubble) {
+  if (!baseRuns) return;
+  call("shape", withBubble ? baseRuns.concat([[194, 20, 66, 48]]) : baseRuns, devicePixelRatio || 1);
+}
+function react(kind, secs) {
+  if (!GLYPH[kind]) return;
+  if (R && R.kind === "sleepy" && kind === "think") return;              // don't wake her for that
+  R = { kind, t0: performance.now() / 1000, until: performance.now() / 1000 + (secs || LASTS[kind]) };
+  bubble.className = kind; bubble.firstElementChild.textContent = GLYPH[kind];
+  reshape(true);
+  requestAnimationFrame(() => bubble.classList.add("on"));
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(clearReact, (secs || LASTS[kind]) * 1000);
+}
+function clearReact() {
+  R = null; clearTimeout(bubbleTimer);
+  bubble.classList.remove("on");
+  setTimeout(() => { if (!R) reshape(false); }, 260);
+}
+// after midnight she gets a little sleepy every few minutes
+setInterval(() => { const h = new Date().getHours(); if (h >= 0 && h < 5 && !R && S.visible) react("sleepy", 5); }, 4 * 60 * 1000);
+function applyReact(t, o) {
+  if (!R || reduced) return o;
+  const k = t - R.t0, fade = Math.min(1, k * 6, Math.max(0, (R.until - t) * 3));
+  const mix = (a, b) => a + (b - a) * fade;
+  switch (R.kind) {
+    case "cheer": { const b = Math.abs(Math.sin(k * 11)); return { ...o, nod: mix(o.nod, -0.4 + b), side: mix(o.side, Math.sin(k * 5.5) * .8),
+      swingL: mix(o.swingL, Math.sin(k * 16) * 24), swingR: mix(o.swingR, Math.sin(k * 16 + 2.5) * 24), open: Math.max(o.open, .5 * b) }; }
+    case "heart": return { ...o, side: mix(o.side, Math.sin(k * 2.6) * .9), nod: mix(o.nod, .25 + .15 * Math.sin(k * 5.2)), open: Math.max(o.open, .35) };
+    case "pout": return { ...o, side: mix(o.side, -1 + Math.sin(k * 28) * .12 * Math.max(0, 1 - k)), nod: mix(o.nod, -.5),
+      swingL: mix(o.swingL, Math.sin(k * 9) * 12), swingR: mix(o.swingR, Math.sin(k * 9 + 3) * 12) };
+    case "sleepy": return { ...o, nod: mix(o.nod, .8 + .2 * Math.sin(k * 1.3)), side: mix(o.side, .45), swingL: mix(o.swingL, 2), swingR: mix(o.swingR, -1), open: 0 };
+    case "perk": return { ...o, nod: mix(o.nod, -1), side: mix(o.side, 0) };
+    case "think": return { ...o, side: mix(o.side, .75), nod: mix(o.nod, .15) };
+    case "note": return { ...o, side: mix(o.side, Math.sin(k * 4) * .7) };
+  }
+  return o;
+}
+
 let hairLag = 0;
 function pose(t, o) {
+  o = applyReact(t, o);
   // o: nod 0..1 (on the beat), side -1..1, swingL/swingR degrees, open (her voice) 0..1
   hairLag += (o.side - hairLag) * 0.1;
   if (her) her.draw(t, { head: (o.nod * 4.5 + o.side * 2) * Math.PI / 180, hair: hairLag + o.nod * .4,
@@ -393,6 +453,8 @@ window.J = {
       case "voice": voice = Math.max(voice, +e.level || +e.v || 0); break;
       case "window": run(!!e.visible); break;
       case "fps": FPS = Math.max(5, Math.min(60, +e.fps || 30)); break;
+      case "react": react(e.kind); break;
+      case "state": if (e.state === "thinking") react("think", 30); else if (R && R.kind === "think") clearReact(); break;
     }
   },
   batch(list) { list.forEach((e) => this.on(e)); },
@@ -441,7 +503,7 @@ async function boot() {
   booted = true;
   try { await document.fonts.ready; } catch (e) {}
   const runs = await outline().catch(() => null);
-  if (runs && runs.length) call("shape", runs, devicePixelRatio || 1);
+  if (runs && runs.length) { baseRuns = runs; call("shape", runs, devicePixelRatio || 1); }
   try { const f = await api().fps(); if (f) FPS = +f; } catch (e) {}
   call("ready");
 }
@@ -459,6 +521,7 @@ run(true);
   setInterval(() => { t0 += 1 / 30; const b = (t0 % .5) < .06 ? .9 : .35 + .15 * Math.sin(t0 * 7); onLevel(S.playing ? b : 0); }, 33);
   if (q.has("talk")) setInterval(() => window.J.on({ type: "voice", level: Math.random() }), 90);
   if (q.has("outline")) outline().then((r) => { window.__runs = r; });
+  if (q.get("react")) setTimeout(() => react(q.get("react"), 60), 400);
 })();
 </script>
 </body>

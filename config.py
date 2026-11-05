@@ -229,6 +229,27 @@ CHAT_FIRST = os.environ.get("JUNO_CHAT_FIRST", "true").lower() != "false"
 CHAT_EVERY = os.environ.get("JUNO_CHAT_EVERY", "normal").lower()              # rarely / normal / often
 QUIET_HOURS = os.environ.get("JUNO_QUIET_HOURS", "23-8")                     # "23-8" = 11 PM to 8 AM; empty = none
 CHAT_NEVER = [a.strip().lower() for a in os.environ.get("JUNO_CHAT_NEVER", "").split(",") if a.strip()]
+
+
+def _int_env(key, default, lo, hi):
+    try:
+        return max(lo, min(hi, int(float(os.environ.get(key, default)))))
+    except ValueError:
+        return default
+
+
+CHAT_MINUTES = _int_env("JUNO_CHAT_MINUTES", 40, 3, 600)       # "How often" = custom: about this many minutes apart
+CHAT_DWELL = _int_env("JUNO_CHAT_DWELL", 0, 0, 120)            # minutes in one thing first (0 = go by "How often")
+CHAT_MAX = _int_env("JUNO_CHAT_MAX", 0, 0, 200)                # most a day (0 = go by "How often")
+CHAT_PAUSE = _int_env("JUNO_CHAT_PAUSE", 6, 2, 60)             # wait until you've paused this many seconds
+CHAT_STYLE = os.environ.get("JUNO_CHAT_STYLE", "mixed").lower()   # mixed / questions / tips / jokes / hype
+CHAT_TOPICS = os.environ.get("JUNO_CHAT_TOPICS", "").strip()   # things you like talking about, in your words
+CHAT_MUSIC = os.environ.get("JUNO_CHAT_MUSIC", "true").lower() != "false"     # a word about the song now and then
+# Check-ins (moments.py)
+EVENING_WRAP = os.environ.get("JUNO_EVENING_WRAP", "true").lower() != "false"
+EVENING_AT = _int_env("JUNO_EVENING_AT", 20, 16, 23)
+RAIN_ALERT = os.environ.get("JUNO_RAIN_ALERT", "true").lower() != "false"
+BREAK_EVERY = _int_env("JUNO_BREAK_EVERY", 120, 0, 600)        # minutes at the PC before a break nudge (0 = off)
 # A briefing the first time you start or wake the PC each day (the day rolls over at 4 AM)
 MORNING_BRIEFING = os.environ.get("JARVIS_MORNING_BRIEFING", "true").lower() != "false"
 # Headlines for the briefing (any RSS feed). Empty = no news.
@@ -253,6 +274,7 @@ EMAIL_ANNOUNCE = os.environ.get("JARVIS_EMAIL_ANNOUNCE", "false").lower() == "tr
 # Let him type messages into YOUR Discord app, as you (each one needs your OK). Off unless you switch it on.
 DISCORD_TYPE = os.environ.get("JARVIS_DISCORD_TYPE", "false").lower() == "true"
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
+DISCORD_BOT_ON_SERVER = os.environ.get("DISCORD_BOT_ON_SERVER", "false").lower() == "true"   # server/run_bot.py runs it
 DISCORD_OWNER_ID = os.environ.get("DISCORD_OWNER_ID", "").strip()      # your Discord user ID: you skip the rate limits
 DISCORD_BOT_REPLY = os.environ.get("DISCORD_BOT_REPLY", "everyone").strip().lower()   # everyone, owner or off
 # Started with Windows: seconds to wait after login before loading (keeps login snappy)
@@ -268,12 +290,47 @@ FAST_MODEL = os.environ.get("JARVIS_FAST_MODEL", "claude-haiku-5-5")
 # Game mode: while you're in a fullscreen game or video he keeps answers to one short sentence
 # and shows non-urgent heads-ups on screen instead of talking over your game.
 GAME_MODE = os.environ.get("JARVIS_GAME_MODE", "true").lower() != "false"
+GAME_DETECT = os.environ.get("JUNO_GAME_DETECT", "true").lower() != "false"      # gamemode.py: notice games
+GAME_CHECKIN = os.environ.get("JUNO_GAME_CHECKIN", "true").lower() != "false"    # "how'd it go?" after a session
+GAME_EXTRA = os.environ.get("JUNO_GAME_EXTRA", "")                               # more game .exe names, commas
+GAME_ALLOW = os.environ.get("JUNO_GAME_ALLOW", "")                               # Discord names that may interrupt
+# Smart lights (smarthome.py): Philips Hue and/or Home Assistant
+HUE_BRIDGE = os.environ.get("JUNO_HUE_BRIDGE", "")
+HUE_USER = os.environ.get("JUNO_HUE_USER", "")                 # the key the bridge gives when you pair (secret)
+HA_URL = os.environ.get("HOME_ASSISTANT_URL", "")
+HA_TOKEN = os.environ.get("HOME_ASSISTANT_TOKEN", "")          # long-lived access token (secret)
+LIGHTS_SYNC = os.environ.get("JUNO_LIGHTS_SYNC", "false").lower() == "true"
+LIGHTS_SYNC_TARGET = os.environ.get("JUNO_LIGHTS_SYNC_TARGET", "all")
+STEAM_API_KEY = os.environ.get("STEAM_API_KEY", "")                            # steam.py (secret)
+STEAM_ID = os.environ.get("STEAM_ID", "")                                      # profile link, custom name or 17-digit id
+STEAM_SALE_ALERTS = os.environ.get("JUNO_STEAM_SALES", "true").lower() != "false"
+STEAM_SALE_MIN = _int_env("JUNO_STEAM_SALE_MIN", 20, 1, 95)                    # % off before she mentions it
+PATCH_NOTES = os.environ.get("JUNO_PATCH_NOTES", "true").lower() != "false"     # updates for games you play
+MOODS = os.environ.get("JUNO_MOODS", "true").lower() != "false"                 # her mood colors her tone
+BANTER = os.environ.get("JUNO_BANTER", "true").lower() != "false"               # the AIs quip when you switch
+BIRTHDAYS = os.environ.get("JUNO_BIRTHDAYS", "true").lower() != "false"         # birthday reminders
+JOURNAL = os.environ.get("JUNO_JOURNAL", "true").lower() != "false"             # nightly journal question
+JOURNAL_AT = _int_env("JUNO_JOURNAL_AT", 22, 0, 23)                                    # from this hour
+JOURNAL_FILE = os.environ.get("JUNO_JOURNAL_FILE", "")                          # empty = Desktop\Juno Journal.txt
+GOODNIGHT_PC = os.environ.get("JUNO_GOODNIGHT_PC", "sleep").lower()             # sleep / lock / nothing
+GOODNIGHT_LIGHTS = os.environ.get("JUNO_GOODNIGHT_LIGHTS", "off").lower()       # off / dim / leave
+REACTIONS = os.environ.get("JUNO_REACTIONS", "true").lower() != "false"         # small Juno reacts
+BUTLER_NUDGE = os.environ.get("JUNO_BUTLER_NUDGE", "true").lower() != "false"   # weekly "Downloads is full" nudge
+PHONE_NOTIFS = os.environ.get("JUNO_PHONE_NOTIFS", "true").lower() != "false"   # Phone Link notifications on screen
+PHONE_SPEAK = os.environ.get("JUNO_PHONE_SPEAK", "false").lower() == "true"     # ...and read out loud
 
 # Phone remote: type to him from your phone on the same Wi-Fi. Off unless you turn it on.
 PHONE = os.environ.get("JARVIS_PHONE", "false").lower() == "true"
 PHONE_PORT = int(os.environ.get("JARVIS_PHONE_PORT", "8766"))
 # Glass mode (cards over your webcam that you move with your hands). Only ever on this PC (127.0.0.1).
 GLASS_PORT = int(os.environ.get("JARVIS_GLASS_PORT", "8767"))
+GLASS_WHERE = os.environ.get("JUNO_GLASS_WHERE", "window").lower()     # window (its own, with your camera) / desktop
+# Widgets on her desktop (deskwidgets.py): PC stats, now playing, weather, today, notes & timers, Discord
+_W_KEYS = {"stats": "JUNO_W_STATS", "music": "JUNO_W_MUSIC", "weather": "JUNO_W_WEATHER", "calendar": "JUNO_W_CALENDAR",
+           "notes": "JUNO_W_NOTES", "discord": "JUNO_W_DISCORD"}
+DESK_WIDGETS = os.environ.get("JUNO_DESK_WIDGETS", "true").lower() != "false"
+DESK_WIDGET_ON = {k: os.environ.get(v, "true").lower() != "false" for k, v in _W_KEYS.items()}
+DESK_WIDGETS_WHERE = os.environ.get("JUNO_DESK_WIDGETS_WHERE", "right").lower()      # right / left / second
 
 # Say a pre-recorded "On it." the instant a slow request starts (web search, screen, Blender...)
 INSTANT_ACK = os.environ.get("JARVIS_INSTANT_ACK", "true").lower() != "false"
@@ -307,3 +364,61 @@ CONFIRM_TIMEOUT = 45
 APPROVE_HOTKEY = os.environ.get("JARVIS_APPROVE_HOTKEY", "ctrl+alt+y")
 DENY_HOTKEY = os.environ.get("JARVIS_DENY_HOTKEY", "ctrl+alt+n")
 COMMAND_TIMEOUT = 60      # max seconds a PowerShell command may run
+
+
+# Settings that apply the moment you save them (no restart). Everything else restarts her.
+LIVE_KEYS = {"JARVIS_MINI", "JUNO_FPS", "JUNO_CHAT_FIRST", "JUNO_CHAT_EVERY", "JUNO_CHAT_MINUTES", "JUNO_CHAT_DWELL",
+             "JUNO_CHAT_MAX", "JUNO_CHAT_PAUSE", "JUNO_CHAT_STYLE", "JUNO_CHAT_TOPICS", "JUNO_CHAT_MUSIC",
+             "JUNO_QUIET_HOURS", "JUNO_CHAT_NEVER", "JUNO_EVENING_WRAP", "JUNO_EVENING_AT", "JUNO_RAIN_ALERT",
+             "JUNO_BREAK_EVERY", "JUNO_GLASS_WHERE", "JUNO_DESK_WIDGETS", "JUNO_DESK_WIDGETS_WHERE", "JUNO_W_STATS",
+             "JUNO_W_MUSIC", "JUNO_W_WEATHER", "JUNO_W_CALENDAR", "JUNO_W_NOTES", "JUNO_W_DISCORD", "JUNO_GAME_DETECT", "JUNO_GAME_CHECKIN",
+             "JUNO_GAME_EXTRA", "JUNO_GAME_ALLOW", "JUNO_PHONE_NOTIFS", "JUNO_PHONE_SPEAK", "JUNO_BUTLER_NUDGE", "JUNO_HUE_BRIDGE", "JUNO_HUE_USER", "HOME_ASSISTANT_URL",
+             "HOME_ASSISTANT_TOKEN", "JUNO_LIGHTS_SYNC", "JUNO_LIGHTS_SYNC_TARGET", "JUNO_JOURNAL", "JUNO_JOURNAL_AT", "JUNO_JOURNAL_FILE",
+             "JUNO_GOODNIGHT_PC", "JUNO_GOODNIGHT_LIGHTS", "JUNO_REACTIONS", "STEAM_API_KEY", "STEAM_ID",
+             "JUNO_STEAM_SALES", "JUNO_STEAM_SALE_MIN", "JUNO_PATCH_NOTES", "JUNO_MOODS", "JUNO_BANTER", "JUNO_BIRTHDAYS",
+             "JUNO_VOICE", "JARVIS_VOICE", "ULTRON_VOICE", "JUNO_OPINIONS"}
+WIDGET_KEYS = {"JUNO_DESK_WIDGETS", "JUNO_DESK_WIDGETS_WHERE", "JUNO_W_STATS", "JUNO_W_MUSIC", "JUNO_W_WEATHER",
+               "JUNO_W_CALENDAR", "JUNO_W_NOTES", "JUNO_W_DISCORD"}
+
+
+def reload_live():
+    """Re-read the live settings from the environment (settings.save puts the new values there)."""
+    global MINI_HUD, ANIM_FPS, CHAT_FIRST, CHAT_EVERY, CHAT_MINUTES, CHAT_DWELL, CHAT_MAX, CHAT_PAUSE, CHAT_STYLE
+    global CHAT_TOPICS, CHAT_MUSIC, QUIET_HOURS, CHAT_NEVER, EVENING_WRAP, EVENING_AT, RAIN_ALERT, BREAK_EVERY
+    global GLASS_WHERE, DESK_WIDGETS, DESK_WIDGET_ON, DESK_WIDGETS_WHERE, GAME_DETECT, GAME_CHECKIN, GAME_EXTRA, GAME_ALLOW
+    on = lambda k, d="true": os.environ.get(k, d).lower() != "false"
+    GAME_DETECT, GAME_CHECKIN = on("JUNO_GAME_DETECT"), on("JUNO_GAME_CHECKIN")
+    GAME_EXTRA, GAME_ALLOW = os.environ.get("JUNO_GAME_EXTRA", ""), os.environ.get("JUNO_GAME_ALLOW", "")
+    global PHONE_NOTIFS, PHONE_SPEAK, BUTLER_NUDGE
+    BUTLER_NUDGE = on("JUNO_BUTLER_NUDGE")
+    global HUE_BRIDGE, HUE_USER, HA_URL, HA_TOKEN, LIGHTS_SYNC, LIGHTS_SYNC_TARGET
+    HUE_BRIDGE, HUE_USER = os.environ.get("JUNO_HUE_BRIDGE", ""), os.environ.get("JUNO_HUE_USER", "")
+    HA_URL, HA_TOKEN = os.environ.get("HOME_ASSISTANT_URL", ""), os.environ.get("HOME_ASSISTANT_TOKEN", "")
+    LIGHTS_SYNC = os.environ.get("JUNO_LIGHTS_SYNC", "false").lower() == "true"
+    LIGHTS_SYNC_TARGET = os.environ.get("JUNO_LIGHTS_SYNC_TARGET", "all")
+    global JOURNAL, JOURNAL_AT, JOURNAL_FILE, GOODNIGHT_PC, GOODNIGHT_LIGHTS, REACTIONS
+    JOURNAL, JOURNAL_AT, JOURNAL_FILE = on("JUNO_JOURNAL"), _int_env("JUNO_JOURNAL_AT", 22, 0, 23), os.environ.get("JUNO_JOURNAL_FILE", "")
+    GOODNIGHT_PC = os.environ.get("JUNO_GOODNIGHT_PC", "sleep").lower()
+    GOODNIGHT_LIGHTS = os.environ.get("JUNO_GOODNIGHT_LIGHTS", "off").lower()
+    REACTIONS = on("JUNO_REACTIONS")
+    global STEAM_API_KEY, STEAM_ID, STEAM_SALE_ALERTS, STEAM_SALE_MIN, PATCH_NOTES, MOODS, BANTER, BIRTHDAYS
+    STEAM_API_KEY, STEAM_ID = os.environ.get("STEAM_API_KEY", ""), os.environ.get("STEAM_ID", "")
+    STEAM_SALE_ALERTS, STEAM_SALE_MIN = on("JUNO_STEAM_SALES"), _int_env("JUNO_STEAM_SALE_MIN", 20, 1, 95)
+    PATCH_NOTES, MOODS, BANTER, BIRTHDAYS = on("JUNO_PATCH_NOTES"), on("JUNO_MOODS"), on("JUNO_BANTER"), on("JUNO_BIRTHDAYS")
+    PHONE_NOTIFS, PHONE_SPEAK = on("JUNO_PHONE_NOTIFS"), os.environ.get("JUNO_PHONE_SPEAK", "false").lower() == "true"
+    GLASS_WHERE = os.environ.get("JUNO_GLASS_WHERE", "window").lower()
+    DESK_WIDGETS = on("JUNO_DESK_WIDGETS")
+    DESK_WIDGET_ON = {k: on(v) for k, v in _W_KEYS.items()}
+    DESK_WIDGETS_WHERE = os.environ.get("JUNO_DESK_WIDGETS_WHERE", "right").lower()
+    MINI_HUD = on("JARVIS_MINI")
+    ANIM_FPS = _int_env("JUNO_FPS", 30, 5, 60)
+    CHAT_FIRST, CHAT_MUSIC = on("JUNO_CHAT_FIRST"), on("JUNO_CHAT_MUSIC")
+    CHAT_EVERY = os.environ.get("JUNO_CHAT_EVERY", "normal").lower()
+    CHAT_MINUTES, CHAT_DWELL = _int_env("JUNO_CHAT_MINUTES", 40, 3, 600), _int_env("JUNO_CHAT_DWELL", 0, 0, 120)
+    CHAT_MAX, CHAT_PAUSE = _int_env("JUNO_CHAT_MAX", 0, 0, 200), _int_env("JUNO_CHAT_PAUSE", 6, 2, 60)
+    CHAT_STYLE = os.environ.get("JUNO_CHAT_STYLE", "mixed").lower()
+    CHAT_TOPICS = os.environ.get("JUNO_CHAT_TOPICS", "").strip()
+    QUIET_HOURS = os.environ.get("JUNO_QUIET_HOURS", "23-8")
+    CHAT_NEVER = [a.strip().lower() for a in os.environ.get("JUNO_CHAT_NEVER", "").split(",") if a.strip()]
+    EVENING_WRAP, RAIN_ALERT = on("JUNO_EVENING_WRAP"), on("JUNO_RAIN_ALERT")
+    EVENING_AT, BREAK_EVERY = _int_env("JUNO_EVENING_AT", 20, 16, 23), _int_env("JUNO_BREAK_EVERY", 120, 0, 600)

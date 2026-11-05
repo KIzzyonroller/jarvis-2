@@ -942,7 +942,16 @@ def clipboard(action, text=None):
     import pyperclip
     if action == "get":
         c = pyperclip.paste()
-        return c[:6000] if c else "The clipboard is empty."
+        if c:
+            return c[:6000]
+        try:                                            # a copied picture (screenshot, image from a page)
+            from PIL import ImageGrab
+            img = ImageGrab.grabclipboard()
+            if img is not None and hasattr(img, "size"):
+                return _image_blocks(img, "The clipboard holds this picture:")
+        except Exception:
+            pass
+        return "The clipboard is empty."
     if action == "set":
         pyperclip.copy(text or "")
         return "Copied to clipboard."
@@ -1043,6 +1052,57 @@ _LAST_VIEW = None
 
 _DETAIL_WORDS = re.compile(r"\b(read|text|say|says|error|message|code|word|words|number|small|tiny|click|button|"
                            r"link|menu|tab|field|spell|exact|detail|line|price|email|chat|log)\b", re.I)
+
+
+def screen_text(target="active", copy=False, find=None):
+    """The exact text on screen, read on this PC with Windows' own OCR (ocr.py). target: 'active' (the window in
+    front), 'mouse' (the area around the pointer), 'all', 'monitor N', or part of a window title. copy: put it on
+    the clipboard. find: only the lines containing this."""
+    if not IS_WINDOWS:
+        return "Windows only."
+    import ocr
+    full = _grab()
+    ox, oy = _virtual_origin()
+    box, where = (0, 0, full.width, full.height), "the whole screen"
+    t = (target or "active").strip().lower()
+    mon = re.match(r"^(monitor|screen|display)\s*(\d+)$", t)
+    if mon:
+        mons = _monitors()
+        i = int(mon.group(2)) - 1
+        if not 0 <= i < len(mons):
+            return f"There are {len(mons)} monitors."
+        l, tp, r, bt = mons[i]
+        box, where = (l - ox, tp - oy, r - ox, bt - oy), f"monitor {i + 1}"
+    elif t == "mouse":
+        import pyautogui
+        mx, my = pyautogui.position()
+        box = (max(0, mx - ox - 450), max(0, my - oy - 220), min(full.width, mx - ox + 450), min(full.height, my - oy + 220))
+        where = "the area around the mouse"
+    elif t not in ("all", "screen", "everything"):
+        w = _find_window(None if t in ("active", "focused", "current", "") else target)
+        if w is None:
+            return f"Couldn't find a window matching '{target}'."
+        import proactive
+        if proactive.PRIVATE_TITLES.search(w.title or ""):
+            return "That window looks private (passwords, banking or a login), so I won't read it."
+        b = (max(0, w.left - ox), max(0, w.top - oy), min(full.width, w.left - ox + w.width), min(full.height, w.top - oy + w.height))
+        if b[2] - b[0] > 20 and b[3] - b[1] > 20:
+            box, where = b, f"the '{w.title}' window"
+    try:
+        text = ocr.read(full.crop(box))
+    except Exception as e:
+        return f"Couldn't read the text ({type(e).__name__}: {e}). Use the screen tool to look instead."
+    if find:
+        f = find.lower()
+        text = "\n".join(l for l in text.splitlines() if f in l.lower())
+        if not text:
+            return f"No line with '{find}' in {where}."
+    if not text:
+        return f"No readable text in {where}."
+    if copy:
+        import pyperclip
+        pyperclip.copy(text)
+    return (f"Text in {where}" + (" (copied to the clipboard)" if copy else "") + ":\n" + text[:6000])
 
 
 def look_at_screen(question="", target="all", detail="auto"):
@@ -1732,6 +1792,25 @@ def forget(query):
     return f"Forgot {len(gone)} thing{'s' if len(gone) != 1 else ''}." if gone else f"Nothing matching '{query}'."
 
 
+def edit_memory(mid, text):
+    """Her window's memory page: change what one remembered thing says."""
+    text = " ".join(str(text or "").split())
+    if not text:
+        return forget(mid)
+    if SECRET_HINTS.search(text):
+        return "Not stored: that looks like a password or other secret."
+    with MEMORY.lock:
+        items = memories()
+        for m in items:
+            if m["id"] == mid:
+                m["text"] = text
+                break
+        else:
+            return "That memory's gone already."
+        MEMORY.save(items)
+    return "Updated."
+
+
 def routines():
     return ROUTINES.load() or {}
 
@@ -2298,7 +2377,9 @@ def set_glass(getter):
     _GLASS["get"] = getter
 
 
-def glass_tool(action="show", title=None, body=None, items=None, image=None, id=None):
+def glass_tool(action="show", title=None, body=None, items=None, image=None, id=None, kind=None, place=None,
+               seconds=None, value=None, max=None, labels=None, values=None, chart_type=None, unit=None, folder=None,
+               file=None, video=None, query=None, zoom=None):
     if _GLASS["get"] is None:
         return "Glass mode isn't available."
     hub = _GLASS["get"]()
@@ -2306,19 +2387,55 @@ def glass_tool(action="show", title=None, body=None, items=None, image=None, id=
         return "Glass mode couldn't start (see the log)."
     a = (action or "show").lower()
     first = "The first time, the window asks to use the camera: they should click Allow."
+    if a in ("desktop", "window"):
+        if _VOICE_CORE is None:
+            return "Not available."
+        where = _VOICE_CORE.set_glass_where(a)
+        if where == "desktop":
+            return ("Glass mode will show on the desktop from now on (hands only there; their windows get minimized "
+                    "while it's up and come back when it closes)." +
+                    ("" if getattr(_VOICE_CORE, "desk", None) else " But 'Her world as your desktop' is off in "
+                     "Settings, so until that's on it still uses its own window."))
+        return "Glass mode will use its own window (with the camera behind the cards) from now on."
+    if a == "calibrate":
+        hub.calibrate()
+        return "Started lining up their hand: they pinch the two circles that appear." if hub.connected() else "Glass mode isn't open."
     if a == "open":
         if hub.connected():
             return "Glass mode is already open."
-        hub.open_window()
-        return f"Opening glass mode. {first}"
+        return "Opening glass mode on the desktop." if hub.open_window() == "desktop" else f"Opening glass mode. {first}"
     if a in ("show", "add"):
-        card, err = hub.put(title, body, items, image, stage=a == "show")
+        k = str(kind or "").lower().strip()
+        if k in ("", "note", "list", "text", "image", "picture"):
+            card, err = hub.put(title, body, items, image, stage=a == "show")
+        else:
+            import glass_kinds
+            if k not in glass_kinds.KINDS:
+                return f"kind must be one of: {', '.join(sorted(glass_kinds.KINDS))} (or leave it out for a plain card)."
+            args = {k2: v for k2, v in {"title": title, "body": body, "items": items or labels, "place": place,
+                                         "seconds": seconds, "value": value, "max": max, "labels": labels,
+                                         "values": values, "chart_type": chart_type, "unit": unit, "folder": folder,
+                                         "file": file, "video": video, "query": query, "zoom": zoom}.items() if v not in (None, "", [])}
+            card, err = hub.put_kind(k, title or "", args, stage=a == "show")
         if err:
             return err
         if hub.connected():
             return f"Put #{card['id']} on the glass" + (" centre stage." if a == "show" else ".")
-        hub.open_window()
-        return f"Opening glass mode with #{card['id']} on it. {first}"
+        where = hub.open_window()
+        return f"Opening glass mode with #{card['id']} on it" + (" on the desktop." if where == "desktop" else f". {first}")
+    if a == "update":
+        ok, msg = hub.update(id if id is not None else title, value=value, max_=max, items=items, text=body)
+        return msg
+    if a in ("pin", "unpin"):
+        with hub.lock:
+            c = hub._find(id if id is not None else title)
+        if c is None:
+            return "No card like that."
+        ok, msg = hub.pin(c["id"], a == "pin")
+        return msg
+    if a == "restore":
+        ok, msg = hub.restore()
+        return msg or "Brought the last card back."
     if a == "list":
         return hub.board_text()
     if a == "remove":
@@ -2330,7 +2447,7 @@ def glass_tool(action="show", title=None, body=None, items=None, image=None, id=
     if a == "close":
         hub.bye()
         return "Closed glass mode."
-    return "action must be open, show, add, list, remove, clear or close."
+    return "action must be open, show, add, update, pin, unpin, restore, list, remove, clear, close, desktop, window or calibrate."
 
 
 def blender_expert(task):
@@ -2345,6 +2462,18 @@ def unreal_expert(task):
 
 # =================================================================== game mode
 _FS_CACHE = {"t": 0.0, "v": None}
+
+
+def in_game():
+    """The game you're playing (gamemode.py; counts even while alt-tabbed) or the fullscreen app in front, or None."""
+    try:
+        import gamemode
+        g = gamemode.playing()
+        if g:
+            return g
+    except Exception:
+        pass
+    return fullscreen_app()
 
 
 def fullscreen_app():
@@ -2618,7 +2747,263 @@ def set_mailbox(m):
 _VOICE_CORE = None
 
 
+def corner_widget_tool(action="toggle"):
+    """The small always-on-top widget that shows while her window is minimized."""
+    if _VOICE_CORE is None:
+        return "Not available."
+    on = {"on": True, "off": False}.get(action, not config.MINI_HUD)
+    if action == "status":
+        return f"The corner widget is {'on' if config.MINI_HUD else 'off'}."
+    _VOICE_CORE.set_corner_widget(on)
+    return (f"Corner widget {'on' if on else 'off'}. " +
+            ("It shows in the top-right whenever her window is minimized." if on else
+             "Her window just minimizes to the taskbar now; the desktop and music player still show what she's doing."))
+
+
 FPS_STEPS = (10, 15, 20, 24, 30, 45, 60)
+
+
+def pc_doctor(action="slow", name=None, hours=None, speedtest=False):
+    """Why is my PC slow, updates, disk, crashes, startup apps, network."""
+    import pcdoctor
+    a = (action or "slow").lower()
+    if a == "slow":
+        return pcdoctor.slow()
+    if a == "updates":
+        return pcdoctor.updates()
+    if a == "disk":
+        return pcdoctor.disk()
+    if a == "crashes":
+        return pcdoctor.crashes(hours or 48)
+    if a == "startup":
+        return pcdoctor.startup_list()
+    if a in ("startup_off", "startup_on"):
+        return pcdoctor.startup_set(name, a == "startup_on", lambda t, d: _confirm(t, d))
+    if a == "network":
+        return pcdoctor.network(bool(speedtest))
+    return "action must be slow, updates, disk, crashes, startup, startup_off, startup_on or network."
+
+
+def steam_tool(action="friends", game=None, region=None, role=None):
+    import steam
+    a = (action or "friends").lower()
+    try:
+        if a == "dbd_queue":
+            import dbdqueue
+            return dbdqueue.report(region, role)
+        if a == "patch_notes":
+            return steam.patch_notes(game or "dead by daylight")
+        if a == "installed":
+            gs = steam.installed_games()
+            return ", ".join(sorted(g["name"] for g in gs)) if gs else "No Steam games found on this PC."
+        if not steam.ready():
+            return ("Steam isn't connected yet: add a Steam Web API key (free, steamcommunity.com/dev/apikey) and your "
+                    "Steam profile link in Settings > Connected apps > Steam.")
+        if a == "friends":
+            return steam.friends()
+        if a == "suggest":
+            return steam.suggest()
+        if a == "sales":
+            return steam.sales_text()
+    except Exception as e:
+        return f"Steam: {e}"
+    return "action must be friends, suggest, sales, patch_notes, installed or dbd_queue."
+
+
+def birthdays_tool(action="upcoming", name=None, month=None, day=None, year=None, note=None):
+    import birthdays
+    a = (action or "upcoming").lower()
+    if a == "add":
+        return birthdays.add(name, month, day, year, note)
+    if a == "remove":
+        return birthdays.remove(name or "")
+    return birthdays.upcoming()
+
+
+def speed_report(hours=None):
+    import speedlog
+    return speedlog.report(float(hours) if hours else None)
+
+
+def journal_tool(action="add", text=None, question=None, days=7, search=None):
+    """The journal file on their desktop."""
+    import journal
+    a = (action or "add").lower()
+    if a == "add":
+        if not text:
+            return "What should I write?"
+        return journal.add(text, question)
+    if a == "read":
+        return journal.read(days, search)
+    if a == "open":
+        return journal.open_file()
+    if a == "ask":
+        if _VOICE_CORE is None:
+            return "Not available."
+        return journal.question(_VOICE_CORE)
+    return "action must be add, read, open or ask."
+
+
+def goodnight_tool(action="goodnight", pc=None, lights=None):
+    if _VOICE_CORE is None:
+        return "Not available."
+    if (action or "").lower() == "cancel":
+        return "Cancelled, the PC stays on." if _VOICE_CORE._night_cancel() else "Nothing was going to sleep."
+    return _VOICE_CORE.goodnight(pc, lights)
+
+
+def lights_tool(action, target="all", value=None, color=None):
+    import smarthome
+    return smarthome.control(action, target, value, color)
+
+
+def butler_tool(action="report", folder=None):
+    """Downloads/Desktop: report, tidy into folders (undoable), clean old installers + duplicates to the Recycle Bin."""
+    import butler
+    a = (action or "report").lower()
+    ask = lambda t, d: _confirm(t, d)                      # no "always allow": every tidy and clean asks
+    if a == "report":
+        return butler.report(folder)[1]
+    if a == "tidy":
+        return butler.tidy(folder, ask)
+    if a == "undo":
+        return butler.undo()
+    if a == "clean":
+        return butler.clean(folder, ask)
+    return "action must be report, tidy, undo or clean."
+
+
+def phone_tool(action="recent", hours=12, who=None):
+    """Phone notifications mirrored by Phone Link."""
+    w = getattr(_VOICE_CORE, "phonelink", None) if _VOICE_CORE else None
+    if w is None:
+        return ("Phone notifications aren't coming through. They need Windows' Phone Link app set up (Start > Phone "
+                "Link, pair the phone, allow notifications) and 'Show my phone's notifications' on in Settings.")
+    import notifications
+    if action == "unread":
+        msgs = w.unread()
+    else:
+        msgs = w.since(time.time() - float(hours or 12) * 3600)
+    if who:
+        msgs = [m for m in msgs if who.lower() in m["sender"].lower()]
+    if not msgs:
+        return "Nothing from the phone" + (f" from {who}" if who else "") + "."
+    return "\n".join(f"{datetime.fromtimestamp(m['time']):%I:%M %p} {m['sender']}: {m['text'][:200]}" for m in msgs[-25:])
+
+
+def game_mode_tool(action="status", name=None, person=None, text=None, label=None, seconds=None):
+    """Game mode: what she's noticed, start/stop it by hand, who on Discord may interrupt, and per-game notes and
+    quick timers (shown on a glass-mode card)."""
+    import gamemode
+    a = (action or "status").lower()
+    w = gamemode.WATCH
+    if a in ("add_note", "add_timer", "remove", "show", "start_timer", "notes"):
+        import glass_kinds
+        game = (name or gamemode.playing() or "").strip()
+        if not game:
+            return "Which game? (They aren't playing one right now.)"
+        hub = _GLASS["get"]() if _GLASS["get"] else None
+        if a == "notes":
+            d = glass_kinds.game_data(game)
+            return (f"{game} notes: " + "; ".join(d["notes"]) if d["notes"] else f"No notes for {game}.") + \
+                (" Timers: " + ", ".join(f"{t['label']} {t['secs']}s" for t in d["timers"]) if d["timers"] else "")
+        if a == "start_timer":
+            if hub is None or not hub.connected():
+                return "Glass mode isn't open, so there's no game card to run it on. A normal reminder or glass timer works instead."
+            hub.game_card(game)
+            hub.game_timer(label or "")
+            return f"Started {label}."
+        if a == "show":
+            if hub is None:
+                return "Glass mode couldn't start."
+            hub.game_card(game)
+            if not hub.connected():
+                hub.open_window()
+            return f"{game}'s card is on the glass."
+        if a == "add_note" and not text:
+            return "What's the note?"
+        if a == "add_timer":
+            secs = glass_kinds._secs(seconds) if isinstance(seconds, str) else int(seconds or 0)
+            if not label or secs <= 0:
+                return "Need a name for the timer and how long (seconds)."
+            data = glass_kinds.game_edit(game, timer=label, seconds=secs)
+        elif a == "remove":
+            data = glass_kinds.game_edit(game, remove=text or label or "")
+        else:
+            data = glass_kinds.game_edit(game, note=text)
+        if hub is not None:
+            hub.game_update(game, data)
+        return f"Saved for {game}. It shows on the {game} card in glass mode."
+    if a == "status":
+        g = gamemode.playing()
+        last = w.last_session if w else None
+        s = f"In game mode: {g}." if g else "Not in a game right now."
+        if last and not g:
+            s += f" Last session: {last['name']}, {last['minutes']} minutes."
+        allow = config.GAME_ALLOW.strip()
+        return s + (f" Discord people allowed through: {allow}." if allow else " Nobody's Discord messages get read out mid-game.")
+    if a in ("won", "lost"):
+        if w is None:
+            return "Game mode isn't running."
+        w.result("win" if a == "won" else "loss")
+        wi, lo = w.record()
+        return f"Noted. Today: {wi} wins, {lo} losses" + (f", {w.loss_streak()} losses in a row." if w.loss_streak() >= 2 else ".")
+    if a in ("start", "stop"):
+        if w is None:
+            return "Game mode isn't running (Windows only)."
+        w.set_manual((name or "a game") if a == "start" else None)
+        return f"Game mode on for {name or 'your game'}: I'll stay quiet." if a == "start" else "Game mode off."
+    if a in ("allow", "disallow"):
+        if not person or _VOICE_CORE is None:
+            return "Who?"
+        names = [x.strip() for x in config.GAME_ALLOW.split(",") if x.strip()]
+        names = [x for x in names if x.lower() != person.lower()] + ([person.strip()] if a == "allow" else [])
+        _VOICE_CORE.set_widgets({"JUNO_GAME_ALLOW": ", ".join(names)})
+        return f"{person} {'can' if a == 'allow' else 'can no longer'} interrupt your games on Discord."
+    if a in ("detect_on", "detect_off"):
+        if _VOICE_CORE is None:
+            return "Not available."
+        _VOICE_CORE.set_widgets({"JUNO_GAME_DETECT": "true" if a == "detect_on" else "false"})
+        return "I'll notice your games again." if a == "detect_on" else "I won't watch for games any more."
+    return "action must be status, start, stop, allow, disallow, detect_on or detect_off."
+
+
+def desk_widgets_tool(action="status", widget=None, where=None):
+    """The live widgets on her desktop (PC stats, now playing, weather, today, notes, Discord)."""
+    if _VOICE_CORE is None:
+        return "Not available."
+    keys = {"stats": "JUNO_W_STATS", "music": "JUNO_W_MUSIC", "weather": "JUNO_W_WEATHER", "calendar": "JUNO_W_CALENDAR",
+            "notes": "JUNO_W_NOTES", "discord": "JUNO_W_DISCORD"}
+    names = {"stats": "PC stats", "music": "now playing", "weather": "weather", "calendar": "today",
+             "notes": "notes, lists and timers", "discord": "Discord"}
+    a = (action or "status").lower()
+    if a == "status":
+        if not config.DESK_WIDGETS:
+            return "Desktop widgets are off."
+        on = [names[k] for k, v in config.DESK_WIDGET_ON.items() if v]
+        return f"Desktop widgets are on ({config.DESK_WIDGETS_WHERE}): " + (", ".join(on) or "none of them picked")
+    ch = {}
+    if a in ("on", "off"):
+        if widget and widget in keys:
+            ch[keys[widget]] = "true" if a == "on" else "false"
+            if a == "on":
+                ch["JUNO_DESK_WIDGETS"] = "true"
+        else:
+            ch["JUNO_DESK_WIDGETS"] = "true" if a == "on" else "false"
+    if where in ("right", "left", "second"):
+        ch["JUNO_DESK_WIDGETS_WHERE"] = where
+        ch.setdefault("JUNO_DESK_WIDGETS", "true")
+    if not ch:
+        return "Say on/off (optionally which widget) or where (right, left, second)."
+    if getattr(_VOICE_CORE, "desk", None) is None:
+        note = " They show once 'Her world as your desktop' is on in Settings."
+    else:
+        note = ""
+    _VOICE_CORE.set_widgets(ch)
+    what = names.get(widget, "desktop widgets") if widget else "desktop widgets"
+    return (f"{what[0].upper() + what[1:]} {'on' if a == 'on' else 'off' if a == 'off' else 'moved'}"
+            + (f", {where} side" if where in ("right", "left") else ", on the other monitor" if where == "second" else "")
+            + "." + note)
 
 
 def frame_rate_tool(action="get", fps=None):
@@ -2655,7 +3040,7 @@ def voice_settings_tool(action="list", who=None, voice=None, speed=None, pitch=N
     if _VOICE_CORE is None:
         return "Voice settings aren't available."
     key = (who or getattr(_CTX, "persona", None) or _VOICE_CORE.persona_key).lower()
-    key = personas.DEFAULT
+    key = "ultron" if "ultron" in key else "jarvis" if "jarvis" in key else "juno" if "juno" in key else personas.DEFAULT
     if key not in personas.PERSONAS:
         return f"No one called {who}."
     if action == "reset":
@@ -2799,7 +3184,14 @@ TOOL_SPECS = [
     _spec("keyboard_input", "Type text or press keys in an app. ALWAYS set window to part of the target window's title (e.g. 'Discord', 'Notepad', 'Chrome') so it gets focused first. If that app isn't open, it opens it and waits for it to load before typing, so you don't need to open it first. action: type (text), hotkey (keys like ['ctrl','s']), press (one key like 'enter', with times). Only press enter to send a message if the user asked you to send it.",
           {"action": {"type": "string", "enum": ["type", "hotkey", "press"]}, "text": S,
            "keys": {"type": "array", "items": S}, "times": {"type": "integer"}, "window": S}, ["action"]),
-    _spec("clipboard", "Read (get) or write (set) the clipboard.",
+    _spec("screen_text", "Read the exact text on screen with Windows' built-in OCR, on this PC (faster and more exact "
+                          "than looking: error codes, serials, paths, text in a picture or video). target: active (the "
+                          "window in front, default), mouse (around the pointer), all, 'monitor 2', or part of a window "
+                          "title. copy: put it on the clipboard ('copy the text in that'). find: only lines containing it.",
+          {"target": S, "copy": B, "find": S}),
+    _spec("clipboard", "Read (get) or write (set) the clipboard. get also returns a copied picture. For 'translate / "
+                       "summarize / fix / rewrite / explain what I copied': get it, do the work, and set the result "
+                       "back when it's something they'll paste (say it's on the clipboard; keep the spoken part short).",
           {"action": {"type": "string", "enum": ["get", "set"]}, "text": S}, ["action"]),
     _spec("screen", "Look at the user's screen (screenshot you can see). Use for anything about what's on screen, errors, "
                     "'read this'. target: 'all' (every monitor), 'monitor 1' / 'monitor 2', 'active' (focused window), or part "
@@ -2903,6 +3295,83 @@ TOOL_SPECS = [
                      "where possible; don't add your persona's flourishes unless they asked you to speak as yourself.",
           {"action": {"type": "string", "enum": ["recent", "unread", "servers", "read_channel", "send", "send_as_me"]}, "who": S,
            "hours": {"type": "number"}, "channel": S, "text": S, "limit": {"type": "number"}}, ["action"]),
+    _spec("corner_widget", "The small always-on-top window in the top-right that shows while her main window is "
+                           "minimized (the minimized window / mini HUD). on, off, toggle or status.",
+          {"action": {"type": "string", "enum": ["on", "off", "toggle", "status"]}}, ["action"]),
+    _spec("pc_doctor", "Diagnose the PC (read-only unless they approve a startup change). slow: what's using CPU/memory, "
+                        "disk space, uptime, GPU heat, startup count ('why is my PC slow'). updates: apps with updates, "
+                        "GPU driver age, Windows updates (report only, never install). disk: what's filling the drives, "
+                        "safe caches, big Steam games not played lately. crashes (hours, default 48): app crashes, hangs, "
+                        "unexpected shutdowns from the event log: explain them plainly. startup: what launches at boot; "
+                        "startup_off / startup_on (name): asks them first. network (speedtest true only if they ask for "
+                        "a speed test): router vs internet ping, packet loss, Wi-Fi signal. Lead with the likely cause.",
+          {"action": {"type": "string", "enum": ["slow", "updates", "disk", "crashes", "startup", "startup_off", "startup_on", "network"]},
+           "name": S, "hours": N, "speedtest": B}, ["action"]),
+    _spec("steam", "Steam: friends (who's online and what they're playing), suggest (candidates from their library for "
+                   "'what should I play': pick one or two and say why), sales (wishlist games on sale), patch_notes "
+                   "(game: latest update notes for that game, to summarize), installed (Steam games on this PC), "
+                   "dbd_queue (Dead by Daylight queue times and region status from deadbyqueue.com; region e.g. 'us "
+                   "east', role killer/survivor). For other games' server status, search the web.",
+          {"action": {"type": "string", "enum": ["friends", "suggest", "sales", "patch_notes", "installed", "dbd_queue"]},
+           "game": S, "region": S, "role": {"type": "string", "enum": ["killer", "survivor"]}}, ["action"]),
+    _spec("birthdays", "Birthday radar: add (name, month, day, year if known, note like gift ideas) whenever they mention "
+                       "someone's birthday; remove (name); upcoming. She reminds them 3 days before and on the day.",
+          {"action": {"type": "string", "enum": ["add", "remove", "upcoming"]}, "name": S, "month": S, "day": N,
+           "year": N, "note": S}, ["action"]),
+    _spec("speed_report", "How fast she's been answering: where the time goes between them stopping talking and her "
+                           "first sound (hearing, Claude, tools, voice), split by model, tools, cold vs warm. hours "
+                           "limits it to recent answers. Also saved as speed_report.txt in her data folder. Read out "
+                           "only the headline numbers unless they ask for detail.",
+          {"hours": N}),
+    _spec("journal", "Their journal: a text file on their desktop (Juno Journal.txt). add (text = their words, first "
+                      "person, lightly cleaned up, nothing invented; question = the question it answers, if any): when "
+                      "they answer your journal question, or say 'journal: ...' / 'write in my journal'. read (days, or "
+                      "search for a word) for 'what did I write...'. open: opens the file. ask: a question to ask them "
+                      "now if they want to journal.",
+          {"action": {"type": "string", "enum": ["add", "read", "open", "ask"]}, "text": S, "question": S, "days": N,
+           "search": S}, ["action"]),
+    _spec("goodnight", "When they say goodnight / they're going to bed: tells them tomorrow's first thing and weather, "
+                       "pauses music, turns lights off (Settings), and sleeps or locks the PC after 30 seconds unless "
+                       "something's still running. Say the returned text (shorten it, keep the 30 seconds part). "
+                       "cancel: stop the sleep. pc: sleep / lock / nothing to override; lights: off / dim / leave.",
+          {"action": {"type": "string", "enum": ["goodnight", "cancel"]},
+           "pc": {"type": "string", "enum": ["sleep", "lock", "nothing"]},
+           "lights": {"type": "string", "enum": ["off", "dim", "leave"]}}, ["action"]),
+    _spec("lights", "Smart lights (Philips Hue and/or Home Assistant). on, off, brightness (value 1-100), color (a name "
+                     "like purple / warm white, a hex code, or juno / jarvis / ultron for her colours), list, "
+                     "pair_hue (they press the bridge's button first). target: a room or light name, or all. Lights only.",
+          {"action": {"type": "string", "enum": ["on", "off", "brightness", "color", "list", "pair_hue"]},
+           "target": S, "value": N, "color": S}, ["action"]),
+    _spec("file_butler", "Keep Downloads (default) or Desktop tidy. report: what's there and what's safe to clear. "
+                          "tidy: sort loose files into Installers/Archives/Pictures/Videos/Music/Documents/Code/3D/Other "
+                          "folders (asks first; undo puts them back). clean: send installers/archives older than 30 days "
+                          "and duplicate downloads to the Recycle Bin (asks first with the list). Run report before "
+                          "suggesting tidy or clean. folder: downloads, desktop, or a folder in their user folder.",
+          {"action": {"type": "string", "enum": ["report", "tidy", "undo", "clean"]}, "folder": S}, ["action"]),
+    _spec("phone", "The user's phone notifications (texts, WhatsApp, calls, apps), mirrored to the PC by Windows' Phone "
+                    "Link. recent (hours, default 12) or unread (since they last asked); who filters by sender. "
+                    "Read-only: she can't reply from the phone.",
+          {"action": {"type": "string", "enum": ["recent", "unread"]}, "hours": N, "who": S}, ["action"]),
+    _spec("game_mode", "Game mode: she notices games (Steam, Epic, Riot, Xbox, GOG, EA, Ubisoft, Battle.net, or ones "
+                        "they added) and stays quiet while they play (no conversation starters or check-ins; Discord only "
+                        "from allowed people), then asks how it went. status; start (name: 'I'm playing X', for games it "
+                        "didn't catch) / stop; allow / disallow (person: a Discord name that may interrupt a game); "
+                        "detect_on / detect_off. Per-game notes and quick timers (name = the game, defaults to the one "
+                        "they're playing): add_note (text), add_timer (label + seconds, e.g. a cooldown they want to "
+                        "track), remove (text or label), notes (read them), show (put the game's card on the glass), "
+                        "start_timer (label: start one of the quick timers on that card). Timers are only started by "
+                        "them, by voice or a pinch: nothing reads the game. won / lost: record a result they told you "
+                        "about (usually automatic). Never clicks or types in games.",
+          {"action": {"type": "string", "enum": ["status", "start", "stop", "allow", "disallow", "detect_on", "detect_off",
+                                                 "add_note", "add_timer", "remove", "notes", "show", "start_timer", "won", "lost"]},
+           "name": S, "person": S, "text": S, "label": S, "seconds": N}, ["action"]),
+    _spec("desk_widgets", "The live widgets on her desktop wallpaper: PC stats (CPU, memory, GPU load/temp, VRAM, "
+                           "disk, network), now playing, weather, today's calendar, notes/lists/timers, Discord. on/off "
+                           "(all, or one widget), where (right or left side of the main monitor, or second = the other "
+                           "monitor), or status.",
+          {"action": {"type": "string", "enum": ["on", "off", "move", "status"]},
+           "widget": {"type": "string", "enum": ["stats", "music", "weather", "calendar", "notes", "discord"]},
+           "where": {"type": "string", "enum": ["right", "left", "second"]}}, ["action"]),
     _spec("frame_rate", "Her animation frame rate on the desktop and the music player (default 30). get, or set with "
                         "fps (10, 15, 20, 24, 30, 45 or 60; other numbers snap to the closest). 'smoother' = higher, "
                         "'lighter on my PC' / 'it's lagging' = lower.",
@@ -3010,16 +3479,38 @@ TOOL_SPECS = [
     _spec("glass", "Glass mode: cards floating over the user's webcam that they move, throw, stretch and close with "
                    "their hands (or the mouse). Use it when they ask to SEE something, to show/put something up, or "
                    "when glass mode is open and the answer is a list, a comparison, steps, an image or anything "
-                   "easier to look at than to hear. show: one card centre stage (title, body = short text, a little "
-                   "markdown: - bullets, 1. steps, **bold**; items = a list of short lines; image = a web link, "
-                   "'screenshot', or a picture file path). add: another card without taking the stage (use it "
-                   "several times for several results, one per card). list: what's on the glass and which card "
-                   "they're holding or made bigger (look before talking about 'this one'). remove (id or title), "
-                   "clear, open (just the window), close. Keep cards short and scannable (under about 60 words, "
-                   "or up to 8 items); say only a few words out loud, like 'Up on the glass.' If the window "
-                   "wasn't open, showing a card opens it.",
-          {"action": {"type": "string", "enum": ["open", "show", "add", "list", "remove", "clear", "close"]},
-           "title": S, "body": S, "items": {"type": "array", "items": S}, "image": S, "id": N}, ["action"]),
+                   "easier to look at than to hear. show: one card centre stage; add: another card without taking "
+                   "the stage. A plain card (no kind): title, body = short text, a little markdown (- bullets, 1. "
+                   "steps, **bold**), items = short lines, image = a web link, 'screenshot' or a picture path. "
+                   "Or a kind: timer (seconds, or body like '5 minutes'; title = what it's for), stopwatch, stats "
+                   "(live CPU/RAM/GPU), nowplaying (song with buttons), weather (place; hourly strip), calendar "
+                   "(today), progress (value, max), checklist (items; ticks are remembered by title), sliders "
+                   "(volume and brightness), launcher (items = app names, else their usual apps), sticky (body; "
+                   "stays between sessions until they close it), chart (labels, values, chart_type bar/line, unit), "
+                   "map (place, zoom 3-17), youtube (query, or video = a link/id; they pinch one to play it), photos "
+                   "(folder of pictures), model (file = a .glb/.gltf to spin), windows (their open windows: focus, "
+                   "move to the other monitor, close), feed (Discord messages as they arrive). Her yes/no questions "
+                   "show up as cards on their own. update (id): change a progress value/max, a checklist's items or "
+                   "a sticky's body. pin/unpin (id): keep a card for next time. restore: bring back the last card "
+                   "they threw away. list: what's up, which card they're holding, pointing at or made bigger (look "
+                   "before talking about 'this one'). remove (id or title), clear, open (just the window), close. "
+                   "desktop / window: from now on show glass mode on their desktop (over her world, hands only) or "
+                   "in its own window with the camera (Settings has the same choice). calibrate: start 'line up my "
+                   "hand' when the dots sit off their hand. "
+                   "Keep plain cards short (under about 60 words, or up to 8 items); say only a few words out loud, "
+                   "like 'Up on the glass.' If the window wasn't open, showing a card opens it. Their hands can also: "
+                   "pinch buttons, flick a finger for next/previous song, hold an open hand to play/pause, thumbs "
+                   "up/down to answer, hold up fingers to pick a number on a list (you'll get 'Number N on the ... "
+                   "card'), peace sign for a screenshot.",
+          {"action": {"type": "string", "enum": ["open", "show", "add", "update", "pin", "unpin", "restore", "list",
+                                                 "remove", "clear", "close", "desktop", "window", "calibrate"]},
+           "kind": {"type": "string", "enum": ["game", "timer", "stopwatch", "stats", "nowplaying", "weather", "calendar",
+                                               "progress", "checklist", "sliders", "launcher", "sticky", "chart",
+                                               "map", "youtube", "photos", "model", "windows", "feed"]},
+           "title": S, "body": S, "items": {"type": "array", "items": S}, "image": S, "id": N, "place": S,
+           "seconds": N, "value": N, "max": N, "labels": {"type": "array", "items": S},
+           "values": {"type": "array", "items": N}, "chart_type": {"type": "string", "enum": ["bar", "line"]},
+           "unit": S, "folder": S, "file": S, "video": S, "query": S, "zoom": N}, ["action"]),
     _spec("activity", "Activity memory: which apps and windows the user had in front, logged on this PC (titles "
                       "only, never screenshots or typing), if they've switched it on. summary (when: today, "
                       "yesterday, this morning, yesterday afternoon, last 2 hours, friday, last week, 2026-10-20): "
@@ -3041,11 +3532,11 @@ TOOL_SPECS = [
 
 FUNCS = {
     "open": open_thing, "close_app": close_app, "self_control": self_control, "window_control": window_control,
-    "keyboard_input": keyboard_input, "clipboard": clipboard, "screen": screen, "mouse": mouse,
+    "keyboard_input": keyboard_input, "clipboard": clipboard, "screen_text": screen_text, "screen": screen, "mouse": mouse,
     "look_at_camera": look_at_camera, "display": display, "media_control": media_control, "set_volume": set_volume,
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
-    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "history": history_tool, "background": background_tool,
+    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "pc_doctor": pc_doctor, "steam": steam_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
     "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
 

@@ -41,7 +41,7 @@ from urllib.parse import parse_qs, urlparse
 
 import config
 
-KEEP = {"state", "persona", "caption", "duo", "voice", "turn_start", "turn_end"}
+KEEP = {"state", "persona", "caption", "duo", "voice", "turn_start", "turn_end", "telemetry", "confirm", "confirm_done", "discord", "react"}
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 MAX_CARDS = 12
 MAX_TEXT = 4000
@@ -73,6 +73,10 @@ class GlassHub:
         self.last_seen = 0.0
         self.srv = None
         self._voice_t = 0.0
+        self.trash = deque(maxlen=8)      # cards you threw away or crumpled, newest last (both palms up brings one back)
+        self.files = {}                   # file id -> 3D model path
+        self._live = None
+        self._restore_saved()
 
     # ------------------------------------------------------------------ lifecycle
     @property
@@ -134,6 +138,27 @@ class GlassHub:
             self._voice_t = now
         if t in ("state", "persona", "duo"):
             self.snap[t] = ev
+        if t == "telemetry":
+            if not any(c["kind"] == "stats" for c in self.cards.values()):
+                return
+            return self._push({k: ev.get(k) for k in ("type", "cpu", "ram", "ram_used", "ram_total", "disk", "down_kbps", "up_kbps")})
+        if t == "confirm":                               # her yes/no question, as a card you can pinch
+            card, _ = self.put_kind("approval", ev.get("title") or "Approve?", {}, stage=True,
+                                    data={"cid": ev.get("id"), "detail": str(ev.get("detail") or "")[:400]})
+            return
+        if t == "confirm_done":
+            for k in [k for k, c in self.cards.items() if c["kind"] == "approval"]:
+                self.remove(k)
+            return
+        if t == "discord":                               # into the feed card, if one is up
+            feed = next((c for c in self.cards.values() if c["kind"] == "feed"), None)
+            if feed is not None:
+                item = {"who": str(ev.get("from") or ev.get("who") or "Discord")[:40], "channel": str(ev.get("channel") or "")[:40],
+                        "text": str(ev.get("text") or ev.get("content") or "")[:300], "at": time.time() * 1000}
+                feed["data"].setdefault("items", []).insert(0, item)
+                del feed["data"]["items"][12:]
+                self._push({"type": "update", "id": feed["id"], "data": feed["data"]})
+            return
         self._push({k: v for k, v in ev.items() if k in ("type", "state", "key", "name", "text", "v", "on", "who")})
 
     def events_since(self, since, wait=20.0):
@@ -174,10 +199,17 @@ class GlassHub:
             return None, f"There's no picture at {p}."
         if p.stat().st_size > MAX_IMAGE:
             return None, "That picture is too big for the glass (over 25 MB)."
+        return self.register(p), None
+
+    def register(self, p):
+        """A link the page can load this file from (pictures and 3D models he chose to show; nothing else)."""
         iid = secrets.token_urlsafe(8)
         with self.lock:
-            self.images[iid] = p
-        return f"/img/{iid}?t={self.token}", None
+            if Path(p).suffix.lower() in IMAGE_EXT:
+                self.images[iid] = Path(p)
+                return f"/img/{iid}?t={self.token}"
+            self.files[iid] = Path(p)
+            return f"/file/{iid}?t={self.token}"
 
     def put(self, title="", body="", items=None, image=None, stage=True):
         title = _clean(title, 120).strip()
@@ -210,6 +242,155 @@ class GlassHub:
         self._push({"type": "card", "card": card})
         return card, None
 
+    def put_kind(self, kind, title="", args=None, stage=True, data=None):
+        """A richer card (glass_kinds.py): timer, stats, weather, checklist, chart, map, 3D model..."""
+        import glass_kinds
+        args = dict(args or {})
+        if data is None:
+            try:
+                data = glass_kinds.build(self, self.core, kind, dict(args, title=title))
+            except ValueError as e:
+                return None, str(e)
+            except Exception as e:
+                return None, f"Couldn't make that card ({type(e).__name__}: {e})."
+        title = _clean(title, 120).strip()
+        with self.lock:
+            if kind == "sticky":                          # notes stay between sessions
+                st = glass_kinds.load()
+                st.setdefault("notes", []).append({"title": title, "text": data.get("text", "")})
+                glass_kinds.save(st)
+            cid = self.next_id
+            self.next_id += 1
+            card = {"id": cid, "kind": kind, "title": title, "body": "", "items": [], "image": None, "data": data,
+                    "args": {k: v for k, v in args.items() if isinstance(v, (str, int, float, list)) and k != "data"},
+                    "stage": bool(stage), "t": time.time()}
+            if stage:
+                for c in self.cards.values():
+                    c["stage"] = False
+            self.cards[cid] = card
+        self._push({"type": "card", "card": card})
+        self._ensure_live()
+        return card, None
+
+    def _restore_saved(self):
+        """Sticky notes and pinned cards come back every time."""
+        import glass_kinds
+        st = glass_kinds.load()
+        for n in st.get("notes", []):
+            cid = self.next_id
+            self.next_id += 1
+            self.cards[cid] = {"id": cid, "kind": "sticky", "title": n.get("title", ""), "body": "", "items": [], "image": None,
+                               "data": {"text": n.get("text", "")}, "args": {}, "stage": False, "t": time.time(), "saved": True}
+        self._pins = st.get("pins", [])
+
+    def restore_pins(self):
+        """Pinned cards rebuilt (live ones get fresh data). Called when the page opens."""
+        pins, self._pins = getattr(self, "_pins", []), []
+        for p in pins:
+            if p.get("kind") == "sticky":                   # sticky notes come back on their own already
+                continue
+            if p.get("kind") in (None, "note", "list"):
+                self.put(p.get("title"), p.get("body"), p.get("items"), None, stage=False)
+            else:
+                self.put_kind(p["kind"], p.get("title", ""), p.get("args") or {}, stage=False)
+            with self.lock:
+                last = next(reversed(self.cards))
+                self.cards[last]["pinned"] = True
+
+    def pin(self, cid, on):
+        import glass_kinds
+        with self.lock:
+            c = self.cards.get(cid)
+            if not c:
+                return False, "No such card."
+            if c["kind"] in ("image", "photos", "model", "approval"):
+                return False, "Pictures, photo stacks and 3D models can't be pinned (their files are only shared for this session)."
+            c["pinned"] = bool(on)
+            pins = [{"kind": None if x["kind"] in ("note", "list") else x["kind"], "title": x["title"], "body": x["body"],
+                     "items": x["items"], "args": x.get("args", {})} for x in self.cards.values() if x.get("pinned")]
+        st = glass_kinds.load()
+        st["pins"] = pins
+        glass_kinds.save(st)
+        self._push({"type": "pinned", "id": cid, "on": bool(on)})
+        return True, "Pinned: it'll be here next time." if on else "Unpinned."
+
+    def update(self, ref, value=None, max_=None, items=None, text=None):
+        """Change a card that's up: a progress bar's value, a checklist's items (ticks kept), a sticky's text."""
+        import glass_kinds
+        with self.lock:
+            c = self._find(ref)
+            if c is None:
+                return False, "No card like that."
+            d = c["data"]
+            if c["kind"] == "progress":
+                if value is not None:
+                    d["value"] = float(value)
+                if max_ is not None and float(max_) > 0:
+                    d["max"] = float(max_)
+            elif c["kind"] == "checklist" and items:
+                done = {i["t"]: i["done"] for i in d.get("items", [])}
+                d["items"] = [{"t": str(t)[:200], "done": bool(done.get(str(t)[:200]))} for t in items][:20]
+                st = glass_kinds.load()
+                st.setdefault("lists", {})[(c["title"] or "Checklist").lower()] = d["items"]
+                glass_kinds.save(st)
+            elif c["kind"] == "sticky" and text:
+                d["text"] = str(text)[:600]
+            else:
+                return False, f"#{c['id']} is a {c['kind']} card: only progress bars, checklists and sticky notes change."
+            cid = c["id"]
+        self._push({"type": "update", "id": cid, "data": d})
+        return True, f"Updated #{cid}."
+
+    def _find(self, ref):
+        """A card by id ('3', '#3') or by a bit of its title. Call with the lock held."""
+        r = str(ref or "").strip().lower().lstrip("#")
+        if r.isdigit():
+            return self.cards.get(int(r))
+        if not r:                                         # no id: the one up close, else the newest
+            return next((c for c in self.cards.values() if c.get("stage")), None) or (next(reversed(self.cards.values())) if self.cards else None)
+        return next((c for c in reversed(list(self.cards.values())) if r in (c["title"] or "").lower()), None)
+
+    def restore(self, ref=None):
+        """Bring back the last card you threw away."""
+        with self.lock:
+            if not self.trash:
+                return False, "Nothing to bring back."
+            card = self.trash.pop()
+            cid = self.next_id
+            self.next_id += 1
+            card = dict(card, id=cid, stage=True, t=time.time())
+            for c in self.cards.values():
+                c["stage"] = False
+            self.cards[cid] = card
+        self._push({"type": "card", "card": card})
+        return True, ""
+
+    def _ensure_live(self):
+        """While a stats or now-playing card is up: GPU numbers and the song, every couple of seconds."""
+        if self._live and self._live.is_alive():
+            return
+        self._live = threading.Thread(target=self._live_loop, daemon=True, name="glass-live")
+        self._live.start()
+
+    def _live_loop(self):
+        import glass_kinds
+        last_np = None
+        while self.srv is not None:
+            kinds = {c["kind"] for c in list(self.cards.values())}
+            if not kinds & {"stats", "nowplaying"}:
+                return
+            if "stats" in kinds and self.connected():
+                g = glass_kinds.gpu()
+                if g:
+                    self._push(dict(g, type="gpu"))
+            if "nowplaying" in kinds:
+                np = glass_kinds.nowplaying(self.core)
+                key = np and (np["title"], np["artist"], np["playing"])
+                if key != last_np or (np and np.get("playing") and int(time.time()) % 10 == 0):
+                    last_np = key
+                    self._push({"type": "np", "data": np or {}})
+            time.sleep(2)
+
     def remove(self, ref):
         ref = str(ref or "").strip().lower().lstrip("#")
         with self.lock:
@@ -239,7 +420,14 @@ class GlassHub:
         closed = [int(x) for x in (data.get("closed") or []) if str(x).isdigit()]
         with self.lock:
             for k in closed:
-                self.cards.pop(k, None)
+                c = self.cards.pop(k, None)
+                if c is not None and c["kind"] != "approval":
+                    self.trash.append(c)
+                    if c["kind"] == "sticky":          # thrown away: the note's done
+                        import glass_kinds
+                        st = glass_kinds.load()
+                        st["notes"] = [n for n in st.get("notes", []) if n.get("text") != c["data"].get("text")]
+                        glass_kinds.save(st)
             cards = []
             for c in (data.get("cards") or [])[:MAX_CARDS * 2]:
                 try:
@@ -251,7 +439,7 @@ class GlassHub:
                                   "big": bool(c.get("big"))})
                     self.cards[cid]["stage"] = bool(c.get("stage"))
             self.board = {"cards": cards, "at": time.time(), "hands": int(data.get("hands") or 0),
-                          "mode": str(data.get("mode") or "")[:20]}
+                          "mode": str(data.get("mode") or "")[:20], "pointing": data.get("pointing")}
 
     def board_text(self):
         with self.lock:
@@ -262,17 +450,89 @@ class GlassHub:
             for cid, c in self.cards.items():
                 b = info.get(cid, {})
                 tags = [t for t, on in (("centre stage", c.get("stage")), ("the user is holding it", b.get("held")),
-                                        ("made bigger", b.get("big"))) if on]
-                what = c["title"] or (c["items"][0] if c["items"] else c["body"][:60]) or "a picture"
+                                        ("made bigger", b.get("big")), ("the user is pointing at it", self.board.get("pointing") == cid),
+                                        ("pinned", c.get("pinned"))) if on]
+                what = c["title"] or (c["items"][0] if c["items"] else c["body"][:60]) or (c.get("data") or {}).get("text", "")[:60] or "a picture"
                 lines.append(f"#{cid} {c['kind']}: {what}" + (f" ({', '.join(tags)})" if tags else ""))
             head = "On the glass:" if self.connected() else "On the glass (the window isn't open right now):"
             return head + "\n" + "\n".join(lines)
 
     def bye(self):
         self._push({"type": "bye"})
+        self._off_desktop()
 
-    # ------------------------------------------------------------------ the window
+    def game_card(self, name):
+        """Game mode noticed a game: put its card (notes + quick timers) up, unless it's already there."""
+        with self.lock:
+            for c in self.cards.values():
+                if c["kind"] == "game" and (c["data"] or {}).get("name", "").lower() == name.lower():
+                    return c
+        card, err = self.put_kind("game", name, {}, stage=False)
+        return card
+
+    def game_update(self, name, data):
+        """Notes or timers changed: refresh any card for that game."""
+        with self.lock:
+            ids = [c["id"] for c in self.cards.values() if c["kind"] == "game" and (c["data"] or {}).get("name", "").lower() == name.lower()]
+            for i in ids:
+                self.cards[i]["data"] = data
+        for i in ids:
+            self._push({"type": "update", "id": i, "data": data})
+
+    def game_timer(self, label):
+        """Start one of the game card's quick timers by voice."""
+        self._push({"type": "game_timer", "label": label})
+
+    def calibrate(self):
+        """Start 'line up my hand' (handy on the desktop, where there's no keyboard or mouse to start it)."""
+        self._push({"type": "calibrate"})
+
+    # ------------------------------------------------------------------ where it shows: its own window or the desktop
+    def _desk(self):
+        return getattr(self.core, "desk", None) if self.core is not None else None
+
+    def _off_desktop(self):
+        d = self._desk()
+        if d is not None and getattr(d, "glass_url", None):
+            try:
+                d.glass(None)
+            except Exception as e:
+                self.log(f"[glass] desktop: {e}")
+
+    def on_desktop(self):
+        d = self._desk()
+        return bool(d is not None and getattr(d, "glass_url", None))
+
     def open_window(self):
+        """Open glass mode where Settings says. Returns 'desktop' if it went on the desktop, else True/False."""
+        if config.GLASS_WHERE == "desktop":
+            d = self._desk()
+            try:
+                if d is not None and d.glass(self.url() + "&desk"):
+                    return "desktop"
+            except Exception as e:
+                self.log(f"[glass] couldn't put it on the desktop: {e}")
+            self.log("[glass] the living desktop isn't running, so glass mode opens in its own window")
+        return self._browser()
+
+    def move(self, where):
+        """Settings changed while it's open: move it across (the page that was open says goodbye)."""
+        was_desk, live = self.on_desktop(), self.connected()
+        if not live and not was_desk:
+            return
+        if (where == "desktop") == was_desk:
+            return
+        self._push({"type": "bye"})
+        self._off_desktop()
+        threading.Timer(0.8, self.open_window).start()
+
+    def desk_fallback(self, why=""):
+        """The desktop copy couldn't get the camera: use the normal window instead."""
+        self.log(f"[glass] no camera on the desktop ({why or 'refused'}); opening its own window")
+        self._off_desktop()
+        return self._browser()
+
+    def _browser(self):
         """An app-style window (no tabs or address bar) in Edge or Chrome; the default browser if neither."""
         url = self.url()
         if sys.platform == "win32":
@@ -347,7 +607,10 @@ def _make_handler(hub):
                                    "'unsafe-eval' 'wasm-unsafe-eval' blob: https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net "
                                    "https://storage.googleapis.com; img-src 'self' https: data: blob:; style-src 'self' "
                                    "'unsafe-inline'; font-src 'self'; media-src 'self' blob: mediastream:; worker-src 'self' blob: "
-                                   "https://cdn.jsdelivr.net; frame-ancestors 'none'",
+                                   "https://cdn.jsdelivr.net" +
+                                   # on the desktop it lives inside her wallpaper page (a file:// page, which CSP can't
+                                   # name). Still needs this run's secret key, so no website can frame it.
+                                   ("" if "desk" in parse_qs(u.query, keep_blank_values=True) else "; frame-ancestors 'none'"),
                                    "Permissions-Policy": "camera=(self), microphone=()"})
             if path == "/events":
                 try:
@@ -356,10 +619,21 @@ def _make_handler(hub):
                     since = -1
                 hub.last_seen = time.time()
                 if since < 0:
+                    if getattr(hub, "_pins", None):
+                        hub.restore_pins()                 # pinned cards come back when the page opens
                     return self._send(200, {"events": [hub.sync()], "seq": hub.seq})
                 evs, seq = hub.events_since(since, wait=15.0)
                 hub.last_seen = time.time()
                 return self._send(200, {"events": evs, "seq": seq})
+            if path == "/ui/juno_sit.png":                  # her picture, for sitting on the card you hold
+                f = hub.ui / "juno_sit.png"
+                return self._send(200, f.read_bytes(), "image/png", {"Cache-Control": "max-age=3600"}) if f.is_file() else self._send(404, {"error": "no"})
+            m = re.fullmatch(r"/file/([\w-]{6,20})", path)
+            if m:
+                p = hub.files.get(m.group(1))
+                if not p or not p.is_file():
+                    return self._send(404, {"error": "gone"})
+                return self._send(200, p.read_bytes(), "model/gltf-binary" if p.suffix.lower() == ".glb" else "model/gltf+json")
             m = re.fullmatch(r"/img/([\w-]{6,20})", path)
             if m:
                 p = hub.images.get(m.group(1))
@@ -392,6 +666,14 @@ def _make_handler(hub):
             if urlparse(self.path).path == "/board":
                 hub.page_report(data if isinstance(data, dict) else {})
                 return self._send(200, {"ok": True})
+            if urlparse(self.path).path == "/action":       # you pinched a control on a card
+                import glass_kinds
+                try:
+                    ok, msg = glass_kinds.act(hub, hub.core, data if isinstance(data, dict) else {})
+                except Exception as e:
+                    ok, msg = False, f"{type(e).__name__}: {e}"
+                    print(f"[glass] action failed: {msg}")
+                return self._send(200, {"ok": ok, "msg": msg})
             return self._send(404, {"error": "not found"})
 
         def do_OPTIONS(self):                              # no cross-site access, ever

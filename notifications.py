@@ -78,6 +78,8 @@ class DiscordWatcher:
     """Polls the notification store every few seconds. on_message(msg) for each new Discord message.
     msg = {"id", "time", "sender", "channel", "text"}."""
 
+    apps = APPS
+
     def __init__(self, on_message=None, poll=3.0, log=print):
         self.on_message = on_message or (lambda m: None)
         self.poll = poll
@@ -123,15 +125,19 @@ class DiscordWatcher:
                 shutil.rmtree(tmp, ignore_errors=True)
         out = []
         for nid, arrival, payload, app in rows:
-            if not any(a in str(app or "").lower() for a in APPS):
+            if not any(a in str(app or "").lower() for a in self.apps):
                 continue
             title, body = parse_payload(payload)
             if not title:
                 continue
-            sender, channel = split_sender(title)
+            sender, channel = self.split(title)
             out.append({"id": int(nid), "time": _filetime(arrival), "sender": sender, "channel": channel, "text": body or ""})
         max_id = max([int(r[0]) for r in rows], default=after_id or 0)
         return out, max_id
+
+    @staticmethod
+    def split(title):
+        return split_sender(title)
 
     def _changed(self):
         sig = []
@@ -231,3 +237,24 @@ def as_text(msgs):
         when = time.strftime("%a %H:%M", time.localtime(m["time"]))
         lines.append(f"[{when}] {m['sender']}{' (#' + m['channel'] + ')' if m['channel'] else ''}: {m['text']}")
     return "Discord messages (from Windows notifications; only what popped up for the user):\n" + "\n".join(lines)
+
+
+class PhoneWatcher(DiscordWatcher):
+    """Your phone's notifications, through Windows' Phone Link app (it mirrors them into Windows notifications,
+    which land in the same store). Set up Phone Link once (Start > Phone Link, pair the phone, turn on
+    notifications) and texts, WhatsApp, calls and so on show up here. Nothing is sent to the phone."""
+    apps = ("microsoft.yourphone", "phonelink", "microsoft.phoneexperience")
+
+    @staticmethod
+    def split(title):
+        return (title or "Your phone").strip(), None
+
+
+def phone_summary(msgs, max_items=4):
+    if not msgs:
+        return "Nothing new from your phone."
+    n = len(msgs)
+    head = f"{n} phone notification{'s' if n != 1 else ''}"
+    parts = [f"{m['sender']}: {speakable(m['text'], 16)}" for m in msgs[:max_items]]
+    more = f" And {n - max_items} more." if n > max_items else ""
+    return head + ". " + " ".join(p if p.endswith((".", "!", "?", "...")) else p + "." for p in parts) + more

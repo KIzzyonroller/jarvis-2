@@ -1,0 +1,19 @@
+# systemd unit: keeps the bot running and restarts it if it crashes or the server reboots.
+# Copy to /etc/systemd/system/juno-bot.service, change User and the paths, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now juno-bot
+#   journalctl -u juno-bot -f        (watch it)
+[Unit]
+Description=Juno Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=juno
+WorkingDirectory=/home/juno/jarvis-2
+ExecStart=/home/juno/jarvis-2/.venv/bin/python server/run_bot.py
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

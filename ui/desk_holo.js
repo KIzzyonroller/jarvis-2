@@ -206,6 +206,25 @@ function briefingPanels(e) {
 }
 
 
+
+// Check-ins (evening wrap-up, rain heads-up, break reminders...): a few cards, same look as the briefing.
+function cardPanels(e) {
+  if (!holo.on) return;
+  const wxHtml = (w) => `<div class="wx"><svg viewBox="0 0 48 48">${WXI(w.code)}</svg><div class="t">${esc(w.high ?? w.now)}<span class="u">${esc(w.unit)}</span></div>
+    <div class="l">${esc(w.label || "")}</div>
+    <div class="r">${w.low != null ? `<span>Low <b>${esc(w.low)}°</b></span>` : ""}${w.rain >= 20 ? `<span>Precip <b>${esc(w.rain)}%</b></span>` : ""}</div></div>`;
+  for (const c of e.cards || []) {
+    const P = holoAdd("generic", "briefing", {}); if (!P) continue;
+    P.el.querySelector(".hh").childNodes[1].textContent = c.title || "";
+    let html = "";
+    if (c.weather) html = wxHtml(c.weather);
+    else if (c.list) html = c.list.length ? `<ul class="hl">${c.list.slice(0, 6).map((r, i) => `<li style="animation-delay:${i * .08}s"><b>${esc(r.time || "")}</b>${esc(r.text)}</li>`).join("")}</ul>`
+                                          : `<div class="sub" style="white-space:normal">${esc(c.empty || "Nothing.")}</div>`;
+    else html = `${c.big ? `<div class="big">${esc(c.big)}</div>` : ""}${c.text ? `<div class="sub" style="white-space:normal">${esc(c.text)}</div>` : ""}`;
+    P.el.querySelector(".bd").innerHTML = html;
+    holoDone(P, true, e.linger || 14000); P.el.querySelector(".hh span").textContent = "";
+  }
+}
 const turnText = {};
 function on(e) {
   switch (e.type) {
@@ -221,6 +240,7 @@ function on(e) {
     case "telemetry": holo.tele = e; break;
     case "instant": holoInstant(e); break;
     case "briefing": briefingPanels(e); break;
+    case "cards": cardPanels(e); break;
     case "discord": { const P = holoAdd("discord", "discord", e); if (P) holoDone(P, true, 9000); break; }
     case "holo_on": holo.on = !!e.on; break;
   }

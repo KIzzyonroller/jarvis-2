@@ -7,6 +7,7 @@ Only exact, simple phrasings match. Anything longer or combined ("open Spotify
 and play something chill") goes to Claude as usual, so nothing gets misread
 as a shortcut. If a shortcut fails (an app it can't find), Claude gets it.
 """
+import random
 import re
 import threading
 from datetime import datetime
@@ -298,6 +299,47 @@ def _apple_music(m):
     return None
 
 
+def _lights_ready():
+    try:
+        import smarthome
+        av = smarthome.available()
+        return av["hue"] or av["ha"]
+    except Exception:
+        return False
+
+
+def _lights(action, target_group=None, value_group=None, color_group=None):
+    def go(m):
+        if not _lights_ready():
+            return None                                   # not set up: Claude explains how
+        if _DRY.on:
+            return HIT
+        import smarthome
+        target = (m.group(target_group) if target_group and m.group(target_group) else "all").strip()
+        act = action
+        if action == "onoff":
+            act = m.group(value_group)
+        value = _n(m.group(value_group)) if action == "brightness" else None
+        color = m.group(color_group) if color_group else None
+        res = smarthome.control(act, target, value, color)
+        if res.startswith(("Couldn't", "No light", "I don't know")):
+            return None                                   # let Claude sort it out
+        return random.choice(["Done.", "There you go.", "Okay."]), res
+    return go
+
+
+def _goodnight(m):
+    core = getattr(tools, "_VOICE_CORE", None)
+    if core is None:
+        return None
+    if _DRY.on:
+        return HIT
+    line = core.goodnight()
+    return line, "Goodnight"
+
+
+COLORS = r"(red|orange|yellow|green|teal|cyan|blue|purple|violet|pink|magenta|white|warm white|cool white|warm|cool|juno|jarvis|ultron)"
+
 NUMWORD = r"(\d+(?:\.\d+)?|" + "|".join(sorted(WORDNUM, key=len, reverse=True)) + r")"
 RULES = [
     (r"^(?:play|put on|pull up|show me|watch|find and play) (.+?) on youtube$", _youtube),
@@ -333,6 +375,14 @@ RULES = [
     (r"^(?:turn on |enable |switch to |go |use )?(dark|light) mode(?: on)?$|^turn (?:off|on) (dark|light) mode$|^(?:disable) (dark|light) mode$", _mode),
     (rf"^(?:set |start )?(?:a |an )?timer (?:for )?{NUMWORD} ?(seconds?|secs?|minutes?|mins?|hours?|hrs?)$", _timer),
     (rf"^(?:set |start )?(?:a |an )?{NUMWORD}[ -](second|sec|minute|min|hour)s? timer$", _timer),
+    # smart lights (only when Hue / Home Assistant is connected; otherwise Claude answers)
+    (r"^(?:turn |switch |put )?(?:the |all (?:the )?)?lights? (on|off)$", _lights("onoff", None, 1)),
+    (r"^lights (on|off)$", _lights("onoff", None, 1)),
+    (r"^(?:turn |switch )(on|off) (?:the |all (?:the )?)?lights?$", _lights("onoff", None, 1)),
+    (r"^(?:turn |switch )?(?:the )?([a-z ]{3,24}?) lights? (on|off)$", _lights("onoff", 1, 2)),
+    (rf"^(?:set |dim |turn |put )?(?:the )?lights? (?:to |at |down to |up to )?{NUM}(?: ?%| percent)?$", _lights("brightness", None, 1)),
+    (rf"^(?:make|turn|set|change) (?:the )?lights? (?:to )?{COLORS}$", _lights("color", None, None, 1)),
+    (r"^(?:good ?night|night night|goodnight juno|i'?m going to (?:bed|sleep)|going to bed)$", _goodnight),
 ]
 RULES = [(re.compile(p), f) for p, f in RULES]
 

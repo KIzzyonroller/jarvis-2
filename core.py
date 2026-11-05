@@ -305,8 +305,8 @@ class Core:
         self.events = queue.Queue()
         self.brains = {}
         st = self._load_state()
-        self.persona_key = st.get("persona", personas.DEFAULT)
-        self.duo = False                        # there's only Juno now: no "both of you" mode
+        self.persona_key = personas.DEFAULT      # always start as Juno (switch to Jarvis or Ultron any time)
+        self.duo = False                        # "both of you" (Jarvis and Ultron taking turns): off at every start
         self._duo_once = None             # lead key for a one-off duo turn ("Jarvis and Ultron?" then the question)
         self._duo_capture = None          # tool results from the lead, handed to the second
         if self.persona_key not in personas.PERSONAS:     # e.g. left on Jarvis or Ultron, who are retired
@@ -361,6 +361,7 @@ class Core:
         tools.set_self_window_handler(lambda show: self.on_restore() if show else self.on_minimize())
         tools.set_face_handler(lambda name: self.emit({"type": "face", "name": name}))
         self.glass = None
+        self.desk = None                 # the living desktop (jarvis.py sets it), for glass mode on the wallpaper
         self._glass_lock = threading.Lock()
         tools.set_glass(self.glass_hub)
 
@@ -425,6 +426,15 @@ class Core:
             self.proactive = proactive.Proactive(self).start()
         except Exception as e:
             print(f"[chat first] off: {e}")
+        try:
+            import moments
+            moments.start(self)                  # evening wrap-up, rain heads-up, break reminders
+            import gamemode
+            gamemode.start(self)                 # notices games: quiet while you play, "how'd it go" after
+            import steam
+            steam.start(self)                    # wishlist sales + patch notes for games you play (slow, background)
+        except Exception as e:
+            print(f"[check-ins] off: {e}")
 
     def shutdown(self):
         if getattr(self, "_shut", False):
@@ -450,6 +460,14 @@ class Core:
             pass
         if getattr(self, "proactive", None) is not None:
             self.proactive.stop()
+        try:
+            import moments
+            moments.stop()
+            import gamemode
+            if gamemode.WATCH is not None:
+                gamemode.WATCH.stop()
+        except Exception:
+            pass
         for part in (getattr(self, "watchers", None), getattr(self, "activity", None)):
             if part is not None:
                 try:
@@ -545,7 +563,7 @@ class Core:
                 self.listener.expecting = lambda: (self._hold is not None or self._turn is not None
                                                    or self._engaged() or self._pending is not None)
                 self.listener.start()
-                self._log('ALWAYS LISTENING  [SAY "JUNO"]')
+                self._log('ALWAYS LISTENING  [SAY "JUNO", "JARVIS" OR "ULTRON"]')
                 self._start_hotkey()
             except Exception as e:
                 self.listener = None
@@ -562,6 +580,7 @@ class Core:
         part = "morning" if 4 <= h < 12 else "afternoon" if 12 <= h < 18 else "evening"
         self._emit_autostart()
         self._start_discord()
+        self._start_phonelink()
         self._start_discord_bot()
         self._start_email()
         self._start_netflix()
@@ -633,6 +652,7 @@ class Core:
         if s == "speaking":
             if self._turn:
                 self._turn["spoke"] = True
+                self._turn.setdefault("audio_at", time.time())
             if self.state != "awaiting":
                 self.set_state("speaking")
         elif s == "waiting" and self._turn:
@@ -1117,6 +1137,20 @@ class Core:
         if kind == "chat_first":                       # proactive.py: she starts a conversation
             self._chat_first(payload)
             return
+        if kind == "song_chat":                        # proactive.py: she says something about the song
+            self._song_chat(payload)
+            return
+        if kind == "journal":                          # moments.py: tonight's journal question
+            self._journal_ask()
+            return
+        if kind == "moment":                           # moments.py: a check-in (break, rain...)
+            if self.state == "idle" and self._turn is None:
+                self.emit({"type": "cards", "cards": payload.get("cards", [])})
+                self.say_line(payload["line"])
+            return
+        if kind == "evening":                          # moments.py: the evening wrap-up
+            self._evening_wrap()
+            return
         if kind == "say":
             self.emit({"type": "msg", "role": "jarvis", "text": payload})
             self.speak(payload)
@@ -1129,6 +1163,9 @@ class Core:
             return
         if kind == "discord":
             self._announce_discord(payload)
+            return
+        if kind == "phone_note":
+            self._announce_phone()
             return
         if kind == "job_done":
             self._announce_job(payload)
@@ -1194,6 +1231,14 @@ class Core:
             if announce:
                 self._wake()
             return
+        old_key, old_voice = self.persona_key, dict(self.speaker.persona)
+        quip = personas.banter(old_key, key) if announce and config.BANTER and random.random() < 0.4 else None
+        if quip and not tools.in_game():                 # the one leaving gets a word in, in their own voice
+            try:
+                self.emit({"type": "msg", "role": "jarvis", "text": f"{personas.PERSONAS[old_key]['name']}: {quip}"})
+                self.speaker.play(self.speaker.synth(quip, old_voice))
+            except Exception as e:
+                print(f"[banter] {e}")
         self.persona_key = key
         self.speaker.set_persona(self.persona)
         self._save_state()
@@ -1835,8 +1880,7 @@ class Core:
         hub = self.glass_hub()
         if hub is None:
             return "Glass mode couldn't start."
-        hub.open_window()
-        return "Opening glass mode."
+        return "Opening glass mode on your desktop." if hub.open_window() == "desktop" else "Opening glass mode."
 
     def watch_remove(self, wid):
         ws = getattr(self, "watchers", None)
@@ -1954,6 +1998,50 @@ class Core:
                 self._log("DISCORD MESSAGES  [WINDOWS NOTIFICATIONS]")
         except Exception as e:
             print(f"[discord] not available: {e}")
+
+    # ================================================================ phone notifications (Phone Link)
+    def _start_phonelink(self):
+        self.phonelink = None
+        if not config.PHONE_NOTIFS:
+            return
+        try:
+            w = notifications.PhoneWatcher(on_message=self._on_phone, log=print)
+            if w.start():
+                self.phonelink = w
+                self._log("PHONE NOTIFICATIONS  [PHONE LINK]")
+        except Exception as e:
+            print(f"[phone] not available: {e}")
+
+    def _on_phone(self, m):
+        if not config.PHONE_NOTIFS:
+            return
+        self.emit({"type": "phone_note", "from": m["sender"], "text": m["text"]})
+        if self.history is not None:
+            self.history.add(f"Phone, {m['sender']}", m["text"], ts=m["time"])
+        if not config.PHONE_SPEAK or self._dictation:
+            return
+        with self._plock:
+            q = self._phone_q = getattr(self, "_phone_q", []) + [m]
+            first = len(q) == 1
+        if first:
+            threading.Timer(1.5, lambda: self.events.put(("phone_note", None))).start()
+
+    def _announce_phone(self):
+        for _ in range(20):
+            if not self._user_talking and self._pending is None and self.state in ("idle", "listening"):
+                break
+            time.sleep(0.5)
+        with self._plock:
+            q, self._phone_q = getattr(self, "_phone_q", []), []
+        import gamemode
+        if gamemode.playing():
+            q = [m for m in q if gamemode.allow_discord(m["sender"])]
+        if not q or self.muted:
+            return
+        line = notifications.phone_summary(q) if len(q) > 1 else f"{q[0]['sender']}: {notifications.speakable(q[0]['text'])}"
+        self.emit({"type": "caption", "text": line})
+        self.emit({"type": "msg", "role": "system", "text": "Phone: " + line})
+        self.speak(line)
 
     def _has_key(self):
         k = config.ANTHROPIC_API_KEY or ""
@@ -2115,6 +2203,59 @@ class Core:
     def emit_settings(self):
         self.emit({"type": "settings", "fields": settings.view(), "voices": self._voice_view()})
 
+    def apply_live(self, keys):
+        """Settings that change without a restart: tell the parts that care."""
+        if "JARVIS_MINI" in keys and getattr(self, "on_mini", None):
+            self.on_mini(config.MINI_HUD)
+        if "JUNO_FPS" in keys:
+            self.emit({"type": "fps", "fps": config.ANIM_FPS})
+        if "JUNO_PHONE_NOTIFS" in keys and config.PHONE_NOTIFS and getattr(self, "phonelink", None) is None:
+            self._start_phonelink()
+        if config.WIDGET_KEYS & set(keys):
+            import deskwidgets
+            if deskwidgets.WIDGETS is not None:
+                deskwidgets.WIDGETS.refresh()
+        if "JUNO_GLASS_WHERE" in keys and getattr(self, "glass", None) is not None:
+            self.glass.move(config.GLASS_WHERE)
+        voice_keys = {"JUNO_VOICE": "juno", "JARVIS_VOICE": "jarvis", "ULTRON_VOICE": "ultron"}
+        for k in set(keys) & set(voice_keys):            # a new voice for one of them, straight away
+            v = os.environ.get(k, "").strip()
+            if v:
+                personas.PERSONAS[voice_keys[k]]["voice"] = v
+                self._wake_audio.pop(voice_keys[k], None)
+        if set(keys) & set(voice_keys):
+            self.speaker.set_persona(self.persona)
+        if "JUNO_OPINIONS" in keys:
+            for b in {id(x): x for x in [self.brain] + list((getattr(self, "brains", None) or {}).values()) if x}.values():
+                try:
+                    b.persona = personas.system_prompt(getattr(b, "persona_key", self.persona_key), config.ADDRESS_AS)
+                except Exception:
+                    pass
+
+    def set_widgets(self, changes):
+        """Voice: desktop widgets on/off, which ones, where. changes = {setting key: value}."""
+        settings.save(changes)
+        for k, v in changes.items():
+            os.environ[k] = v
+        config.reload_live()
+        self.apply_live(list(changes))
+
+    def set_glass_where(self, where):
+        """Voice or Settings: glass mode in its own window, or on the desktop."""
+        where = "desktop" if str(where).lower().startswith("desk") else "window"
+        settings.save({"JUNO_GLASS_WHERE": where})
+        os.environ["JUNO_GLASS_WHERE"] = where
+        config.reload_live()
+        self.apply_live(["JUNO_GLASS_WHERE"])
+        return where
+
+    def set_corner_widget(self, on):
+        """Voice or Settings: the small corner widget that shows while her window is minimized."""
+        settings.save({"JARVIS_MINI": "true" if on else "false"})
+        os.environ["JARVIS_MINI"] = "true" if on else "false"
+        config.reload_live()
+        self.apply_live(["JARVIS_MINI"])
+
     def save_settings(self, changes=None, clear=None):
         """From the Settings panel. Secrets arrive here once and are never sent back to the screen."""
         ok, errors = settings.save(changes or {}, clear or [])
@@ -2122,6 +2263,14 @@ class Core:
             self.emit({"type": "settings_result", "ok": False, "errors": errors})
             return
         changed = [k for k, v in (changes or {}).items() if str(v or "").strip()] + list(clear or [])
+        if changed and all(k in config.LIVE_KEYS for k in changed):      # these apply straight away
+            for k in changed:
+                os.environ[k] = str((changes or {}).get(k, "") or "")
+            config.reload_live()
+            self.apply_live(changed)
+            self.emit({"type": "settings_result", "ok": True, "restart": False})
+            print(f"[settings] saved {', '.join(sorted(changed))}; applied live")
+            return
         self.emit({"type": "settings_result", "ok": True, "restart": bool(changed)})
         if changed:                                    # anything saved: restart so all of him picks it up
             print(f"[settings] saved {', '.join(sorted(changed))}; restarting")
@@ -2186,6 +2335,10 @@ class Core:
         import discord_bot
         self.discord_bot = None
         if self.brain is None or not config.DISCORD_BOT_TOKEN:
+            self._emit_discord_bot()
+            return
+        if config.DISCORD_BOT_ON_SERVER:                 # server/run_bot.py runs it 24/7; two copies would double-reply
+            print("[discord bot] runs on your server; not starting a second copy here")
             self._emit_discord_bot()
             return
         b = discord_bot.DiscordBot(make_brain=lambda p: Brain(p), persona_key=lambda: self.persona_key,
@@ -2260,6 +2413,11 @@ class Core:
             q, self._discord_q = getattr(self, "_discord_q", []), []
         if not q or self._dictation or not self._discord_reading():
             return
+        import gamemode
+        if gamemode.playing():                   # mid-game: only the people you picked get read out
+            q = [m for m in q if gamemode.allow_discord(m["sender"])]
+            if not q:
+                return
         if len(q) == 1:
             m = q[0]
             who = m["sender"] + (f" in {m['channel']}" if m["channel"] else "")
@@ -2343,9 +2501,174 @@ class Core:
         self.say_line(text)
         self._engage(config.FOLLOW_UP_TIMEOUT + 10)     # answer without saying her name
 
+    def _evening_wrap(self):
+        import moments
+        if self.state != "idle" or self._turn is not None:
+            return
+        self.set_state("thinking")
+        try:
+            cards, facts = moments.evening(self)
+            self.emit({"type": "cards", "cards": cards, "linger": 20000})
+            line = moments.evening_line(self, facts)
+        except Exception as e:
+            print(f"[check-ins] evening wrap-up failed: {e}")
+            self.set_state("idle")
+            return
+        print(f"[check-ins] evening wrap-up: {line}")
+        self.say_line(line)
+        self._engage(config.FOLLOW_UP_TIMEOUT + 6)
+
+    def _song_chat(self, info):
+        import proactive
+        if self.state != "idle" or self._turn is not None:
+            return
+        got = proactive.song_line(self, info)
+        if not got or self.state != "idle" or self._turn is not None:
+            return
+        text, ask = got
+        print(f"[song chat] {info.get('title')} by {info.get('artist')}: {text}")
+        b = self.brain
+        if b is not None and isinstance(getattr(b, "history", None), list) and (not b.history or b.history[-1]["role"] == "assistant"):
+            b.history.append({"role": "user", "content": ask})
+            b.history.append({"role": "assistant", "content": [{"type": "text", "text": text}]})
+        self.say_line(text)
+        self._engage(config.FOLLOW_UP_TIMEOUT + 6)
+
     def say_line(self, line):
         self.emit({"type": "msg", "role": "jarvis", "text": line})
         self.speak(line)
+
+    # ================================================================ reactions (small Juno on the music player / glass)
+    REACT_RULES = [
+        ("cheer", re.compile(r"\b(i|we) (won|did it|got it|passed|beat it|escaped)\b|\bgg\b|\blet'?s go+\b|\bclutch(ed)?\b|\bvictory\b|\bfinally (done|finished)\b", re.I)),
+        ("heart", re.compile(r"\b(thank(s| you)|ty|love you|you'?re (the best|amazing|awesome)|good (girl|job)|nice work|i appreciate)\b", re.I)),
+        ("pout", re.compile(r"\b(shut up|stupid|you suck|useless|hate you|go away|dumb)\b", re.I)),
+        ("sleepy", re.compile(r"\b(i'?m (so )?(tired|sleepy|exhausted)|going to (bed|sleep)|good ?night)\b", re.I)),
+    ]
+
+    def react(self, kind):
+        """Show a reaction on the small Juno (music player, glass). Harmless if nothing's showing."""
+        if config.REACTIONS and kind:
+            self.emit({"type": "react", "kind": kind})
+
+    def _reaction_for(self, text, source):
+        for kind, rx in self.REACT_RULES:
+            if rx.search(text or ""):
+                return kind
+        return "perk" if source == "voice" else None
+
+    # ================================================================ journal
+    def _journal_ask(self):
+        import journal
+        if self.state != "idle" or self._turn is not None or journal.written_today():
+            return
+        q = journal.question(self)
+        ask = (f"[Journal time. You're asking today's journal question on your own: \"{q}\". When they answer, save "
+               f"it with the journal tool (action add, question = that question, text = their answer in their own "
+               f"words, first person, lightly cleaned up, nothing added), then reply in a sentence or two, warm and in "
+               f"character. If they say skip, not tonight, or ignore it, don't save anything.]")
+        b = self.brain
+        if b is not None and isinstance(getattr(b, "history", None), list) and (not b.history or b.history[-1]["role"] == "assistant"):
+            b.history.append({"role": "user", "content": ask})
+            b.history.append({"role": "assistant", "content": [{"type": "text", "text": q}]})
+        self.emit({"type": "cards", "cards": [{"title": "Journal", "text": q}]})
+        self.say_line(random.choice(["Journal time. ", "Quick one for your journal. ", "Before the day ends: "]) + q)
+        self._engage(config.FOLLOW_UP_TIMEOUT + 15)
+
+    # ================================================================ goodnight
+    def goodnight(self, pc=None, lights=None):
+        """'Goodnight': tomorrow's first thing, music paused, lights down, then the PC sleeps (or locks) unless it's
+        busy (a render, download or game still going). Saying anything in the next 30 seconds cancels the sleep."""
+        import moments
+        pc = (pc or config.GOODNIGHT_PC or "sleep").lower()
+        lights = (lights or config.GOODNIGHT_LIGHTS or "off").lower()
+        done, said = [], []
+        # tomorrow
+        try:
+            items = moments.tomorrow_items(self)
+            if items:
+                said.append(f"First thing tomorrow: {items[0]['text']} at {items[0]['time']}.")
+        except Exception:
+            pass
+        try:
+            w = moments.tomorrow_weather(self)
+            if w:
+                said.append(f"Tomorrow's {w['label']}, high of {w['high']}{w['unit'][-1]}" + (", bring a jacket for the rain." if w["rain"] >= 50 else "."))
+        except Exception:
+            pass
+        # music
+        try:
+            m = getattr(self, "music", None)
+            if m is not None and (m.track or {}).get("playing"):
+                m.cmds.put(("toggle",))
+                done.append("music paused")
+        except Exception:
+            pass
+        # lights
+        if lights in ("off", "dim"):
+            try:
+                import smarthome
+                av = smarthome.available()
+                if av["hue"] or av["ha"]:
+                    r = smarthome.control("off" if lights == "off" else "brightness", "all", value=10)
+                    if not r.startswith("Couldn't"):
+                        done.append("lights " + ("off" if lights == "off" else "down"))
+            except Exception as e:
+                print(f"[goodnight] lights: {e}")
+        # the PC
+        busy = self._busy_reason()
+        if pc in ("sleep", "lock"):
+            if pc == "sleep" and busy:
+                said.append(f"I won't put the PC to sleep, {busy}. I'll just lock it.")
+                pc = "lock"
+            self._night_cancel()
+            self._night_timer = threading.Timer(30, self._night_finish, args=(pc,))
+            self._night_timer.daemon = True
+            self._night_timer.start()
+            said.append(("Sleeping" if pc == "sleep" else "Locking") + " the PC in 30 seconds. Say anything to stop me.")
+        self.react("sleepy")
+        lead = random.choice(["Goodnight.", "Night night.", "Sleep well.", "Goodnight. Don't stay up on your phone."])
+        return " ".join([lead] + said) + (f" ({', '.join(done)})" if done else "")
+
+    def _busy_reason(self):
+        """Why the PC shouldn't sleep right now, or ''."""
+        try:
+            import psutil
+            import gamemode
+            if gamemode.playing():
+                return f"{gamemode.playing()} is still running"
+            names = {p.info["name"].lower() for p in psutil.process_iter(["name"]) if p.info.get("name")}
+            for exe, what in (("blender.exe", "Blender is open"), ("unrealeditor.exe", "Unreal is open"),
+                              ("handbrake.exe", "HandBrake is encoding"), ("obs64.exe", "OBS is open")):
+                if exe in names:
+                    if exe == "blender.exe" and psutil.cpu_percent(interval=1.0) < 30:
+                        continue
+                    return what
+            n1 = psutil.net_io_counters().bytes_recv
+            time.sleep(1.0)
+            if psutil.net_io_counters().bytes_recv - n1 > 2_000_000:
+                return "something's still downloading"
+            if psutil.cpu_percent(interval=0.5) > 60:
+                return "something's working hard (CPU is busy)"
+        except Exception:
+            pass
+        return ""
+
+    def _night_cancel(self):
+        t = getattr(self, "_night_timer", None)
+        if t is not None:
+            t.cancel()
+            self._night_timer = None
+            return True
+        return False
+
+    def _night_finish(self, pc):
+        self._night_timer = None
+        print(f"[goodnight] {pc}")
+        try:
+            tools.system_power(pc)
+        except Exception as e:
+            print(f"[goodnight] {e}")
 
     # ================================================================ both at once
     def _duo_turn(self, text, source, ended, lead=None):
@@ -2607,10 +2930,11 @@ class Core:
             print(f"[tts] pre-recording phrases failed: {e}")
 
     def _log_timing(self, what):
-        """One line per request in the console: where the time went between you stopping and him starting."""
+        """One line per request in the console: where the time went between you stopping and him starting.
+        Returns (speech_end, seconds) for speedlog, or None."""
         t = getattr(self, "_timing", None)
         if not t or time.time() - t.get("speech_end", 0) > 30:
-            return
+            return None
         self._timing = None
         total = time.time() - t["speech_end"]
         parts = [("noticing you'd stopped (" + t.get("how", "") + ")", t.get("endpoint", 0)),
@@ -2625,6 +2949,81 @@ class Core:
         if total > 3:
             biggest = max(parts, key=lambda p: p[1])
             print(f"[timing] slowest part: {biggest[0]}")
+        return t["speech_end"], total
+
+    # ================================================================ her mood, and how your games are going
+    LOSS_RE = re.compile(r"\b(i|we) lost\b(?!\s+(my|your|his|her|our|a|an|track|it all)\b)|\b(i|we) (died|got (tunneled|tunnelled|camped|sacrificed|killed|hooked|wrecked|destroyed|"
+                         r"stomped))\b|\blost (again|another)\b|\banother loss\b|\bthat was (a )?(loss|rough)\b", re.I)
+    WIN_RE = re.compile(r"\b(i|we) (won|escaped|got out|4k'?d|four[- ]k'?d)\b|\bgg\b.*\b(win|won)\b|\bvictory\b", re.I)
+
+    def _game_result(self, text):
+        import gamemode
+        w = gamemode.WATCH
+        if w is None or not (gamemode.playing() or (w.last_session and time.time() - w.last_session["ended"] < 900)):
+            return
+        if self.WIN_RE.search(text):
+            w.result("win")
+        elif self.LOSS_RE.search(text):
+            w.result("loss")
+
+    def _mood_note(self):
+        """A light steer for her tone right now (never announced): the hour, how long you've been gone, your game."""
+        if not config.MOODS:
+            return ""
+        import gamemode
+        bits = []
+        streak = gamemode.WATCH.loss_streak() if gamemode.WATCH else 0
+        if streak >= 3 and not getattr(self, "_streak_said", 0) == streak:
+            self._streak_said = streak
+            bits.append(f"they've lost {streak} games in a row in {gamemode.playing() or 'their game'}: be on their side, "
+                        "and if it fits, suggest a short break or a different game, once, kindly, without lecturing")
+        elif streak >= 3:
+            bits.append("they're on a losing streak: be supportive, don't bring up a break again")
+        h = datetime.now().hour
+        if 1 <= h < 5:
+            bits.append("it's the middle of the night: you're a bit sleepy and soft, and you might tease them about being up")
+        elif 5 <= h < 9:
+            bits.append("it's early: gentle morning energy")
+        away = time.time() - getattr(self, "_last_turn_at", time.time())
+        self._last_turn_at = time.time()
+        if away > 4 * 3600:
+            bits.append("they've been gone for hours: you're glad they're back")
+        vibe = getattr(self, "_vibe", None)
+        if vibe and time.time() - vibe[1] < 600:
+            bits.append("they were sweet to you a moment ago: you're in a good mood" if vibe[0] == "heart"
+                        else "they were rude a moment ago: be a little sulky for a reply or two, then let it go")
+        g = gamemode.playing()
+        if g and gamemode.WATCH and gamemode.WATCH.current and time.time() - gamemode.WATCH.current["since"] > 3 * 3600:
+            bits.append(f"they've been playing {g} for over three hours")
+        if not bits:
+            return ""
+        return "[Your mood right now (let it color your tone lightly; never announce it): " + "; ".join(bits) + ".]"
+
+    def _speed(self, turn, brain, source, quick, t0, heard, reply):
+        """One line in speed.jsonl for this answer (speedlog.py)."""
+        if source not in ("voice", "typed") or reply is None:
+            return
+        import speedlog
+        tr = getattr(brain, "trace", None) or {"rounds": [], "tools": [], "tools_s": 0.0}
+        rs = tr["rounds"]
+        start = heard[0] if heard else t0
+        audio = turn.get("audio_at")
+        first = rs[0] if rs else {}
+        rec = {
+            "source": source, "quick": bool(quick), "model": first.get("model"),
+            "hear": round(heard[1], 2) if heard else None,
+            "prep": round(first["sent"] - t0, 2) if first.get("sent") else None,
+            "claude": round(first["first"] - first["sent"], 2) if first.get("first") else None,
+            "tools": round(tr["tools_s"] + sum((r.get("done", 0) - r["sent"]) for r in rs[1:]), 2) if len(rs) > 1 else 0.0,
+            "voice": round(audio - turn["text_at"], 2) if audio and turn.get("text_at") and audio >= turn["text_at"] else None,
+            "total": round((audio or time.time()) - start, 2),
+            "spoke": bool(audio), "rounds": len(rs), "tools_used": tr["tools"][:8],
+            "in_tok": sum(r.get("inp", 0) + r.get("cr", 0) + r.get("cw", 0) for r in rs[:1]),
+            "cache_read": first.get("cr", 0), "cache_write": first.get("cw", 0), "out_tok": sum(r.get("out", 0) for r in rs),
+            "cold": first.get("cr", 0) == 0, "words_in": len((turn.get("text_in") or "").split()),
+            "interrupted": bool(turn.get("interrupted")),
+        }
+        speedlog.record(rec)
 
     def _quick(self, text):
         """Short, everyday request? Then the fast model answers it."""
@@ -2641,6 +3040,17 @@ class Core:
         brain = brain or self.brain
         tid = uuid.uuid4().hex[:8]
         t0 = time.time()
+        if source in ("voice", "typed") and self._night_cancel():
+            self.emit({"type": "toast", "text": "Okay, not going to sleep."})
+        if source in ("voice", "typed"):
+            r = self._reaction_for(text, source)
+            self.react(r)
+            if r in ("heart", "pout"):
+                self._vibe = (r, time.time())
+            self._game_result(text)
+            note = self._mood_note()
+            if note:
+                prompt = (prompt or text) + "\n" + note
         detail = bool(DETAIL_HINTS.search(text))
         if max_words == "auto":
             max_words = None if detail else config.MAX_SPOKEN_WORDS
@@ -2657,8 +3067,7 @@ class Core:
         turn = {"id": tid, "stream": stream, "text": "", "cancel": threading.Event(), "spoke": False,
                 "interrupted": False, "source": source, "text_in": text, "utt_end": ended or t0}
         self._turn = turn
-        if source != "duo":
-            self._log_timing("thinking")
+        heard = self._log_timing("thinking") if source != "duo" else None
         self.set_state("thinking")
         self.emit({"type": "turn_start", "id": tid, "who": who or self.persona["name"]})
 
@@ -2684,6 +3093,8 @@ class Core:
         def on_text(delta):
             if turn["cancel"].is_set():
                 return
+            if delta.strip() and "text_at" not in turn:
+                turn["text_at"] = time.time()
             turn["text"] += delta
             if delta.strip():
                 self.emit({"type": "reply_delta", "id": tid, "text": delta})
@@ -2729,6 +3140,10 @@ class Core:
                            "secs": round(time.time() - t0, 1), "interrupted": True})
         finally:
             self._turn = None
+            try:
+                self._speed(turn, brain, source, quick, t0, heard, reply)
+            except Exception as e:
+                print(f"[speed] {e}")
         final = (turn["text"].strip() or reply or "")
         if not turn["interrupted"] and source == "voice" and wait and final.rstrip().endswith("?"):
             self._engage()
@@ -2757,6 +3172,12 @@ class Core:
             "glass": self.glass_open,
             "calendar_mode": lambda: threading.Timer(1.0, self.switch_mode, args=("calendar",)).start() or "Switching to calendar mode...",
             "reset": lambda: (self.brain.reset() if self.brain else None) or "Memory wiped.",
+            # her window's Memory and Routines pages
+            "forget_memory": lambda: tools.forget(str(value)),
+            "edit_memory": lambda: tools.edit_memory(str((value or {}).get("id")), (value or {}).get("text")),
+            "delete_routine": lambda: tools.delete_routine(str(value)),
+            "save_routine": lambda: tools.save_routine((value or {}).get("name", ""), (value or {}).get("steps", "")),
+            "run_routine": lambda: self.submit(str(value)) or f"Running {value}.",
         }
         fn = actions.get(name)
         if not fn:
@@ -2767,6 +3188,9 @@ class Core:
             res = f"{name} failed: {e}"
         if name not in ("volume", "brightness"):
             self.emit({"type": "toast", "text": str(res)})
+        if name in ("forget_memory", "edit_memory", "delete_routine", "save_routine"):
+            self.emit({"type": "memory", "items": tools.memories()[-50:]})
+            self.emit({"type": "routines", "items": [{"name": k, "steps": v["steps"]} for k, v in tools.routines().items()]})
 
     # ================================================================ telemetry
     def _check_alerts(self, bat, mem, disk):
@@ -2792,7 +3216,7 @@ class Core:
 
     def _alert(self, msg, urgent=False):
         """Heads-ups are spoken, except mid-game, where they show quietly (unless it's urgent)."""
-        if config.GAME_MODE and not urgent and tools.fullscreen_app():
+        if config.GAME_MODE and not urgent and tools.in_game():
             self.emit({"type": "alert", "text": msg})
             self.emit({"type": "msg", "role": "system", "text": msg})
             return

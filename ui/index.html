@@ -170,6 +170,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;heigh
 .list li.soon span:last-child{color:var(--alarm)}
 .list li.col{flex-direction:column;gap:0}
 .list .note{color:var(--dim);font-size:12.5px;line-height:1.55}
+.list li.ed{align-items:flex-start}
+.list li.ed .acts,.list li.editing .acts{display:flex;gap:6px;flex:none;opacity:.55;transition:opacity .15s}
+.list li.ed:hover .acts,.list li.ed:focus-within .acts,.list li.editing .acts{opacity:1}
+.list li.col.ed .acts{margin-top:4px}
+.list .ib{font:inherit;font-size:11.5px;color:var(--c);background:transparent;border:1px solid rgba(var(--crgb,127,231,255),.35);padding:2px 8px;cursor:pointer}
+.list .ib:hover,.list .ib:focus-visible{background:rgba(var(--crgb,127,231,255),.15);outline:none}
+.list li.gone{opacity:.3;pointer-events:none}
+.list li.editing{flex-direction:column;gap:6px}
+.list .ef{display:grid;gap:3px;width:100%}
+.list .ef span{font-size:11.5px;color:var(--dim)}
+.list .ef textarea{font:inherit;font-size:13px;color:var(--ink,#fff);background:rgba(0,0,0,.3);border:1px solid rgba(var(--crgb,127,231,255),.35);padding:5px 7px;resize:vertical;width:100%;box-sizing:border-box}
 .list li.day{color:var(--c);font-size:11.5px;margin-top:4px}
 .list li.day:first-child{margin-top:0}
 .list li small{color:var(--dim);font-size:11px;margin-left:4px}
@@ -551,6 +562,9 @@ body.swap #stage{animation:swap .6s steps(6)}
   <button class="ico" id="t-left" aria-label="Show conversation" aria-pressed="true" title="Conversation">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h14M3 8h9M3 12h14M3 16h7"/></svg></button>
   <div class="drag pywebview-drag-region"><span id="wordmark" class="pywebview-drag-region">J.U.N.O.</span></div>
+  <div id="who" role="group" aria-label="Who you're talking to">
+    <button data-ai="juno" aria-pressed="true">Juno</button><button data-ai="jarvis" aria-pressed="false">Jarvis</button><button data-ai="both" aria-pressed="false" title="Jarvis and Ultron, taking turns">Both</button><button data-ai="ultron" aria-pressed="false">Ultron</button>
+  </div>
   <div id="clock"><span id="time">--:--</span><span id="date"></span></div>
   <button class="ico" id="t-studio" aria-label="Studio: Blender and Unreal modes" aria-pressed="false" aria-controls="studio" title="Studio (Blender and Unreal)">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 2.5l6.5 3.75v7.5L10 17.5l-6.5-3.75v-7.5z"/><path d="M3.5 6.25L10 10l6.5-3.75M10 10v7.5"/></svg></button>
@@ -590,7 +604,7 @@ body.swap #stage{animation:swap .6s steps(6)}
       </div>
       <label class="slider"><span>Volume</span><input type="range" id="vol" min="0" max="100" value="50"><output id="vol-out">50</output></label>
       <div class="facepick"><b>Face</b><span>How she looks. Or say “Juno, change your face”.</span><div class="seg" role="radiogroup" aria-label="Her face" id="face-pick"></div></div>
-      <div class="perm" style="padding:2px 0 10px"><b>Living background</b><button class="sw" role="switch" id="bg-sw" aria-checked="true" aria-label="Animated background"></button><span>A slow drift of light behind her.</span></div>
+      <div class="perm" style="padding:2px 0 10px"><b>Living background</b><button class="sw" role="switch" id="bg-sw" aria-checked="true" aria-label="Animated background"></button><span>Drifting light for Juno, equations for Jarvis, something worse for Ultron.</span></div>
       <div class="perm" style="padding:2px 0 10px"><b>Holographic panels</b><button class="sw" role="switch" id="holo-sw" aria-checked="true" aria-label="Show holographic panels while she works"></button><span>Pop-up visuals beside her while she works.</span></div>
       <div class="perm" style="padding:2px 0 6px"><b>Sound effects</b><button class="sw" role="switch" id="sfx-sw" aria-checked="true" aria-label="Sound effects"></button><span>Chimes and hums as she listens, thinks and works.</span></div>
       <label class="slider" id="sfx-vol-row"><span>Effects</span><input type="range" id="sfx-vol" min="0" max="100" value="60"><output id="sfx-vol-out">60</output></label>
@@ -1448,16 +1462,47 @@ function renderAgenda(items) {
     return head + `<li><span>${esc(it.title)}${it.cal && it.cal !== "Jarvis" ? ` <small>${esc(it.cal)}</small>` : ""}</span><span>${it.all_day ? "all day" : esc(it.time)}</span></li>`;
   }).join("");
 }
+// Memory and Routines: what she keeps about you, which you can change or wipe right here
 function renderMemory(items) {
   $("#mem-n").textContent = items.length || "";
-  $("#mem").innerHTML = items.length ? items.slice().reverse().map((m) => `<li><span>${esc(m.text)}</span></li>`).join("")
+  $("#mem").innerHTML = items.length ? items.slice().reverse().map((m) => `<li class="ed" data-id="${esc(m.id)}"><span class="t">${esc(m.text)}</span>`
+      + `<span class="acts"><button type="button" class="ib" data-do="edit" aria-label="Edit">Edit</button><button type="button" class="ib" data-do="forget" aria-label="Forget this">Forget</button></span></li>`).join("")
+      + `<li class="note">She uses these in every conversation. Edit or forget anything, or say “forget that I…”.</li>`
     : `<li class="note">Nothing yet. Try “remember my sister's birthday is May 3rd”.</li>`;
 }
 function renderRoutines(items) {
   $("#rtn-n").textContent = items.length || "";
-  $("#rtn").innerHTML = items.length ? items.map((r) => `<li class="col"><span>${esc(r.name)}</span><span class="note">${esc(r.steps)}</span></li>`).join("")
-    : `<li class="note">None yet. Try “when I say gaming mode, open Steam and set volume to 30”.</li>`;
+  $("#rtn").innerHTML = (items.length ? items.map((r) => `<li class="col ed" data-name="${esc(r.name)}"><span class="t">${esc(r.name)}</span><span class="note s">${esc(r.steps)}</span>`
+      + `<span class="acts"><button type="button" class="ib" data-do="run">Run</button><button type="button" class="ib" data-do="edit">Edit</button><button type="button" class="ib" data-do="delete">Delete</button></span></li>`).join("")
+    : `<li class="note">None yet. Try “when I say gaming mode, open Steam and set volume to 30”.</li>`)
+    + `<li class="note"><button type="button" class="ib" data-do="new">New routine</button></li>`;
 }
+function editInline(li, fields, onSave) {               // swap a row for text boxes + Save / Cancel
+  const old = li.innerHTML;
+  li.innerHTML = fields.map((f, i) => `<label class="ef"><span>${esc(f.label)}</span><textarea rows="${f.rows || 2}" data-i="${i}">${esc(f.value)}</textarea></label>`).join("")
+    + `<span class="acts"><button type="button" class="ib" data-x="save">Save</button><button type="button" class="ib" data-x="cancel">Cancel</button></span>`;
+  li.classList.add("editing");
+  const boxes = li.querySelectorAll("textarea"); boxes[0].focus();
+  li.querySelector('[data-x="save"]').onclick = (e) => { e.stopPropagation(); onSave([...boxes].map((b) => b.value.trim())); };
+  li.querySelector('[data-x="cancel"]').onclick = (e) => { e.stopPropagation(); li.innerHTML = old; li.classList.remove("editing"); };
+  boxes.forEach((b) => b.addEventListener("keydown", (e) => { if (e.key === "Escape") li.querySelector('[data-x="cancel"]').click(); if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) li.querySelector('[data-x="save"]').click(); }));
+}
+$("#mem").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-do]"); if (!b) return;
+  const li = b.closest("li"), id = li.dataset.id;
+  if (b.dataset.do === "forget") { li.classList.add("gone"); call("action", "forget_memory", id); }
+  if (b.dataset.do === "edit") editInline(li, [{ label: "She remembers", value: li.querySelector(".t").textContent }], ([t]) => call("action", "edit_memory", { id, text: t }));
+});
+$("#rtn").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-do]"); if (!b) return;
+  const li = b.closest("li"), name = li.dataset.name;
+  if (b.dataset.do === "run") call("action", "run_routine", name);
+  if (b.dataset.do === "delete") { li.classList.add("gone"); call("action", "delete_routine", name); }
+  if (b.dataset.do === "edit") editInline(li, [{ label: "When I say", value: name, rows: 1 }, { label: "Do this", value: li.querySelector(".s").textContent, rows: 3 }],
+    ([n, s]) => { if (n !== name) call("action", "delete_routine", name); call("action", "save_routine", { name: n, steps: s }); });
+  if (b.dataset.do === "new") editInline(li, [{ label: "When I say", value: "", rows: 1 }, { label: "Do this", value: "", rows: 3 }],
+    ([n, s]) => { if (n && s) call("action", "save_routine", { name: n, steps: s }); });
+});
 document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => {
   document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
   ["cal", "rem", "mem", "rtn"].forEach((id) => $("#" + id).hidden = id !== b.dataset.tab);
@@ -1895,6 +1940,26 @@ function briefingPanels(e) {
   if (hl.length) add("Headlines", `<ul class="hl plain">${hl.slice(0, 3).map((h, i) => `<li style="animation-delay:${i * .08}s;white-space:normal">${esc(h)}</li>`).join("")}</ul>`);
 }
 
+
+// Check-ins (evening wrap-up, rain heads-up, break reminders...): a few cards, same look as the briefing.
+function cardPanels(e) {
+  if (!holo.on) return;
+  const wxHtml = (w) => `<div class="wx"><svg viewBox="0 0 48 48">${WXI(w.code)}</svg><div class="t">${esc(w.high ?? w.now)}<span class="u">${esc(w.unit)}</span></div>
+    <div class="l">${esc(w.label || "")}</div>
+    <div class="r">${w.low != null ? `<span>Low <b>${esc(w.low)}°</b></span>` : ""}${w.rain >= 20 ? `<span>Precip <b>${esc(w.rain)}%</b></span>` : ""}</div></div>`;
+  for (const c of e.cards || []) {
+    const P = holoAdd("generic", "briefing", {}); if (!P) continue;
+    P.el.querySelector(".hh").childNodes[1].textContent = c.title || "";
+    let html = "";
+    if (c.weather) html = wxHtml(c.weather);
+    else if (c.list) html = c.list.length ? `<ul class="hl">${c.list.slice(0, 6).map((r, i) => `<li style="animation-delay:${i * .08}s"><b>${esc(r.time || "")}</b>${esc(r.text)}</li>`).join("")}</ul>`
+                                          : `<div class="sub" style="white-space:normal">${esc(c.empty || "Nothing.")}</div>`;
+    else html = `${c.big ? `<div class="big">${esc(c.big)}</div>` : ""}${c.text ? `<div class="sub" style="white-space:normal">${esc(c.text)}</div>` : ""}`;
+    P.el.querySelector(".bd").innerHTML = html;
+    holoDone(P, true, e.linger || 14000); P.el.querySelector(".hh span").textContent = "";
+  }
+}
+
 // ================================================================ events from Python
 function bootLine(line) {
   const d = document.createElement("div");
@@ -1956,6 +2021,7 @@ window.J = {
       case "tool": holo.results[e.name] = typeof e.result === "string" ? e.result : ""; break;
       case "instant": holoInstant(e); break;
       case "briefing": briefingPanels(e); break;
+      case "cards": cardPanels(e); break;
       case "connectors": renderConnectors(e); break;
       case "jobs": renderJobs(e.items || []); break;
       case "watchers": renderWatchers(e.items || []); break;
@@ -2323,7 +2389,7 @@ const EXTRAS = {
       const b = mk("button", { type: "button", text: FACES[k].name || k, "aria-pressed": String(k === faceKey) });
       b.onclick = () => { setFace(k); renderSettings(); }; return b; })), mk("p", { class: "help", text: "The shape at the centre of her window. Or say “Juno, change your face”." })),
     mk("div", { class: "set-list" },
-      instSwitch("Living background", "A slow drift of light behind her.", () => BG.on, (on) => { BG.set(on); $("#bg-sw").setAttribute("aria-checked", String(BG.on)); }),
+      instSwitch("Living background", "Drifting light for Juno, equations for Jarvis, something worse for Ultron.", () => BG.on, (on) => { BG.set(on); $("#bg-sw").setAttribute("aria-checked", String(BG.on)); }),
       instSwitch("Holographic panels", "Pop-up visuals beside her while she works.", () => holo.on, (on) => { if (holo.on !== on) $("#holo-sw").click(); }),
       instSwitch("Sound effects", "Chimes and hums as she listens, thinks and works.", () => sfx.on, (on) => { if (sfx.on !== on) $("#sfx-sw").click(); })),
     instSlider("Effects volume", "How loud the chimes are.", 0, 100, 1, () => Math.round(sfx.vol * 100),

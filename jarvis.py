@@ -251,7 +251,7 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     import webview
     from mini import Mini
     emitter = Emitter()
-    mini = Mini(Emitter) if config.MINI_HUD and sys.platform == "win32" else None
+    mini = Mini(Emitter) if sys.platform == "win32" else None      # made even when off, so it can be switched on live
     import livedesk
     livedesk.recover_icons()                       # a crash last time may have left the desktop icons hidden
     desk = livedesk.LiveDesk(Emitter) if config.LIVING_DESKTOP and sys.platform == "win32" else None
@@ -262,8 +262,12 @@ def run_gui(voice, start_hidden=False, show_hook=None):
 
     phone = []
 
+    import smarthome
+
     def emit(ev):
         emitter(ev)
+        if ev.get("type") == "persona":
+            smarthome.feed(ev)
         if mini:
             mini.feed(ev)
         if desk:
@@ -279,6 +283,10 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     bridge = Bridge(core, emitter)
     if desk:
         desk.core = core
+    core.desk = desk
+    if desk:
+        import deskwidgets
+        deskwidgets.start(desk, core)
     # Start tucked away (minimized, corner widget showing) so his window never covers Juno's intro or your work.
     start_min = start_hidden or config.START_MINIMIZED
     kw = dict(url=str(config.RES_DIR / "ui" / "index.html"), js_api=bridge, width=1360, height=840, min_size=(1100, 700),
@@ -322,15 +330,28 @@ def run_gui(voice, start_hidden=False, show_hook=None):
 
     window.events.closing += on_closing
 
+    away = {"on": False}
+
     def went_away():
         # Stop all HUD animation while minimized and show the corner widget instead
+        away["on"] = True
         emitter({"type": "window", "visible": False})
         if mini:
             mini.show()
 
     def came_back():
+        away["on"] = False
         emitter({"type": "window", "visible": True})
         if mini:
+            mini.hide()
+
+    def mini_switch(on):
+        """The corner widget switched on or off (Settings or "turn off the corner widget"): takes effect now."""
+        if not mini:
+            return
+        if on and away["on"]:
+            mini.show()
+        elif not on:
             mini.hide()
 
     try:
@@ -375,6 +396,7 @@ def run_gui(voice, start_hidden=False, show_hook=None):
             return False
 
     core.on_minimize = minimize
+    core.on_mini = mini_switch
     core.on_restore = restore
     if show_hook is not None:
         show_hook["fn"] = restore              # someone launched Jarvis again: bring this copy forward
@@ -395,6 +417,7 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         threading.Thread(target=desk.start, daemon=True, name="living-desktop").start()
     if music:
         music.core = core
+        core.music = music                               # Glass mode's now-playing card reads it
         threading.Thread(target=music.settle, daemon=True, name="music-settle").start()
     core.start()
     webview.start()

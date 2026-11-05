@@ -117,7 +117,7 @@ class Proactive:
         return proc, ""
 
     def _loop(self):
-        lo, hi, _, _ = EVERY.get(config.CHAT_EVERY, EVERY["normal"])
+        lo, hi, _, _ = timing()
         self.next_gap = random.uniform(lo, hi) * 60
         while not self._stop.wait(5):
             try:
@@ -147,7 +147,7 @@ class Proactive:
         self.cur_label = _app_label(proc, title)
         if not config.CHAT_FIRST:
             return
-        lo, hi, dwell, cap = EVERY.get(config.CHAT_EVERY, EVERY["normal"])
+        lo, hi, dwell, cap = timing()
         day = datetime.now().date()
         if self.today[0] != day:
             self.today = (day, 0)
@@ -167,13 +167,13 @@ class Proactive:
         if why_not:
             return
         idle = _idle_seconds()
-        if not 6 <= idle <= 120:                      # mid-typing, or not at the PC
+        if not config.CHAT_PAUSE <= idle <= max(120, config.CHAT_PAUSE + 60):    # mid-typing, or not at the PC
             return
         if proc in CALL_APPS or CALL_TITLES.search(title or "") or PRIVATE_TITLES.search(title or ""):
             return
         try:
             import tools
-            if tools.fullscreen_app():
+            if tools.in_game():
                 return
         except Exception:
             pass
@@ -185,6 +185,95 @@ class Proactive:
         self.today = (day, self.today[1] + 1)
         mins = round((now - self.cur_since) / 60)
         core.events.put(("chat_first", {"what": self.cur_label, "mins": mins, "recent": list(self.recent)}))
+
+
+def timing():
+    """(min gap, max gap in minutes, minutes in one thing first, most a day), from the settings."""
+    if config.CHAT_EVERY == "custom":
+        m = config.CHAT_MINUTES
+        lo, hi, dwell, cap = m * .8, m * 1.2, max(3, min(15, m // 4)), max(3, int(14 * 60 / m))
+    else:
+        lo, hi, dwell, cap = EVERY.get(config.CHAT_EVERY, EVERY["normal"])
+    if config.CHAT_DWELL:
+        dwell = config.CHAT_DWELL
+    if config.CHAT_MAX:
+        cap = config.CHAT_MAX
+    return lo, hi, dwell, cap
+
+
+STYLES = {
+    "questions": "Ask a curious question about what they're doing.",
+    "tips": "Offer one genuinely useful tip or shortcut for what they're doing.",
+    "jokes": "Make a playful joke or teasing comment about what they're doing.",
+    "hype": "Hype them up and encourage them about what they're doing.",
+}
+
+
+def _style_note():
+    s = STYLES.get(config.CHAT_STYLE, "A curious question, a useful tip, or a light comment, whatever fits best.")
+    if config.CHAT_TOPICS:
+        s += f" They like talking about: {config.CHAT_TOPICS} (bring it in only if it connects)."
+    return s
+
+
+# ------------------------------------------------------------------ the song you're playing
+_SONG = {"last": 0.0, "seen": set()}
+
+
+def maybe_song(core, info):
+    """Called by the music player on a new song. Now and then (not every song, at most every 30 minutes) she
+    says something about it. Same rules as starting a conversation: not muted, not quiet hours, no game or call."""
+    if not (config.CHAT_MUSIC and config.CHAT_FIRST) or core is None:
+        return
+    key = (info.get("title"), info.get("artist"))
+    now = time.time()
+    if key in _SONG["seen"] or now - _SONG["last"] < 30 * 60 or random.random() > .35:
+        _SONG["seen"].add(key)
+        return
+    _SONG["seen"].add(key)
+    if getattr(core, "muted", False) or _in_quiet_hours():
+        return
+    if getattr(core, "state", "idle") != "idle" or getattr(core, "_turn", None) is not None:
+        return
+    try:
+        proc, title = _foreground()
+        import tools
+        if proc in CALL_APPS or CALL_TITLES.search(title or "") or tools.in_game():
+            return
+    except Exception:
+        pass
+    _SONG["last"] = now
+    core.events.put(("song_chat", dict(info)))
+
+
+def song_line(core, info):
+    """One or two sentences about the song, or None. Uses the fast model."""
+    import personas
+    import usage
+    client = getattr(getattr(core, "brain", None), "client", None)
+    if client is None:
+        return None
+    ask = (f"[You're starting a chat on your own: they just started playing \"{info.get('title')}\" by "
+           f"{info.get('artist') or 'an unknown artist'}. One or two short sentences about it in your own voice: a fun "
+           "fact, how it makes you feel, or a question about their taste. Don't claim facts you're unsure of. "
+           "If you don't know the song, just react to the vibe or ask about it. Reply SKIP if it'd be awkward.]")
+    model = config.FAST_MODEL or config.MODEL
+    try:
+        msg = client.messages.create(model=model, max_tokens=110,
+                                     system=personas.character(config.ADDRESS_AS) + "\nEverything you write is spoken "
+                                            "aloud: plain words, no lists, emoji or markdown.",
+                                     messages=[{"role": "user", "content": ask}])
+        try:
+            usage.record_claude(model, msg.usage)
+        except Exception:
+            pass
+        text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
+    except Exception as e:
+        print(f"[song chat] {e}")
+        return None
+    if not text or text.upper().startswith("SKIP"):
+        return None
+    return text, ask
 
 
 def opener(core, info):
@@ -199,8 +288,8 @@ def opener(core, info):
     now = datetime.now().strftime("%A %I:%M %p").lstrip("0")
     ask = (f"[You're about to start a conversation on your own; the user didn't say anything. They've been in "
            f"{info['what']} for about {info['mins']} minutes. Before that: {before}. It's {now}. "
-           "Say one or two short sentences to start a natural, friendly chat about what they're doing: a curious "
-           "question, a useful tip, or a light comment, in your own voice. You only know the app and window title "
+           "Say one or two short sentences to start a natural, friendly chat about what they're doing, in your own "
+           f"voice. {_style_note()} You only know the app and window title "
            "(never claim you saw their screen). If it'd be awkward, pointless or private, reply exactly SKIP.]")
     model = config.FAST_MODEL or config.MODEL
     try:

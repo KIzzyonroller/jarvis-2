@@ -32,7 +32,8 @@ TITLE = "Jarvis Desktop"
 PARK = -30000
 IS_WINDOWS = sys.platform == "win32"
 PASS = {"state", "voice", "persona", "turn_start", "turn_end", "merged", "confirm", "confirm_done", "fps", "music",
-        "telemetry", "instant", "briefing", "discord"}      # the last four feed the pop-up panels
+        "telemetry", "instant", "briefing", "discord", "cards", "phone_note", "game",
+        "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes"}           # the w_ ones feed the desktop widgets      # the last four feed the pop-up panels
 FLAG = "desk_icons_hidden"
 
 _U = None
@@ -68,6 +69,7 @@ def _u():
             "FindWindowExW": ([H, H, wt.LPCWSTR, wt.LPCWSTR], H),
             "SendMessageTimeoutW": ([H, wt.UINT, wt.WPARAM, wt.LPARAM, wt.UINT, wt.UINT, P(ctypes.c_size_t)], ctypes.c_ssize_t),
             "SetParent": ([H, H], H),
+            "PostMessageW": ([H, wt.UINT, wt.WPARAM, wt.LPARAM], wt.BOOL),
             "GetParent": ([H], H),
             "GetAncestor": ([H, wt.UINT], H),
             "GetDesktopWindow": ([], H),
@@ -275,6 +277,9 @@ class LiveDesk:
         self._stop = threading.Event()
         self._vrect = None
         self.snap = {}
+        self.glass_url = None
+        self._min_all = False
+        self._perm = None
 
     # ------------------------------------------------------------------ events from the core
     def feed(self, ev):
@@ -289,7 +294,7 @@ class LiveDesk:
             ev = {"type": "msg", "role": "user", "text": str(ev.get("text", ""))[:200]}
         elif t not in PASS:
             return
-        if t in ("persona", "state", "merged", "music", "fps"):
+        if t in ("persona", "state", "merged", "music", "fps", "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes"):
             self.snap[t] = ev
         if self.attached:
             self.em(ev)
@@ -371,15 +376,71 @@ class LiveDesk:
             print(f"[desktop] attaching failed: {e}")
             return
         merged = bool(_flags("merged"))
-        persona = "juno"
+        persona = getattr(self.core, "persona_key", "juno") if self.core else "juno"
         self.em({"type": "desk_init", "monitors": monitors(), "shot": shot, "intro": bool(config.DESK_INTRO),
                  "persona": persona, "merged": merged, "quality": config.DESK_QUALITY, "viz": config.DESK_VIZ,
                  "fps": config.ANIM_FPS})
-        for k in ("state", "music", "fps"):
+        for k in ("state", "music", "fps", "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes"):
             if k in self.snap:
                 self.em(self.snap[k])
+        self._allow_camera()
+        if self.glass_url:
+            self.em({"type": "glass", "url": self.glass_url})
         print(f"[desktop] living desktop on ({len(monitors())} monitor(s))")
         self._watch()
+
+    # ------------------------------------------------------------------ glass mode on the desktop
+    def glass(self, url):
+        """Show glass mode (url) on the wallpaper, or take it off (None). False if the desktop isn't running."""
+        if url and not self.attached:
+            return False
+        self.glass_url = url
+        self.em({"type": "glass", "url": url})
+        if IS_WINDOWS:
+            try:
+                tray = _u().FindWindowW("Shell_TrayWnd", None)
+                if url and not self._min_all:                  # show the desktop so you can see it (like Win+D)
+                    _u().PostMessageW(tray, 0x0111, 419, 0)    # WM_COMMAND: minimize all
+                    self._min_all = True
+                elif not url and self._min_all:
+                    _u().PostMessageW(tray, 0x0111, 416, 0)    # undo minimize all
+                    self._min_all = False
+            except Exception as e:
+                print(f"[desktop] show desktop: {e}")
+        return True
+
+    def _allow_camera(self):
+        """Let glass mode's page (our own localhost server, inside the desktop) use the camera. Nothing else gets it:
+        the wallpaper can't show WebView2's permission prompt, and no other page in it should ever ask."""
+        if not IS_WINDOWS or self._perm is not None:
+            return
+        try:
+            import clr  # noqa: F401  (pythonnet, which pywebview uses on Windows)
+            from System import Action
+            form = self.window.native
+            br = getattr(form, "browser", None)
+            wv = getattr(form, "webview", None) or getattr(br, "webview", None) or getattr(br, "web_view", None)
+            if wv is None:
+                print("[desktop] no WebView2 to give the camera to; glass mode will use its own window")
+                return
+
+            def hook():
+                from Microsoft.Web.WebView2.Core import CoreWebView2PermissionKind as K, CoreWebView2PermissionState as St
+                def on_perm(sender, args):
+                    try:
+                        ok = re.match(r"^http://127\.0\.0\.1:%d(/|$)" % _glass_port(), str(args.Uri))
+                        if args.PermissionKind == K.Camera and ok:
+                            args.State = St.Allow
+                        else:
+                            args.State = St.Deny
+                    except Exception as e:
+                        print(f"[desktop] camera permission: {e}")
+                wv.CoreWebView2.PermissionRequested += on_perm
+                self._perm = on_perm
+            form.Invoke(Action(hook))
+        except Exception as e:
+            self._perm = None
+            print(f"[desktop] couldn't let glass mode use the camera here: {e}")
 
     def _screenshot(self):
         """The desktop as it is right now, for Juno to grab. Stays on this PC: it only goes into our own page."""
@@ -443,6 +504,16 @@ class LiveDesk:
             self.attached = False
         except Exception as e:
             print(f"[desktop] restoring the desktop: {e}")
+
+
+def _glass_port():
+    """The port glass mode's server actually got (it moves up if the usual one is busy)."""
+    try:
+        import tools
+        hub = tools._GLASS["get"]() if tools._GLASS["get"] else None
+        return hub.port if hub else config.GLASS_PORT
+    except Exception:
+        return config.GLASS_PORT
 
 
 class DeskBridge:

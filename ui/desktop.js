@@ -6,6 +6,31 @@
   const svg = document.getElementById("desk"), cvs = document.getElementById("intro");
   const NAMES = ["juno"];                                   // she's the only one now
   const COLOR = { jarvis: "#8ff3ff", ultron: "#ff2a45", juno: "#c13dff" };
+  // Each AI has their own desktop. Juno: a purple glowing world. Jarvis: cold blue, clean lab light.
+  // Ultron: a red furnace sky over a burnt-orange grid. The panels on the desktop take the same colours.
+  const THEMES = {
+    juno: { sky: ["#2a1747", "#140d24", "#07050c"], base: "#07050c", horizon: "#b44dff", floor: "#b44dff",
+            motes: ["#2ee59d", "#ff5ae0", "#c13dff"], ring: "rgba(193,61,255,.45)", core: "#ff5ae0", icon: "diamond",
+            css: { c: "#c97bff", crgb: "201,123,255", vrgb: "7,4,13", ink: "#f1e6ff", dim: "#8a76a3", alarm: "#ff5ae0", argb: "255,90,224" } },
+    jarvis: { sky: ["#0f2c3d", "#08161f", "#02060b"], base: "#02060b", horizon: "#46c8ff", floor: "#46c8ff",
+            motes: ["#8ff3ff", "#dff6ff", "#46c8ff"], ring: "rgba(127,231,255,.45)", core: "#dff6ff", icon: "reactor",
+            css: { c: "#7fe7ff", crgb: "127,231,255", vrgb: "2,6,11", ink: "#dff6ff", dim: "#5f7f8f", alarm: "#ff9d2e", argb: "255,157,46" } },
+    ultron: { sky: ["#3d0a12", "#1c0408", "#060102"], base: "#060102", horizon: "#ff3046", floor: "#ff5a2a",
+            motes: ["#ff3046", "#ff8a3d", "#ffd34d"], ring: "rgba(255,48,70,.5)", core: "#ff8a3d", icon: "eye",
+            css: { c: "#ff3046", crgb: "255,48,70", vrgb: "8,2,3", ink: "#f4e9e4", dim: "#86636a", alarm: "#ffd34d", argb: "255,211,77" } },
+  };
+  const theme = () => THEMES[S.persona] || THEMES.juno;
+  function applyTheme() {
+    const T = theme(), st = document.documentElement.style;
+    for (const [k, v] of Object.entries(T.css)) st.setProperty("--" + k, v);
+    document.body.style.background = T.base;
+  }
+  function themedFloor(c) {
+    let s = "";
+    for (let i = -10; i <= 10; i++) s += path(PL([[i * 30, 0], [i * 140, 220]]), { stroke: c, "stroke-opacity": .35, "stroke-width": 1.4 });
+    for (let k = 0; k < 7; k++) { const y = Math.pow(k / 6, 1.8) * 220; s += path(PL([[-1400, y], [1400, y]]), { stroke: c, "stroke-opacity": .18 + k * .06, "stroke-width": 1.2 }); }
+    return s;
+  }
   const S = {
     monitors: [{ x: 0, y: 0, w: 1, h: 1, wx: 0, wy: 0, ww: 1, wh: 1, primary: true }],
     persona: "juno", merged: false, speaker: null, state: "booting", confirm: false,
@@ -27,7 +52,7 @@
     const box = document.getElementById("vizbox"), d = devicePixelRatio || 1;
     box.innerHTML = "";
     for (const vc of VIZ) {
-      const half = Math.ceil(vc.r * 1.35), c = document.createElement("canvas");
+      const half = Math.ceil(vc.r * 1.6), c = document.createElement("canvas");      // room for the bars at full voice
       c.style.left = vc.x - half + "px"; c.style.top = vc.y - half + "px"; c.style.width = c.style.height = half * 2 + "px";
       c.width = c.height = Math.ceil(half * 2 * d);
       const g = c.getContext("2d"); g.setTransform(d, 0, 0, d, half - vc.x, half - vc.y);   // draw in page coordinates
@@ -44,9 +69,24 @@
       const glow = vg.createRadialGradient(vc.x, vc.y, 0, vc.x, vc.y, vc.r * .5);
       glow.addColorStop(0, `rgba(${r},${g},${b},${(.35 + lvl * .5).toFixed(2)})`); glow.addColorStop(1, `rgba(${r},${g},${b},0)`);
       vg.fillStyle = glow; vg.beginPath(); vg.arc(vc.x, vc.y, vc.r * .5, 0, 6.283); vg.fill();
-      vg.strokeStyle = "rgba(193,61,255,.45)"; vg.lineWidth = 1.5; vg.beginPath(); vg.arc(vc.x, vc.y, vc.r * .62, 0, 6.283); vg.stroke();
-      vg.beginPath(); vg.moveTo(vc.x, vc.y - vc.r * .3); vg.lineTo(vc.x + vc.r * .12, vc.y); vg.lineTo(vc.x, vc.y + vc.r * .3); vg.lineTo(vc.x - vc.r * .12, vc.y); vg.closePath();
-      vg.fillStyle = "#0d0a14"; vg.fill(); vg.strokeStyle = "#ff5ae0"; vg.lineWidth = 2; vg.stroke();
+      const T = theme();
+      vg.strokeStyle = T.ring; vg.lineWidth = 1.5; vg.beginPath(); vg.arc(vc.x, vc.y, vc.r * .62, 0, 6.283); vg.stroke();
+      // the emblem in the middle: Juno's diamond, Jarvis's reactor, Ultron's eye
+      vg.beginPath();
+      if (T.icon === "reactor") {
+        vg.arc(vc.x, vc.y, vc.r * .22, 0, 6.283);
+        vg.fillStyle = T.base; vg.fill(); vg.strokeStyle = T.core; vg.lineWidth = 2; vg.stroke();
+        vg.beginPath(); for (let k = 0; k < 3; k++) { const a = -Math.PI / 2 + k * 2.094; vg[k ? "lineTo" : "moveTo"](vc.x + Math.cos(a) * vc.r * .14, vc.y + Math.sin(a) * vc.r * .14); }
+        vg.closePath(); vg.fillStyle = `rgba(${r},${g},${b},${(.5 + lvl * .5).toFixed(2)})`; vg.fill();
+      } else if (T.icon === "eye") {
+        vg.moveTo(vc.x - vc.r * .3, vc.y); vg.quadraticCurveTo(vc.x, vc.y - vc.r * .2, vc.x + vc.r * .3, vc.y);
+        vg.quadraticCurveTo(vc.x, vc.y + vc.r * .2, vc.x - vc.r * .3, vc.y); vg.closePath();
+        vg.fillStyle = T.base; vg.fill(); vg.strokeStyle = T.core; vg.lineWidth = 2; vg.stroke();
+        vg.beginPath(); vg.ellipse(vc.x, vc.y, vc.r * .035, vc.r * (.1 + lvl * .04), 0, 0, 6.283); vg.fillStyle = T.core; vg.fill();
+      } else {
+        vg.moveTo(vc.x, vc.y - vc.r * .3); vg.lineTo(vc.x + vc.r * .12, vc.y); vg.lineTo(vc.x, vc.y + vc.r * .3); vg.lineTo(vc.x - vc.r * .12, vc.y); vg.closePath();
+        vg.fillStyle = "#0d0a14"; vg.fill(); vg.strokeStyle = T.core; vg.lineWidth = 2; vg.stroke();
+      }
       const w = Math.max(2, vc.r * .035), r0 = vc.r * .7;
       vg.lineCap = "round";
       for (const [lw, a] of [[w * 2.6, .18], [w, .95]]) {          // a soft wide pass, then the bright bar: a glow without blur
@@ -139,19 +179,20 @@
     RIG.draw(pic, pose, ME.x, ME.ground, k, pic === "walk" ? ME.facing : 1, t, ME.glitch, 1);
   }
   function build() {
-    const W = innerWidth, H = innerHeight;
+    const W = innerWidth, H = innerHeight, TH = theme();
+    applyTheme();
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     let s = defs() + `<defs>
-      <radialGradient id="sky" cx=".5" cy=".38" r=".8"><stop offset="0" stop-color="#2a1747"/><stop offset=".55" stop-color="#140d24"/><stop offset="1" stop-color="#07050c"/></radialGradient>
-      <linearGradient id="horizon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b44dff" stop-opacity="0"/><stop offset=".5" stop-color="#b44dff" stop-opacity=".35"/><stop offset="1" stop-color="#b44dff" stop-opacity="0"/></linearGradient>
+      <radialGradient id="sky" cx=".5" cy=".38" r=".8"><stop offset="0" stop-color="${TH.sky[0]}"/><stop offset=".55" stop-color="${TH.sky[1]}"/><stop offset="1" stop-color="${TH.sky[2]}"/></radialGradient>
+      <linearGradient id="horizon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${TH.horizon}" stop-opacity="0"/><stop offset=".5" stop-color="${TH.horizon}" stop-opacity=".35"/><stop offset="1" stop-color="${TH.horizon}" stop-opacity="0"/></linearGradient>
     </defs>`;
-    s += el("rect", { width: W, height: H, fill: "#07050c" });
+    s += el("rect", { width: W, height: H, fill: TH.base });
     const mons = S.monitors.map(px);
     for (const m of mons) {                                           // each monitor: sky, horizon glow, grid floor
       const ground = m.wy + m.wh * .88;
       s += el("rect", { x: m.x, y: m.y, width: m.w, height: m.h, fill: "url(#sky)" });
       s += el("rect", { x: m.x, y: ground - 40, width: m.w, height: 80, fill: "url(#horizon)" });
-      s += el("g", { transform: `translate(${m.x + m.w / 2},${ground}) scale(${m.w / 2400},${Math.max(.2, (m.y + m.h - ground) / 220)})` }, junoFloor());
+      s += el("g", { transform: `translate(${m.x + m.w / 2},${ground}) scale(${m.w / 2400},${Math.max(.2, (m.y + m.h - ground) / 220)})` }, themedFloor(TH.floor));
     }
     // the cast stands on the main monitor
     const p = primary(), ground = p.wy + p.wh * .88, k = p.wh * .64 / 860;
@@ -169,11 +210,13 @@
     // where the pop-up panels go: either side of the middle of the main monitor
     const gm = mid(p);
     window.deskGeom = () => ({ cx: gm.x, cy: gm.y, R: gm.r, left: p.wx, right: p.wx + p.ww });
+    window.deskMonitors = () => ({ p, o });
+    if (window.DeskWidgets) setTimeout(DeskWidgets.layout, 0);
     if (window.DeskHolo) setTimeout(DeskHolo.layout, 0);
     // drifting shards over every monitor
     let ms = '<g id="motes">';
     const nM = (QUALITY[S.quality] || QUALITY.medium)[2] * mons.length;
-    for (let i = 0; i < nM; i++) ms += el("g", {}, path(P([[0, -9], [3.5, 0], [0, 9], [-3.5, 0]]), { fill: ["#2ee59d", "#ff5ae0", "#c13dff"][i % 3] }));
+    for (let i = 0; i < nM; i++) ms += el("g", {}, path(P([[0, -9], [3.5, 0], [0, 9], [-3.5, 0]]), { fill: TH.motes[i % 3] }));
     ms += "</g>";
     s += ms;
     // Juno herself: her artwork on the graphics card (juno_gl.js), standing on the main monitor's floor
@@ -187,6 +230,7 @@
     svg.innerHTML = s;
     sizeViz();
     placeJuno();
+    placeGlass();
     motes = [...svg.querySelectorAll("#motes > g")].map((e, i) => {
       const m = mons[i % mons.length];
       return { e, m, fx: Math.random(), fy: Math.random(), sp: .006 + Math.random() * .012, ph: Math.random() * 6.28, r: Math.random() * 360 };
@@ -218,10 +262,35 @@
   let lastSummon = 0;
   function summon() { const now = performance.now(); if (now - lastSummon < 2500) return; lastSummon = now; oneShot("summon", active(), 3.4); }
 
+  // ------------------------------------------------------------------ glass mode on the desktop
+  // Its page (from our own localhost server) floats over her world on the main monitor's work area. No camera picture:
+  // her world shows through. The desktop gets no clicks, so it's hands only there.
+  let glassFrame = null;
+  function placeGlass() {
+    if (!glassFrame) return;
+    const p = primary();
+    Object.assign(glassFrame.style, { left: p.wx + "px", top: p.wy + "px", width: p.ww + "px", height: p.wh + "px" });
+  }
+  function glassOn(url) {
+    if (!url) { if (glassFrame) { glassFrame.remove(); glassFrame = null; } document.body.classList.remove("glass-up"); return; }
+    if (!/^http:\/\/127\.0\.0\.1:\d+\/glass\?/.test(url)) return;            // only ever our own glass page
+    if (!glassFrame) {
+      glassFrame = document.createElement("iframe");
+      glassFrame.id = "glassfr"; glassFrame.title = "Glass mode";
+      glassFrame.setAttribute("allow", "camera; autoplay");
+      glassFrame.setAttribute("allowtransparency", "true");
+      glassFrame.style.cssText = "position:fixed;border:0;z-index:50;background:transparent;color-scheme:normal";
+      document.body.appendChild(glassFrame);
+    }
+    if (glassFrame.src !== url) glassFrame.src = url;
+    document.body.classList.add("glass-up");
+    placeGlass();
+  }
   const handlers = {
+    glass(e) { glassOn(e.url); },
     desk_init(e) {
       S.monitors = e.monitors && e.monitors.length ? e.monitors : S.monitors;
-      S.persona = "juno"; S.merged = !!e.merged;
+      S.persona = THEMES[e.persona] ? e.persona : "juno"; S.merged = !!e.merged;
       if (e.quality) S.quality = e.quality; if (e.viz) S.viz = e.viz; if (e.fps) S.fps = +e.fps;
       build();
       if (e.intro && !still) playIntro(e.shot); else reveal(0);
@@ -234,7 +303,11 @@
     },
     fps(e) { S.fps = Math.max(5, Math.min(60, +e.fps || 30)); },
     desk_pause(e) { S.paused = !!e.on; if (!S.paused) kick(); },
-    persona() { refresh(); },
+    persona(e) {                                 // switching AI swaps the whole desktop to theirs
+      const k = THEMES[e.key] ? e.key : "juno";
+      if (k !== S.persona) { S.persona = k; if (S.built) { build(); sizeViz(); } }
+      refresh();
+    },
     merged(e) { S.merged = !!e.on; if (S.merged) oneShot("happy", "juno", 3); refresh(); },
     state(e) { S.state = e.state; if (S.state === "idle") S.speaker = null; refresh(); },
     voice(e) { S.level = e.v || 0; S.levelT = performance.now(); },
@@ -248,7 +321,10 @@
   window.J = {
     on(e) {
       const h = handlers[e && e.type]; if (h) try { h(e); } catch (err) { console.error(err); }
-      if (window.DeskHolo && !S.paused) try { DeskHolo.on(e); } catch (err) { console.error(err); }      // pop-up panels
+      const dupe = e && (e.type === "discord" || e.type === "phone_note") && window.DeskWidgets && DeskWidgets.has("discord");   // the widget has it already
+      const he = e && e.type === "phone_note" ? { type: "discord", from: "📱 " + (e.from || "Phone"), channel: "", text: e.text } : e;
+      if (window.DeskHolo && !S.paused && !dupe) try { DeskHolo.on(he); } catch (err) { console.error(err); }      // pop-up panels
+      if (window.DeskWidgets) try { DeskWidgets.on(e); } catch (err) { console.error(err); }               // widgets
     },
     batch(list) { list.forEach((e) => window.J.on(e)); },
   };

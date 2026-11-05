@@ -37,7 +37,7 @@ IS_WINDOWS = sys.platform == "win32"
 MUSIC_APPS = ("spotify", "applemusic", "apple music", "zunemusic", "itunes", "tidal", "deezer", "amazon music",
               "amazonmusic", "musicbee", "foobar", "winamp", "aimp", "soundcloud", "pandora", "ytmdesktop",
               "youtube music", "cider", "qobuz", "audirvana", "dopamine", "plexamp")
-PASS = {"voice", "state", "fps"}   # from her core: her voice (she glows when she talks) and frame rate changes
+PASS = {"voice", "state", "fps", "react"}   # from her core: her voice (she glows when she talks) and frame rate changes
 
 
 def _is_music(aumid):
@@ -347,6 +347,12 @@ class MusicPlayer:
         self.track = dict(ev, at=now)
         if new_song:
             self.closed_for = None
+            if playing and title:
+                try:
+                    import proactive
+                    proactive.maybe_song(self.core, {"title": title, "artist": artist, "app": _app_name(self.app)})
+                except Exception as e:
+                    print(f"[music] song chat: {e}")
         # show or hide
         if playing:
             self.paused_since = None

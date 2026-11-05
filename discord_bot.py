@@ -273,7 +273,10 @@ class DiscordBot:
     @staticmethod
     def _character(persona):
         import personas
-        return personas.character("you")
+        p = personas.PERSONAS.get(persona) or personas.PERSONAS[personas.DEFAULT]
+        if not p.get("character"):
+            return personas.character("you")
+        return p["character"].format(address="sir" if persona == "jarvis" else "human")
 
     async def _on_message(self, msg):
         if msg.author.bot or msg.author == self.client.user:

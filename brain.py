@@ -202,11 +202,17 @@ class Brain:
     def _stream_once(self, on_text, on_event):
         """One streamed request. Text is handed to on_text as it's generated."""
         self._last_net = time.time()
+        rnd = {"sent": time.time()}                        # speedlog.py: one entry per round trip to Claude
+        tr = getattr(self, "trace", None)
+        if tr is not None:
+            tr["rounds"].append(rnd)
         with self.client.messages.stream(**self._kwargs()) as stream:
             for ev in stream:
                 if self._cancel is not None and self._cancel.is_set():
                     raise Interrupted()
                 t = getattr(ev, "type", "")
+                if "first" not in rnd and t in ("content_block_start", "content_block_delta"):
+                    rnd["first"] = time.time()
                 if t == "content_block_start":
                     bt = ev.content_block.type
                     if bt == "thinking":
@@ -220,6 +226,14 @@ class Brain:
                     elif dt == "thinking_delta" and ev.delta.thinking:
                         on_event("thinking", ev.delta.thinking)
             msg = stream.get_final_message()
+        rnd["done"] = time.time()
+        rnd["model"] = self._model
+        try:
+            u = msg.usage
+            rnd.update(inp=u.input_tokens or 0, cr=getattr(u, "cache_read_input_tokens", 0) or 0,
+                       cw=getattr(u, "cache_creation_input_tokens", 0) or 0, out=u.output_tokens or 0)
+        except Exception:
+            pass
         try:
             usage.record_claude(self._model, msg.usage)
         except Exception as e:
@@ -385,6 +399,7 @@ class Brain:
         self._tools_on = allow_tools
         self._done_calls, self._started, self._started_words = {}, {}, {}     # per request: see _guard
         self._model = (config.FAST_MODEL if quick and config.FAST_MODEL and not Brain.fast_broken else config.MODEL)
+        self.trace = {"rounds": [], "tools": [], "tools_s": 0.0}
         if self._notes:
             text = "[Meanwhile: " + " ".join(self._notes) + "]\n" + text
             self._notes = []
@@ -427,7 +442,10 @@ class Brain:
                     if text_now:
                         spoken_along_the_way.append(text_now)
                     calls = [b for b in resp.content if b.type == "tool_use"]
+                    tt = time.time()
                     results = self._run_tools(calls, on_event, cancel)
+                    self.trace["tools"] += [b.name for b in calls]
+                    self.trace["tools_s"] += time.time() - tt
                     self.history.append({"role": "user", "content": results})
                     continue
 
