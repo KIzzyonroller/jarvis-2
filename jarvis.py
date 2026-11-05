@@ -224,16 +224,6 @@ class Bridge:
     def activity(self, action, value=None):
         threading.Thread(target=self._core.activity_action, args=(str(action), value), daemon=True).start()
 
-    def set_pref(self, key, value):
-        ex = getattr(self._core, "extras", None)
-        if ex is not None:
-            threading.Thread(target=lambda: print("[options]", ex.set_option(str(key), value)), daemon=True).start()
-
-    def options_action(self, action):
-        import tools
-        threading.Thread(target=lambda: self._core.emit({"type": "toast", "text": tools.options_tool(str(action))}),
-                         daemon=True).start()
-
     def set_permission(self, key, on):
         threading.Thread(target=self._core.set_permission, args=(str(key), bool(on)), daemon=True).start()
 
@@ -301,18 +291,10 @@ def run_gui(voice, start_hidden=False, show_hook=None):
 
     window.events.closing += on_closing
 
-    def just_him():
-        try:
-            import prefs
-            return bool(prefs.get("desktop") and prefs.get("hud_mode") == "character")
-        except Exception:
-            return False
-
     def went_away():
-        # Stop all HUD animation while minimized and show the corner widget instead (not in "Just him" mode:
-        # then he's out on the desktop and that's the widget)
+        # Stop all HUD animation while minimized and show the corner widget instead
         emitter({"type": "window", "visible": False})
-        if mini and not just_him():
+        if mini:
             mini.show()
 
     def came_back():
@@ -357,21 +339,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
             print(f"[window] restore failed: {e}")
             return False
 
-    def hide():
-        """'Just him' mode: the window goes away completely (no taskbar button, no corner widget)."""
-        try:
-            window.hide()
-            emitter({"type": "window", "visible": False})
-            if mini:
-                mini.hide()
-            return True
-        except Exception as e:
-            print(f"[window] hide failed: {e}")
-            return False
-
     core.on_minimize = minimize
     core.on_restore = restore
-    core.on_hide = hide
     if show_hook is not None:
         show_hook["fn"] = restore              # someone launched Jarvis again: bring this copy forward
     if start_hidden:

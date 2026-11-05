@@ -138,18 +138,10 @@ DEFAULT_PERSONA = {"voice": config.KOKORO_VOICE, "lang": config.KOKORO_LANG, "sp
 
 
 # =================================================================== engines
-def make_kokoro(model, voices, providers=None):
-    """Kokoro on the processor, or on the graphics card (DirectML) when the voice setting allows it AND the card
-    passed its test (gpu.py). Left alone, kokoro-onnx grabs any GPU provider it finds, and on many graphics cards
-    one of its layers fails ("ConvTranspose ... The parameter is incorrect"), which leaves him with no voice. So
-    the graphics card is only used once it's proven to work."""
-    if providers is None:
-        try:
-            import gpu
-            providers = gpu.voice_providers()
-        except Exception:
-            providers = ["CPUExecutionProvider"]
-    on_gpu = providers[0] != "CPUExecutionProvider"
+def make_kokoro(model, voices):
+    """Kokoro pinned to the CPU. Left alone, kokoro-onnx grabs any GPU provider it finds, and on many
+    graphics cards (DirectML) one of its layers fails ("ConvTranspose ... The parameter is incorrect"),
+    which leaves him with no voice. The CPU is plenty fast for it."""
     os.environ.setdefault("ONNX_PROVIDER", "CPUExecutionProvider")      # older kokoro-onnx versions read this
     from kokoro_onnx import Kokoro
     try:
@@ -164,19 +156,7 @@ def make_kokoro(model, voices, providers=None):
         opts.inter_op_num_threads = 1
         opts.add_session_config_entry("session.intra_op.allow_spinning", "0")
         opts.add_session_config_entry("session.inter_op.allow_spinning", "0")
-        if on_gpu:                                   # DirectML's rules
-            opts.enable_mem_pattern = False
-            opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-        try:
-            sess = ort.InferenceSession(str(model), sess_options=opts, providers=providers)
-        except Exception as e:
-            if not on_gpu:
-                raise
-            print(f"[tts] graphics card wouldn't load the voice ({e}); using the processor")
-            on_gpu = False
-            opts.enable_mem_pattern = True
-            sess = ort.InferenceSession(str(model), sess_options=opts, providers=["CPUExecutionProvider"])
-        config.VOICE_ON = "gpu" if on_gpu and "DmlExecutionProvider" in sess.get_providers() else "cpu"
+        sess = ort.InferenceSession(str(model), sess_options=opts, providers=["CPUExecutionProvider"])
         if hasattr(Kokoro, "from_session"):
             return Kokoro.from_session(sess, str(voices))
     except Exception as e:
@@ -224,28 +204,11 @@ class KokoroEngine:
         if not model.exists() or not voices.exists():
             raise FileNotFoundError("Kokoro voice model not downloaded yet" + (" (it downloads on first start)" if config.FROZEN else " (run setup.bat)"))
         self.k = make_kokoro(model, voices)
-        self._paths = (model, voices)
         self.available = set(self.k.get_voices())
         self._warned = set()
 
-    def rebuild(self):
-        """Re-creates the voice on whatever the voice setting now allows (processor or graphics card)."""
-        k = make_kokoro(*self._paths)
-        with _SYNTH_LOCK:
-            self.k = k
-
     def synth(self, text, p):
         voice = p["voice"]
-        lang = None
-        try:
-            import prefs
-            if prefs.get("languages"):                 # a Spanish (French, ...) sentence gets a Spanish voice
-                import langs
-                hit = langs.voice_for(text, voice)
-                if hit and hit[0] in self.available:
-                    voice, lang = hit
-        except Exception:
-            pass
         if voice not in self.available:
             if voice not in self._warned:
                 self._warned.add(voice)
@@ -254,7 +217,7 @@ class KokoroEngine:
         pitch = float(p.get("pitch") or 1.0)
         speed = min(max(float(p["speed"]) / pitch, 0.5), 2.0)
         with _SYNTH_LOCK:
-            samples, sr = self.k.create(text, voice=voice, speed=speed, lang=lang or _lang_for(voice, p["lang"]))
+            samples, sr = self.k.create(text, voice=voice, speed=speed, lang=_lang_for(voice, p["lang"]))
         pcm = np.asarray(samples, dtype=np.float32)
         peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
         if peak > 0.95:                      # some voices overshoot full scale and would crackle
@@ -377,13 +340,6 @@ class Speaker:
         self._out_failed = not config.ECHO_CANCEL
         self.persona = dict(DEFAULT_PERSONA)
         self.who = None               # name of whoever the next stream speaks as (for the HUD)
-
-    def rebuild_voice(self):
-        """After the voice setting changes: rebuild Kokoro on the processor or graphics card. Returns where it runs."""
-        for e in self.engines:
-            if e.name == "kokoro" and hasattr(e, "rebuild"):
-                e.rebuild()
-        return config.VOICE_ON or "cpu"
 
     def set_persona(self, p):
         """p: a dict from personas.PERSONAS (voice, lang, speed, effect, edge_voice, eleven_voice)."""
@@ -659,8 +615,6 @@ class _Output:
     exact moment it reaches the speakers. (A new stream per sentence would shift the
     timing every sentence and the canceller would have to start learning again.)"""
     SR = 24000
-    TAP = None              # mic_voice.Router: gets every block too, to play into a virtual mic (VB-CABLE)
-    MUTE_SPEAKERS = False   # "Also play him on my speakers" off: only the virtual mic hears him
 
     def __init__(self):
         import sounddevice as sd
@@ -682,14 +636,6 @@ class _Output:
                 self.pos += len(chunk)
                 if self.pos >= len(self.buf):
                     self.buf = None
-        tap = _Output.TAP
-        if tap is not None:
-            try:
-                tap(out)
-            except Exception:
-                pass
-        if _Output.MUTE_SPEAKERS and tap is not None:
-            out = np.zeros(frames, dtype=np.float32)
         outdata[:, 0] = out
         dac = t.outputBufferDacTime or (t.currentTime + self.stream.latency)
         self.ref.write(dac, out, self.SR)

@@ -39,14 +39,9 @@ def _rms(chunk):
 
 
 def _add_cuda_dlls():
-    """If the NVIDIA cuBLAS/cuDNN pip packages are installed, or gpu.py downloaded them, let Windows find their DLLs."""
+    """If the NVIDIA cuBLAS/cuDNN pip packages are installed, let Windows find their DLLs."""
     if sys.platform != "win32":
         return
-    try:
-        import gpu
-        gpu.add_dll_dir()
-    except Exception:
-        pass
     import importlib.util
     import os
     for pkg in ("nvidia.cublas", "nvidia.cudnn", "nvidia.cuda_runtime"):
@@ -96,7 +91,6 @@ def _cuda_libs_present():
     if sys.platform != "win32":
         return True
     import ctypes
-    _add_cuda_dlls()
     for dll in CUDA_DLLS:
         try:
             ctypes.WinDLL(dll)
@@ -125,8 +119,7 @@ def _cuda_works():
         pass
     _add_cuda_dlls()                       # so the child process inherits the PATH to the NVIDIA DLLs
     if config.FROZEN and not _cuda_libs_present():
-        print("[voice] NVIDIA's CUDA 12 libraries aren't installed; speech recognition runs on the CPU "
-              "(say \"set up graphics card hearing\" to get them)")
+        print("[voice] NVIDIA's CUDA 12 libraries aren't installed; speech recognition runs on the CPU")
         ok = False
     else:
         ok = _run_cuda_test()
@@ -165,11 +158,6 @@ def _run_cuda_test():
 
 
 def _pick_device():
-    config.HEARING_ON = d = _pick_device_inner()
-    return d
-
-
-def _pick_device_inner():
     want = config.WHISPER_DEVICE
     if want == "cpu":
         return "cpu"
@@ -296,8 +284,7 @@ class Listener:
         # Pass 2 (only when you're talking to him): bigger and careful. Loads in the background.
         self.accurate = None
         self.accurate_name = (config.WHISPER_ACCURATE if config.WHISPER_ACCURATE != "auto"
-                              else ("large-v3-turbo" if self.device == "cuda"
-                                    else "small" if config.LANGUAGES else "distil-small.en"))
+                              else ("large-v3-turbo" if self.device == "cuda" else "distil-small.en"))
         self._log = log
         threading.Thread(target=self._load_accurate, daemon=True, name="whisper-load").start()
         self.stream = sd.InputStream(samplerate=config.SAMPLE_RATE, channels=1, dtype="int16",
@@ -314,8 +301,7 @@ class Listener:
 
     def _maybe_downgrade(self):
         est = self.careful_estimate()
-        lighter = {"distil-small.en": "base.en", "small.en": "base.en", "medium.en": "base.en",
-                   "small": "base", "medium": "base"}.get(self.accurate_name)
+        lighter = {"distil-small.en": "base.en", "small.en": "base.en", "medium.en": "base.en"}.get(self.accurate_name)
         fast = getattr(self, "_fast_secs", None)
         lighter_ok = fast is not None and fast * self.COST_VS_TINY["base.en"] <= config.CAREFUL_BUDGET * 1.2
         if (config.WHISPER_ACCURATE == "auto" and lighter and est is not None and est > config.CAREFUL_BUDGET
@@ -393,7 +379,6 @@ class Listener:
     # Whisper always works on a fixed 30-second window, so each pass costs about the same whatever
     # the clip length. Relative cost of each model vs tiny.en on a CPU (int8), roughly:
     COST_VS_TINY = {"tiny.en": 1.0, "base.en": 2.0, "distil-small.en": 3.5, "small.en": 6.0,
-                    "tiny": 1.0, "base": 2.0, "small": 6.0, "medium": 15.0,
                     "distil-medium.en": 7.0, "medium.en": 15.0}
 
     def _fast_pass(self, audio):
@@ -465,7 +450,7 @@ class Listener:
 
     def _transcribe(self, model, audio, beam_size, prompt):
         """Returns (list of segments, info). Never lets a broken optional piece stop him hearing you."""
-        kw = dict(language=config.HEAR_LANGUAGE, beam_size=beam_size, vad_filter=Listener._vad_filter, initial_prompt=prompt,
+        kw = dict(language="en", beam_size=beam_size, vad_filter=Listener._vad_filter, initial_prompt=prompt,
                   condition_on_previous_text=False, without_timestamps=True)
         a = _normalize(audio)
         try:

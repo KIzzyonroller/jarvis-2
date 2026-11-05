@@ -432,7 +432,7 @@ class Core:
                 self.glass.stop()
             except Exception:
                 pass
-        for part in (getattr(self, "watchers", None), getattr(self, "activity", None), getattr(self, "extras", None)):
+        for part in (getattr(self, "watchers", None), getattr(self, "activity", None)):
             if part is not None:
                 try:
                     part.stop()
@@ -551,7 +551,6 @@ class Core:
         self._start_jobs()
         self._start_watchers()
         self._start_activity()
-        self._start_extras()
         for old in (config.BASE_DIR / "creator.id", config.JARVIS_DIR / "voiceprint.json"):
             try:                                # left over from removed features (owner PC, voice lock)
                 old.unlink()
@@ -1702,9 +1701,6 @@ class Core:
         gl = getattr(self, "glass", None)
         if gl is not None:
             gl.feed(ev)
-        ex = getattr(self, "extras", None)
-        if ex is not None:
-            ex.feed(ev)
         h = self.history
         if h is None:
             return
@@ -1722,16 +1718,6 @@ class Core:
                     h.add(who, ev["text"])
         except Exception as e:
             print(f"[history] couldn't save: {e}")
-
-    # ================================================================ options, graphics card, desktop characters...
-    def _start_extras(self):
-        try:
-            import extras
-            self.extras = extras.Extras(self)
-            tools.set_extras(lambda: self.extras)
-            self.extras.start()
-        except Exception as e:
-            print(f"[extras] {e}")
 
     # ================================================================ watchers + activity memory
     def _start_watchers(self):
@@ -1790,16 +1776,15 @@ class Core:
             print(f"[activity] {e}")
 
     def secret_code(self, source="voice"):
-        """Up up down down left right left right B A start: the two of them merge into one being (or split again).
-        The merged one shows on the desktop when the desktop characters are on."""
-        import prefs
-        on = not prefs.get("merged")
-        prefs.set("merged", on)
+        """Up up down down left right left right B A start: the two of them merge into one (or split again).
+        The merged form needs the desktop characters; until those exist this just remembers the choice."""
+        on = not self._state_flag("merged")
+        self._state_flag("merged", on)
         print(f"[secret] merged {'on' if on else 'off'} ({source})")
-        desk = prefs.get("desktop")
-        self.emit({"type": "toast", "text": ("Code accepted." + ("" if desk else " Turn on \"Show them on the desktop\" "
-                                             "in Options to see what it did.")) if on else "Split again."})
-        line = random.choice(["Two minds. One body.", "Interesting choice."] if on else ["Back to two of us."])
+        self.emit({"type": "merged", "on": on})
+        self.emit({"type": "toast", "text": ("Code accepted. The merge is armed: you'll see it once they have bodies on your desktop."
+                                            if on else "Split again.")})
+        line = random.choice(["Interesting choice.", "Two minds, one body. Soon."] if on else ["Back to two of us."])
         self.say_line(line) if self.persona_key == "ultron" else self.emit({"type": "msg", "role": "system", "text": line})
 
     def glass_hub(self):
@@ -2679,17 +2664,8 @@ class Core:
             if quick:
                 print(f"[brain] quick model for {text[:50]!r}")
             tools._CTX.persona = getattr(brain, "persona_key", self.persona_key)
-            lane = self.extras.part("localbrain") if getattr(self, "extras", None) else None
-            if (lane is not None and brain is self.brain and source != "duo" and allow_tools and not gaming
-                    and lane.wants(text)):
-                print(f"[brain] small local brain for {text[:50]!r}")
-                reply = lane.ask(text, self.persona_key, config.ADDRESS_AS, on_text, turn["cancel"])
-                if reply:
-                    brain.note(f"(That last exchange was answered by the small local model: they said {text!r} "
-                               f"and you replied {reply!r}.)")
-            if reply is None and not turn["cancel"].is_set():
-                reply = brain.ask(prompt or text, on_text=on_text, on_event=on_event, cancel=turn["cancel"],
-                                  allow_tools=allow_tools, quick=quick)
+            reply = brain.ask(prompt or text, on_text=on_text, on_event=on_event, cancel=turn["cancel"],
+                              allow_tools=allow_tools, quick=quick)
             if reply is not None and not turn["interrupted"]:
                 if not turn["text"].strip():
                     self.emit({"type": "reply_delta", "id": tid, "text": reply})

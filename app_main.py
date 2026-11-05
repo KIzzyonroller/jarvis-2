@@ -30,7 +30,7 @@ def _velopack():
     app.run()
 
 
-def _cuda_test(result_path, code=None, fail="CUDA_FAILED"):
+def _cuda_test(result_path):
     """speech.py tests the GPU in a separate process (a bad NVIDIA driver can crash the process outright).
     In the installed app that process is Jarvis.exe --cuda-test <file>. It has no console, so it writes its
     answer to the file, and it must never let an error escape: that would pop up an error box for the user."""
@@ -43,10 +43,10 @@ def _cuda_test(result_path, code=None, fail="CUDA_FAILED"):
         import speech
         sys.argv = [sys.argv[0], ""]
         with contextlib.redirect_stdout(buf):
-            exec(compile(code or speech._CUDA_TEST, "<child-test>", "exec"), {"__name__": "__cuda_test__"})
+            exec(compile(speech._CUDA_TEST, "<cuda-test>", "exec"), {"__name__": "__cuda_test__"})
         text = buf.getvalue()
     except BaseException:
-        text = fail + " " + traceback.format_exc().strip().splitlines()[-1]
+        text = "CUDA_FAILED " + traceback.format_exc().strip().splitlines()[-1]
     try:
         with open(result_path, "w", encoding="utf-8") as f:
             f.write(text)
@@ -56,7 +56,7 @@ def _cuda_test(result_path, code=None, fail="CUDA_FAILED"):
 
 
 SELFTEST_MODULES = [
-    "config", "core", "brain", "gpu", "prefs", "extras", "buddies", "buddies_qt", "comments", "localbrain", "pointer", "mic_voice", "langs", "tools", "speech", "voice", "vad", "aec", "intents", "personas", "permissions",
+    "config", "core", "brain", "tools", "speech", "voice", "vad", "aec", "intents", "personas", "permissions",
     "spotify", "youtube", "notifications", "briefing", "history", "connectors", "usage", "jobs", "discord_bot",
     "app_update", "autostart", "phone", "mini", "health", "cloud_stt", "download_models", "email_reader", "netflix",
     "settings", "secretbox", "voice_settings", "changelog", "apple_music", "media_buttons", "discord_typing", "app_ready", "providers", "experts", "unreal_bridge", "closer", "folder_access", "rgb", "openrgb", "meshy", "cal_store", "cal_sync", "calendar_service", "calendar_mode", "watchers", "activity", "glass", "secret", "icalendar", "recurring_ical_events", "caldav",
@@ -105,12 +105,6 @@ if __name__ == "__main__":
         _velopack()
         if len(sys.argv) > 2 and sys.argv[1] == "--cuda-test":
             _cuda_test(sys.argv[2])
-        if len(sys.argv) > 3 and sys.argv[1] == "--buddies":            # the desktop characters' own process
-            import buddies_qt
-            sys.exit(buddies_qt.run(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else ""))
-        if len(sys.argv) > 2 and sys.argv[1] == "--voice-gpu-test":     # gpu.py: his voice on the graphics card
-            import gpu
-            _cuda_test(sys.argv[2], gpu.VOICE_TEST_CODE, "VOICE_FAILED")
     import jarvis
     try:
         jarvis.main()

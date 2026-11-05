@@ -299,54 +299,7 @@ def _apple_music(m):
 
 
 NUMWORD = r"(\d+(?:\.\d+)?|" + "|".join(sorted(WORDNUM, key=len, reverse=True)) + r")"
-def _battery(m):
-    if _DRY.on:
-        return HIT
-    import psutil
-    b = psutil.sensors_battery()
-    if b is None:
-        return "This PC doesn't have a battery.", "Battery: none"
-    left = ""
-    if not b.power_plugged and b.secsleft and b.secsleft > 0 and b.secsleft != psutil.POWER_TIME_UNLIMITED:
-        h, mins = divmod(int(b.secsleft) // 60, 60)
-        left = f", about {h} hour{'s' if h != 1 else ''} {mins} minutes left" if h else f", about {mins} minutes left"
-    return f"Battery's at {int(b.percent)} percent{', charging' if b.power_plugged else ''}{left}.", "Battery"
-
-
-def _load(m):
-    if _DRY.on:
-        return HIT
-    import psutil
-    cpu = psutil.cpu_percent(interval=0.4)
-    ram = psutil.virtual_memory().percent
-    return f"Processor's at {cpu:.0f} percent, memory at {ram:.0f} percent.", "Load"
-
-
-def _opt(action, key=None, value=None):
-    def run(m):
-        if _DRY.on:
-            return HIT
-        out = tools.options_tool(action, key, value)
-        return out, f"Options: {action} {key or ''} {value if value is not None else ''}".strip()
-    return run
-
-
-def _clones(m):
-    if _DRY.on:
-        return HIT
-    words = {"two": 2, "three": 3, "four": 4, "five": 5, "a couple": 2, "a few": 3}
-    n = m.group(1) if m.lastindex else None
-    n = words.get(n, n) if n else 3
-    return tools.options_tool("clone", value=n), "Clones"
-
-
 RULES = [
-    (r"^(?:what(?:'s| is) (?:my |the )?battery(?: at| level| life)?|how(?:'s| is) (?:my |the )?battery|battery(?: level)?)$", _battery),
-    (r"^(?:how(?:'s| is) (?:my |the )?(?:pc|computer|cpu|processor) (?:doing|load)|what(?:'s| is) (?:my |the )?(?:cpu|processor) (?:usage|at)|(?:cpu|processor) usage)$", _load),
-    (r"^(?:clone yourself|make (?:some )?clones|(?:make|spawn) (two|three|four|five|a couple|a few) (?:clones|copies)(?: of yourself)?)$", _clones),
-    (r"^(?:clones away|get rid of the clones|(?:send|put) (?:the )?clones away|no more clones)$", _opt("clones_away")),
-    (r"^(?:come out|show yourself|show yourselves)(?: on (?:the|my) desktop)?$|^(?:go |get )?on (?:the|my) desktop$", _opt("set", "desktop", True)),
-    (r"^(?:go back in|hide from (?:the|my) desktop|get off (?:the|my) desktop|leave (?:the|my) desktop)$", _opt("set", "desktop", False)),
     (r"^(?:play|put on|pull up|show me|watch|find and play) (.+?) on youtube$", _youtube),
     (r"^(?:play|put on|open|pull up|start) (.+?) on spotify$", _spotify),
     (r"^(?:shuffle|shuffle play|play shuffled|put on shuffled) (.+?) on spotify$", _spotify_shuffle),

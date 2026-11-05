@@ -1096,26 +1096,6 @@ def mouse(action, what="", x=None, y=None, to_x=None, to_y=None, amount=3, risky
             return "Need x and y (pixels in the latest screenshot)."
         if risky and not _confirm(f"Click: {what or action}", f"{action} at ({x}, {y}) in the last screenshot", "clicks"):
             return DENIED
-        try:
-            import prefs
-            own = bool(prefs.get("own_pointer"))
-        except Exception:
-            own = False
-        if own and (needs_xy or action == "scroll"):        # his own pointer: leave the user's alone where possible
-            import pointer
-            sx, sy = to_screen(x, y) if x is not None and y is not None else pyautogui.position()
-            to = to_screen(to_x, to_y) if action == "drag" and to_x is not None and to_y is not None else None
-            if action == "drag" and to is None:
-                return "Drag needs to_x and to_y."
-            note = pointer.act(action, sx, sy, to=to, amount=amount)
-            done = f"{action.replace('_', ' ').capitalize()}" + (f": {what}" if what else "") + f". {note}"
-            if look_after:
-                time.sleep(0.6)
-                view = look_at_screen(target=(v or {}).get("target", "all"))
-                if isinstance(view, list):
-                    view[0]["text"] = done + " Screen afterwards: " + view[0]["text"]
-                return view
-            return done
         if needs_xy:
             sx, sy = to_screen(x, y)
             pyautogui.moveTo(sx, sy, duration=0.15)
@@ -1737,13 +1717,6 @@ def context_note():
         import activity
         t = activity.short_title(cur["title"], cur["app"])
         parts.append(f"In front right now: {cur['app']}" + (f" ({t[:80]})" if t else ""))
-    try:
-        import langs
-        rule = langs.reply_rule()
-        if rule:
-            parts.append(rule)
-    except Exception:
-        pass
     return " | ".join(parts)
 
 
@@ -2262,55 +2235,6 @@ def activity_tool(action="summary", when=None, query=None, days=None, minutes=No
     return "action must be summary, search, reopen, status, pause, resume, forget, on or off."
 
 
-_EXTRAS = {"get": None}
-
-
-def set_extras(getter):
-    _EXTRAS["get"] = getter
-
-
-def options_tool(action="list", key=None, value=None):
-    ex = _EXTRAS["get"]() if _EXTRAS["get"] else None
-    if ex is None:
-        return "Options aren't ready yet."
-    import prefs
-    a = (action or "list").lower()
-    if a == "list":
-        return prefs.describe()
-    if a == "set":
-        if not key:
-            return "Which option?"
-        if key == "safety":                        # he can make himself stricter, never looser
-            import permissions
-            try:
-                want = prefs.coerce("safety", value)
-            except ValueError as e:
-                return str(e)
-            if not permissions.stricter(want, prefs.get("safety")) and want != prefs.get("safety"):
-                return ("Loosening safety isn't something I'll do by voice. They can change it themselves in the System "
-                        "panel under Options > Safety.")
-        return ex.set_option(key, value)
-    if a == "gpu_status":
-        return ex.gpu_text()
-    if a == "setup_hearing":
-        return ex.setup_hearing()
-    if a == "remove_hearing":
-        return ex.remove_hearing_libs()
-    if a == "retest_voice":
-        return ex.retest_voice()
-    if a == "setup_local_brain":
-        return ex.setup_local()
-    if a == "local_status":
-        return ex.local_text()
-    if a in ("clone", "clones_away", "merge", "summon_test"):
-        b = ex.part("buddies")
-        if b is None:
-            return "The desktop characters aren't on. Turn on \"Show them on the desktop\" first."
-        return b.command(a, value)
-    return ("action must be list, set, gpu_status, setup_hearing, remove_hearing, retest_voice, clone, clones_away, "
-            "setup_local_brain or local_status.")
-
-
 _GLASS = {"get": None}
 
 
@@ -2408,34 +2332,8 @@ def fullscreen_app():
 _URI_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:(?!\\)")
 
 
-_SUMMON = {"fn": None}
-
-
-def set_summon_hook(fn):
-    """buddies.Host.summon: the desktop figure's entrance while something opens."""
-    _SUMMON["fn"] = fn
-
-
 def open_thing(target, kind="auto", front=False, new_window=False, wait=True):
-    """kind: app, url, file, settings, or auto. With the desktop characters out, the one doing it reaches out and the
-    window gets an entrance as it appears."""
-    hook = _SUMMON["fn"]
-    token = None
-    if hook is not None and (target or "").strip():
-        try:
-            token = hook(target, kind, getattr(_CTX, "persona", None))
-        except Exception as e:
-            print(f"[buddies] {e}")
-    result = _open_thing(target, kind, front, new_window, wait)
-    if token is not None:
-        try:
-            token.done(result)
-        except Exception as e:
-            print(f"[buddies] {e}")
-    return result
-
-
-def _open_thing(target, kind="auto", front=False, new_window=False, wait=True):
+    """kind: app, url, file, settings, or auto."""
     t = (target or "").strip()
     if not t:
         return "Open what?"
@@ -3033,26 +2931,6 @@ TOOL_SPECS = [
                    "wasn't open, showing a card opens it.",
           {"action": {"type": "string", "enum": ["open", "show", "add", "list", "remove", "clear", "close"]},
            "title": S, "body": S, "items": {"type": "array", "items": S}, "image": S, "id": N}, ["action"]),
-    _spec("options", "The user's live options (they take effect at once). list: every option and its value. set (key, "
-                     "value): change one when they ask, e.g. 'show yourselves on the desktop' -> desktop on; 'just you, "
-                     "no window' -> hud_mode character; 'comment on what I'm doing' -> screen_comments on; 'be more "
-                     "careful' -> safety careful; 'speak Spanish' -> languages on + language es; 'use the graphics card "
-                     "for your voice' -> voice_device gpu; 'use the small local brain' -> local_brain on; 'talk into my "
-                     "mic' -> mic_voice on. Keys: hearing_device (auto/cpu/cuda), voice_device (auto/cpu/gpu), desktop, "
-                     "desktop_who (persona/jarvis/ultron/both), hud_mode (window/character), desktop_size (s/m/l), roam, "
-                     "perch, peek, nap, dance, hover_fade, summon_fx, clones, screen_comments, comment_rate "
-                     "(rarely/sometimes/often), safety (careful/balanced/relaxed), languages, language (auto/es/fr/it/pt/"
-                     "hi/en), local_brain, local_model, own_pointer, mic_voice, mic_device, mic_also_speakers. "
-                     "gpu_status: where hearing and the voice run. setup_hearing: download NVIDIA's libraries so "
-                     "hearing can run on the graphics card (about 1.2 GB). remove_hearing. retest_voice. clone: a few "
-                     "little copies of you on the desktop (only if the clones option is on; value = how many, up to 5). "
-                     "clones_away. setup_local_brain: download the small local model through Ollama (they need Ollama "
-                     "installed: ollama.com/download). local_status. Never turn safety down or switch something on "
-                     "that they didn't ask for.",
-          {"action": {"type": "string", "enum": ["list", "set", "gpu_status", "setup_hearing", "remove_hearing",
-                                                 "retest_voice", "clone", "clones_away", "setup_local_brain",
-                                                 "local_status"]},
-           "key": S, "value": {"type": ["string", "boolean", "number"]}}, ["action"]),
     _spec("activity", "Activity memory: which apps and windows the user had in front, logged on this PC (titles "
                       "only, never screenshots or typing), if they've switched it on. summary (when: today, "
                       "yesterday, this morning, yesterday afternoon, last 2 hours, friday, last week, 2026-10-20): "
@@ -3079,7 +2957,7 @@ FUNCS = {
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "history": history_tool, "background": background_tool,
-    "watch": watch_tool, "activity": activity_tool, "glass": glass_tool, "options": options_tool,
+    "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
 
 assert set(FUNCS) == {s["name"] for s in TOOL_SPECS}, "TOOL_SPECS and FUNCS are out of sync"

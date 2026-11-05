@@ -17,16 +17,6 @@ DATA_DIR = (Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Lo
 ENV_FILE = DATA_DIR / ".env"
 
 
-def _pref(key, default):
-    """An option from prefs.json (prefs.py), read early because config can't import prefs."""
-    try:
-        import json as _json
-        v = _json.loads((DATA_DIR / "prefs.json").read_text(encoding="utf-8")).get(key)
-        return default if v is None else v
-    except Exception:
-        return default
-
-
 def _load_env():
     env = ENV_FILE
     if not env.exists():
@@ -109,15 +99,7 @@ CHUNK = 1280              # 80 ms
 WHISPER_FAST = os.environ.get("JARVIS_WHISPER_FAST", "tiny.en")   # just listens for the name; the accurate pass does the real work
 WHISPER_THREADS = int(os.environ.get("JARVIS_WHISPER_THREADS", "4"))  # cap so listening never hogs every core
 WHISPER_ACCURATE = os.environ.get("JARVIS_WHISPER", "auto")
-# Other languages (the "Other languages" option, read at start): hearing switches to Whisper's multilingual models
-# and understands the language you pick ("auto" = whatever you speak); his replies follow, in a matching voice.
-LANGUAGES = bool(_pref("languages", False))
-LANGUAGE = str(_pref("language", "auto")).lower()
-HEAR_LANGUAGE = "en" if not LANGUAGES else (None if LANGUAGE == "auto" else LANGUAGE)
-if LANGUAGES and not os.environ.get("JARVIS_WHISPER_FAST"):
-    WHISPER_FAST = "tiny"            # the English-only tiny model can't hear his name inside another language
-WHISPER_DEVICE = (os.environ.get("JARVIS_WHISPER_DEVICE") or str(_pref("hearing_device", "auto"))).lower()   # auto, cpu, cuda
-HEARING_ON = ""            # filled in by speech.py once it knows: "cuda" or "cpu"
+WHISPER_DEVICE = os.environ.get("JARVIS_WHISPER_DEVICE", "auto").lower()   # auto, cpu, cuda
 MEMORY_FILE_NAME = "memory.json"
 ROUTINES_FILE_NAME = "routines.json"
 MEMORY_LIMIT = 200            # facts kept
@@ -166,10 +148,6 @@ KOKORO_LANG = "en-gb"
 # How many CPU cores his voice may use while it's being generated. All of them makes each sentence a big spike
 # (and barely faster); about half, at most 4, keeps it smooth. 0 = let the library decide.
 KOKORO_THREADS = int(os.environ.get("JARVIS_VOICE_THREADS", "-1"))
-# Where his voice is made: "auto" (graphics card only if it passed its test AND is faster), "gpu" (graphics card
-# if it passed its test), "cpu" (always the processor). gpu.py runs the test once, in the background.
-VOICE_DEVICE = (os.environ.get("JARVIS_VOICE_DEVICE") or str(_pref("voice_device", "auto"))).lower()
-VOICE_ON = ""              # filled in by voice.py: "gpu" or "cpu"
 
 ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
 SPOTIFY_CLIENT_ID = os.environ.get("SPOTIFY_CLIENT_ID", "")     # optional: real Spotify control (README explains)

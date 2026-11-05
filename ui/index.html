@@ -170,15 +170,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;heigh
 .perm{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;padding:7px 0}
 .perm b{font-weight:500;font-size:13.5px}
 .perm span{grid-column:1;font-size:12px;color:var(--dim);line-height:1.4}
-#opts details{border-top:1px solid rgba(var(--crgb),.12);padding:6px 0}
-#opts details:first-child{border-top:0}
-#opts summary{cursor:pointer;font-size:13px;color:var(--ink);padding:4px 0;list-style:none;display:flex;justify-content:space-between}
-#opts summary::after{content:"+";color:var(--dim)} #opts details[open] summary::after{content:"\2013"}
-#opts summary:focus-visible{outline:1px solid var(--c);outline-offset:2px}
-#opts select,#opts input[type=text]{font:inherit;font-size:12.5px;color:var(--ink);background:rgba(var(--crgb),.06);border:1px solid rgba(var(--crgb),.25);padding:4px 6px;max-width:170px}
-#opts select option{background:var(--void)}
-#opts .gpu{font-size:12px;color:var(--dim);line-height:1.5;margin:4px 0 6px}
-#opts .gbar{height:4px;background:rgba(var(--crgb),.12);margin:6px 0}#opts .gbar i{display:block;height:100%;background:var(--c);width:0;transition:width .4s}
 .sw{grid-row:1/3;grid-column:2;width:34px;height:18px;border:1px solid rgba(var(--crgb),.35);position:relative;transition:background .2s}
 .sw::after{content:"";position:absolute;top:3px;left:3px;width:10px;height:10px;background:var(--dim);transition:transform .2s,background .2s}
 .sw[aria-checked=true]{background:rgba(var(--argb),.18);border-color:var(--alarm)}
@@ -585,10 +576,6 @@ body.swap #stage{animation:swap .6s steps(6)}
         <button id="wn-btn"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 2.5l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 7.8l5-.7z"/></svg>What's new</button>
         <button data-act="reset"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10a6 6 0 106-6H6M8 1L5 4l3 3"/></svg>New chat</button>
       </div>
-    </section>
-    <section class="sec" id="opts-sec">
-      <h3>Options</h3>
-      <div id="opts"><p class="fine" style="margin-top:0">Loading...</p></div>
     </section>
     <section class="sec">
       <div class="tabs" role="tablist">
@@ -1475,50 +1462,6 @@ function renderActivity(e) {
 $("#act-sw").onclick = () => { actOn = !actOn; $("#act-sw").setAttribute("aria-checked", String(actOn)); call("activity", actOn ? "on" : "off"); };
 $("#act-pause").onclick = () => call("activity", $("#act-pause").textContent === "Resume" ? "resume" : "pause", 60);
 $("#act-wipe").onclick = () => call("activity", "wipe");
-// ---- Options (prefs.py): drawn from the list the app sends, so new options need no UI work
-const optOpen = new Set(["Graphics card"]);
-let optLast = null;
-function renderOpts(e) {
-  optLast = e;
-  const groups = {};
-  (e.items || []).forEach((it) => (groups[it.group] = groups[it.group] || []).push(it));
-  const row = (it) => {
-    const help = it.help ? `<span>${esc(it.help)}</span>` : "";
-    if (it.kind === "bool") return `<div class="perm"><b>${esc(it.label)}</b><button class="sw" role="switch" aria-checked="${!!it.value}" data-k="${esc(it.key)}" aria-label="${esc(it.label)}"></button>${help}</div>`;
-    if (it.kind === "choice") return `<div class="perm"><b>${esc(it.label)}</b><select data-k="${esc(it.key)}" aria-label="${esc(it.label)}">${it.options.map((o) => `<option value="${esc(o.v)}"${o.v === it.value ? " selected" : ""}>${esc(o.label)}</option>`).join("")}</select>${help}</div>`;
-    return `<div class="perm"><b>${esc(it.label)}</b><input type="text" data-k="${esc(it.key)}" value="${esc(String(it.value ?? ""))}" aria-label="${esc(it.label)}">${help}</div>`;
-  };
-  const g = e.gpu || {};
-  const gpuBlock = () => {
-    const hear = g.hearing_on === "cuda" ? "graphics card" : g.hearing_on === "cpu" ? "processor" : "starting";
-    const voice = g.voice_on === "gpu" ? "graphics card" : "processor";
-    const d = g.download || {};
-    return `<div class="gpu">${g.card ? esc(g.card) : "No NVIDIA card found (the voice can still try any DirectX 12 card)."}<br>Hearing on the ${hear}. Voice on the ${voice}.${g.voice_gpu_note ? "<br>" + esc(g.voice_gpu_note) : ""}</div>
-      <div class="gbar" ${d.busy ? "" : "hidden"}><i style="width:${d.pct || 0}%"></i></div><div class="gpu" id="gpu-step">${d.busy ? esc(d.step) : d.error ? esc(d.error) : ""}</div>
-      ${g.card ? (g.cuda_libs ? `<button class="link" data-gpu="remove_hearing">Remove graphics card hearing</button>` : `<button class="link" data-gpu="setup_hearing"${d.busy ? " disabled" : ""}>Set up graphics card hearing (1.2 GB)</button>`) : ""}
-      &nbsp;&nbsp;<button class="link" data-gpu="retest_voice">Test voice on graphics card</button>`;
-  };
-  const lo = e.local || {}, dk = e.desk || {};
-  const brainBlock = () => lo.on ? `<div class="gpu" id="local-step">${esc(lo.note || "Checking...")}${lo.gaming ? " Unloaded while you game." : ""}</div>
-      <div class="gbar" id="local-bar" hidden><i></i></div>${lo.ok ? "" : `<button class="link" data-gpu="setup_local_brain">Download the model</button>`}` : "";
-  const deskBlock = () => dk.available === false ? `<div class="gpu">This build doesn't include the desktop characters yet; they arrive with the next update.</div>` : "";
-  const extra = { "Graphics card": gpuBlock, "Brain": brainBlock, "On your desktop": deskBlock };
-  $("#opts").innerHTML = Object.entries(groups).map(([name, items]) => `<details${optOpen.has(name) ? " open" : ""} data-g="${esc(name)}"><summary>${esc(name)}</summary>${items.map(row).join("")}${extra[name] ? extra[name]() : ""}</details>`).join("");
-  $("#opts").querySelectorAll("details").forEach((d) => d.ontoggle = () => d.open ? optOpen.add(d.dataset.g) : optOpen.delete(d.dataset.g));
-  $("#opts").querySelectorAll(".sw").forEach((s) => s.onclick = () => { const on = s.getAttribute("aria-checked") !== "true"; s.setAttribute("aria-checked", String(on)); call("set_pref", s.dataset.k, on); });
-  $("#opts").querySelectorAll("select,input[type=text]").forEach((s) => s.onchange = () => call("set_pref", s.dataset.k, s.value));
-  $("#opts").querySelectorAll("[data-gpu]").forEach((b) => b.onclick = () => { b.disabled = true; call("options_action", b.dataset.gpu); });
-}
-function localProgress(e) {
-  const bar = $("#local-bar"), step = $("#local-step");
-  if (bar) { bar.hidden = !!e.done; const i = bar.querySelector("i"); if (i) i.style.width = Math.max(0, e.pct) + "%"; }
-  if (step) step.textContent = e.done ? e.step : `${e.step} ${e.pct ? e.pct + "%" : ""}`;
-}
-function gpuProgress(e) {
-  const bar = $("#opts .gbar"), step = $("#gpu-step");
-  if (bar) { bar.hidden = !!e.done; const i = bar.querySelector("i"); if (i) i.style.width = Math.max(0, e.pct) + "%"; }
-  if (step) step.textContent = e.done ? e.step : `${e.step} ${e.pct}%`;
-}
 function renderConnectors(e) {
   const items = e.items || [];
   if (!e.available) { $("#conn").innerHTML = `<p class="fine" style="margin-top:0">Not installed. Run setup.bat once to add the part connectors need.</p>`; return; }
@@ -1978,9 +1921,6 @@ window.J = {
       case "watchers": renderWatchers(e.items || []); break;
       case "face": setFace(e.name); break;
       case "activity_mem": renderActivity(e); break;
-      case "prefs": renderOpts(e); break;
-      case "gpu_progress": gpuProgress(e); break;
-      case "local_progress": localProgress(e); break;
       case "job_done": sfx.play(e.ok ? "yes" : "fail"); toast(e.ok ? `Background job done: ${e.goal}` : `Background job failed: ${e.goal}`); break;
       case "discord": {
         sfx.play("ping");
@@ -2395,22 +2335,6 @@ function demo() {
     { mode: "unreal", name: "Unreal", unlocked: false, has_model: true, where: { Claude: "console.anthropic.com/settings/keys", OpenRouter: "openrouter.ai/settings/keys", OpenAI: "platform.openai.com/api-keys" } }];
   setTimeout(() => J.on({ type: "agenda", items: [{ title: "Dentist", day: "today", time: "3 PM", cal: "Jarvis" },
     { title: "Hockey practice", day: "tomorrow", time: "5 PM", cal: "Google Calendar" }, { title: "Mom's birthday", day: "Saturday", all_day: true, cal: "Jarvis" }] }), 300);
-  // Options (demo): a few of each kind so the section can be checked without the app
-  const DEMO_OPTS = [
-    ["Graphics card", "hearing_device", "Hearing runs on", "choice", "auto", "Graphics card needs NVIDIA's libraries (Set up below, about 1 GB, once). Takes effect next start.", [["auto", "Auto"], ["cpu", "Processor"], ["cuda", "Graphics card"]]],
-    ["Graphics card", "voice_device", "His voice runs on", "choice", "auto", "The graphics card has to pass a test first.", [["auto", "Auto"], ["cpu", "Processor"], ["gpu", "Graphics card"]]],
-    ["On your desktop", "desktop", "Show them on the desktop", "bool", true, "They live on your desktop.", null],
-    ["On your desktop", "hud_mode", "His window", "choice", "window", "", [["window", "Window and figure"], ["character", "Just him"]]],
-    ["Extras", "screen_comments", "Comments on what you're doing", "bool", false, "From window names only.", null],
-    ["Extras", "safety", "Safety", "choice", "balanced", "Hard stops always ask.", [["careful", "Careful"], ["balanced", "Balanced"], ["relaxed", "Relaxed"]]],
-    ["Brain", "local_brain", "Small brain on this PC", "bool", true, "Quick chat answered on your PC for free.", null],
-    ["Hands and voice", "mic_device", "Virtual mic", "text", "CABLE Input", "VB-CABLE's is CABLE Input.", null]];
-  const demoPrefs = () => J.on({ type: "prefs", items: DEMO_OPTS.map(([group, key, label, kind, value, help, opts]) => ({ group, key, label, kind, value, help, options: opts && opts.map(([v, l]) => ({ v, label: l })) })),
-    gpu: { card: "NVIDIA GeForce GTX 1650", cuda_libs: false, hearing_on: "cpu", voice_on: "cpu", voice_gpu_note: "Works, and it's faster than the processor.", download: { busy: false, pct: 0, step: "" } },
-    local: { on: true, ok: false, note: "Ollama is there but the model qwen3:1.7b isn't downloaded yet." }, desk: { available: true } });
-  setTimeout(demoPrefs, 350);
-  api.set_pref = (k, v) => { const o = DEMO_OPTS.find((x) => x[1] === k); if (o) o[4] = v; demoPrefs(); };
-  api.options_action = (a) => { let p = 0; const iv = setInterval(() => { p += 20; J.on({ type: a === "setup_local_brain" ? "local_progress" : "gpu_progress", step: "Downloading", pct: p, done: p >= 100 }); if (p >= 100) clearInterval(iv); }, 300); };
   var DEMO_FOLDERS = [{ path: "D:\\Projects\\Game Project", mode: "edit" }, { path: "E:\\", mode: "read" }];
   setTimeout(() => J.on({ type: "folders", items: DEMO_FOLDERS }), 300);
   const k0 = P.has("ultron") ? "ultron" : "jarvis", u = k0 === "ultron";
