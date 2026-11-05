@@ -2820,6 +2820,32 @@ def birthdays_tool(action="upcoming", name=None, month=None, day=None, year=None
     return birthdays.upcoming()
 
 
+def changelog_tool(action="read", version=None, channel=None, full=False):
+    """Her own release notes: read them, copy them ready for Discord, or post them through her bot."""
+    import changelog
+    a = (action or "read").lower()
+    if a == "read":
+        secs = changelog.sections()
+        pick = [s for s in secs if s[0] == version] if version else secs[:1]
+        if not pick:
+            return f"No release {version} in the changelog. Versions: {', '.join(v for v, _ in secs[:8])}."
+        return f"{pick[0][0]}:\n{pick[0][1][:7000]}"
+    if a == "copy":
+        msgs = changelog.for_discord(version, full=bool(full))
+        if not msgs:
+            return "Nothing to copy."
+        import pyperclip
+        pyperclip.copy(msgs[0] if len(msgs) == 1 else "\n\n".join(msgs))
+        p = changelog.save_for_discord()
+        return (f"Copied to the clipboard, formatted for Discord" + (f" ({len(msgs)} messages' worth; Discord takes "
+                f"2000 characters per message, so it's also split up in {p})" if len(msgs) > 1 and p else "") + ".")
+    if a == "post":
+        if _DISCORD_BOT is None:
+            return "Her Discord bot isn't running on this PC (not set up, or it runs on your server)."
+        return _DISCORD_BOT.post_changelog(channel, version, lambda t, d: _confirm(t, d), full=bool(full))
+    return "action must be read, copy or post."
+
+
 def speed_report(hours=None):
     import speedlog
     return speedlog.report(float(hours) if hours else None)
@@ -3318,6 +3344,13 @@ TOOL_SPECS = [
                        "someone's birthday; remove (name); upcoming. She reminds them 3 days before and on the day.",
           {"action": {"type": "string", "enum": ["add", "remove", "upcoming"]}, "name": S, "month": S, "day": N,
            "year": N, "note": S}, ["action"]),
+    _spec("changelog", "Her own release notes (what's new in each version of this app). read (version, default the "
+                       "newest): summarize it out loud in a few highlights. copy: puts it on the clipboard formatted "
+                       "for Discord. post: whenever they say 'post the changelog / update notes / what's new' (to "
+                       "Discord): her bot posts it to a channel (channel, default the updates channel in Settings); "
+                       "the approval card is the confirmation, so don't ask again first. full: every detail instead of the skim version (titles "
+                       "and first sentences).",
+          {"action": {"type": "string", "enum": ["read", "copy", "post"]}, "version": S, "channel": S, "full": B}, ["action"]),
     _spec("speed_report", "How fast she's been answering: where the time goes between them stopping talking and her "
                            "first sound (hearing, Claude, tools, voice), split by model, tools, cold vs warm. hours "
                            "limits it to recent answers. Also saved as speed_report.txt in her data folder. Read out "
@@ -3536,7 +3569,7 @@ FUNCS = {
     "look_at_camera": look_at_camera, "display": display, "media_control": media_control, "set_volume": set_volume,
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
-    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "pc_doctor": pc_doctor, "steam": steam_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
+    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "pc_doctor": pc_doctor, "steam": steam_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
     "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
 

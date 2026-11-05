@@ -277,6 +277,8 @@ DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
 DISCORD_BOT_ON_SERVER = os.environ.get("DISCORD_BOT_ON_SERVER", "false").lower() == "true"   # server/run_bot.py runs it
 DISCORD_OWNER_ID = os.environ.get("DISCORD_OWNER_ID", "").strip()      # your Discord user ID: you skip the rate limits
 DISCORD_BOT_REPLY = os.environ.get("DISCORD_BOT_REPLY", "everyone").strip().lower()   # everyone, owner or off
+DISCORD_UPDATES_CHANNEL = os.environ.get("DISCORD_UPDATES_CHANNEL", "").strip()     # where she posts her update notes
+DISCORD_UPDATES_MODE = os.environ.get("DISCORD_UPDATES_MODE", "ask").lower()      # ask / auto / off, after an update
 # Started with Windows: seconds to wait after login before loading (keeps login snappy)
 STARTUP_DELAY = float(os.environ.get("JARVIS_STARTUP_DELAY", "10"))
 
@@ -376,7 +378,7 @@ LIVE_KEYS = {"JARVIS_MINI", "JUNO_FPS", "JUNO_CHAT_FIRST", "JUNO_CHAT_EVERY", "J
              "HOME_ASSISTANT_TOKEN", "JUNO_LIGHTS_SYNC", "JUNO_LIGHTS_SYNC_TARGET", "JUNO_JOURNAL", "JUNO_JOURNAL_AT", "JUNO_JOURNAL_FILE",
              "JUNO_GOODNIGHT_PC", "JUNO_GOODNIGHT_LIGHTS", "JUNO_REACTIONS", "STEAM_API_KEY", "STEAM_ID",
              "JUNO_STEAM_SALES", "JUNO_STEAM_SALE_MIN", "JUNO_PATCH_NOTES", "JUNO_MOODS", "JUNO_BANTER", "JUNO_BIRTHDAYS",
-             "JUNO_VOICE", "JARVIS_VOICE", "ULTRON_VOICE", "JUNO_OPINIONS"}
+             "JUNO_VOICE", "JARVIS_VOICE", "ULTRON_VOICE", "JUNO_OPINIONS", "DISCORD_UPDATES_CHANNEL", "DISCORD_UPDATES_MODE"}
 WIDGET_KEYS = {"JUNO_DESK_WIDGETS", "JUNO_DESK_WIDGETS_WHERE", "JUNO_W_STATS", "JUNO_W_MUSIC", "JUNO_W_WEATHER",
                "JUNO_W_CALENDAR", "JUNO_W_NOTES", "JUNO_W_DISCORD"}
 
@@ -405,6 +407,9 @@ def reload_live():
     STEAM_API_KEY, STEAM_ID = os.environ.get("STEAM_API_KEY", ""), os.environ.get("STEAM_ID", "")
     STEAM_SALE_ALERTS, STEAM_SALE_MIN = on("JUNO_STEAM_SALES"), _int_env("JUNO_STEAM_SALE_MIN", 20, 1, 95)
     PATCH_NOTES, MOODS, BANTER, BIRTHDAYS = on("JUNO_PATCH_NOTES"), on("JUNO_MOODS"), on("JUNO_BANTER"), on("JUNO_BIRTHDAYS")
+    global DISCORD_UPDATES_CHANNEL, DISCORD_UPDATES_MODE
+    DISCORD_UPDATES_CHANNEL = os.environ.get("DISCORD_UPDATES_CHANNEL", "").strip()
+    DISCORD_UPDATES_MODE = os.environ.get("DISCORD_UPDATES_MODE", "ask").lower()
     PHONE_NOTIFS, PHONE_SPEAK = on("JUNO_PHONE_NOTIFS"), os.environ.get("JUNO_PHONE_SPEAK", "false").lower() == "true"
     GLASS_WHERE = os.environ.get("JUNO_GLASS_WHERE", "window").lower()
     DESK_WIDGETS = on("JUNO_DESK_WIDGETS")

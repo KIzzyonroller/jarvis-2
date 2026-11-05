@@ -244,18 +244,6 @@ body.jarvis #veil::after{opacity:.5;background-image:linear-gradient(rgba(127,23
 body.ultron #veil::after{opacity:1;background:repeating-linear-gradient(rgba(255,48,70,.06) 0 1px,transparent 1px 4px)}
 body.ultron .card.glitch{animation:glitch .22s steps(2) 1}
 @keyframes glitch{0%{clip-path:inset(10% 0 60% 0);filter:hue-rotate(40deg)}50%{clip-path:inset(55% 0 12% 0);filter:saturate(2)}100%{clip-path:none}}
-#perch{position:absolute;left:0;top:0;width:92px;height:auto;pointer-events:none;transform-origin:0 0;z-index:9999;opacity:0;transition:opacity .25s;filter:drop-shadow(0 6px 10px rgba(0,0,0,.5))}
-#perch.on{opacity:1}
-/* her reactions: the separate translate/rotate properties stack on top of the transform that seats her */
-#perch.r-cheer{animation:pcheer .32s ease-in-out 5}
-#perch.r-heart{animation:pheart 1.3s ease-in-out 2;filter:drop-shadow(0 0 12px #ff6fae)}
-#perch.r-pout{animation:ppout .12s linear 8}
-#perch.r-sleepy{rotate:6deg;translate:0 4px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.5)) brightness(.8);transition:rotate 1s,translate 1s}
-#perch.r-perk{animation:pperk .5s ease-out 1}
-@keyframes pcheer{50%{translate:0 -14px}}
-@keyframes pheart{50%{rotate:-5deg}}
-@keyframes ppout{25%{rotate:-3deg}75%{rotate:3deg}}
-@keyframes pperk{40%{translate:0 -8px;scale:1.05}}
 @media (prefers-reduced-motion:reduce){.card{transition:none}.card.ring-done,body.ultron .card.glitch{animation:none}}
 </style>
 </head>
@@ -278,7 +266,7 @@ body.ultron .card.glitch{animation:glitch .22s steps(2) 1}
     <dt>Fist, hold</dt><dd>crumple a card</dd>
     <dt>Open hand sweep</dt><dd>clear the glass</dd>
     <dt>Pinch a button</dt><dd>press it (sliders follow your hand)</dd>
-    <dt>Flick one finger</dt><dd>next or previous song</dd>
+    <dt>Flick your wrist</dt><dd>next (right) or previous (left) song</dd>
     <dt>Open hand, still</dt><dd>play or pause</dd>
     <dt>Thumbs up or down</dt><dd>answer yes or no</dd>
     <dt>Fingers up, hold</dt><dd>pick that number on a list</dd>
@@ -291,7 +279,6 @@ body.ultron .card.glitch{animation:glitch .22s steps(2) 1}
   <p class="desk-only">On the desktop it's hands only. Dots not on your hand? Tell her "line up my hand".</p>
 </aside>
 <div id="gate" hidden></div>
-<img id="perch" alt="" draggable="false">
 
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <script type="module">
@@ -670,13 +657,7 @@ function onLive(e) {
   if (e.type === "update") { const c = cards.get(e.id); if (c) { c.data = c.d.data = e.data; c.redraw ? c.redraw() : typeof c.live === "function" && c.live(e.data); measure(c); } return true; }
   if (e.type === "np") { cards.forEach((c) => { if (c.d.kind === "nowplaying") { c.live(e.data || {}); measure(c); } }); return true; }
   if (e.type === "gpu" || e.type === "telemetry") { cards.forEach((c) => c.d.kind === "stats" && c.live(e)); return true; }
-  if (e.type === "react") {                  // she cheers / pouts / gets sleepy on the card's edge
-    if (RM.matches) return true;
-    PERCH.className = PERCH.className.replace(/\br-\w+/g, "").trim();
-    void PERCH.offsetWidth; PERCH.classList.add("r-" + e.kind);
-    clearTimeout(GEST.reactT); GEST.reactT = setTimeout(() => PERCH.classList.remove("r-" + e.kind), e.kind === "sleepy" ? 8000 : 2600);
-    return true;
-  }
+  if (e.type === "react") return true;            // (the glass has no picture of her to react)
   if (e.type === "game_timer") {             // "start the DS timer"
     const want = String(e.label || "").toLowerCase();
     cards.forEach((c) => { if (c.d.kind !== "game" || c.dead) return; const t = c.data.timers.find((x) => x.label.toLowerCase() === want) || c.data.timers.find((x) => x.label.toLowerCase().includes(want) || want.includes(x.label.toLowerCase()));
@@ -765,6 +746,7 @@ function handShape(pts, world) {
   const thumb = D(4, 9) / size, up = ext.map((e) => e > 1.5), down = ext.map((e) => e < 1.18);
   return { size, pinchR, ext, thumb, up, down, open: ext.every((e) => e > 1.55) && thumb > .7,
     fist: ext.every((e) => e < 1.08) && pinchR > .22 && thumb < .75,
+    fistLoose: ext.every((e) => e < 1.32) && pinchR > .16 && thumb < .95,      // a relaxed fist still counts once you're in
     sizeS: Math.max(20, dist(pts[0], pts[9])),
     palm: [(pts[0][0] + pts[5][0] + pts[17][0]) / 3, (pts[0][1] + pts[5][1] + pts[17][1]) / 3] };
 }
@@ -781,7 +763,7 @@ function updateHands(list, now) {
       const d = dist(h.wrist, rawPts[0]) + (h.side && hand.side && h.side !== hand.side ? 400 : 0);
       if (d < bd && d < 320) { bd = d; id = k; }
     });
-    if (id == null) { id = "h" + Math.random().toString(36).slice(2, 7); HANDS.set(id, { trail: [], palmTrail: [], pinch: false, p: null, fistT: 0, card: null, f: rawPts.map(() => [new OneEuro(), new OneEuro()]) }); }
+    if (id == null) { id = "h" + Math.random().toString(36).slice(2, 7); HANDS.set(id, { born: now, trail: [], palmTrail: [], pinch: false, p: null, fistT: 0, card: null, f: rawPts.map(() => [new OneEuro(), new OneEuro()]) }); }
     seen.add(id);
     const h = HANDS.get(id);
     const pts = rawPts.map((q, i) => [h.f[i][0].filter(q[0], now), h.f[i][1].filter(q[1], now)]);
@@ -789,11 +771,14 @@ function updateHands(list, now) {
     h.wrist = pts[0]; h.pts = pts; h.shape = sh; h.lastSeen = now; if (hand.side) h.side = hand.side;
     const was = h.pinch;
     const want = was ? sh.pinchR < .48 : sh.pinchR < .32;          // a little give, so it doesn't flicker
-    if (was && !want) { h.offN = (h.offN || 0) + 1; h.pinch = h.offN < 2; }   // let go only if it's still open next frame
+    if (was && !want) { h.offN = (h.offN || 0) + 1; h.pinch = h.offN < 3; }   // let go only if it stays open a couple of frames
     else { h.offN = 0; h.pinch = want; }
     h.p = h.pinch || sh.pinchR < .6 ? [(pts[4][0] + pts[8][0]) / 2, (pts[4][1] + pts[8][1]) / 2] : pts[8]; h.t = now;
     h.trail.push([now, h.p[0], h.p[1]]); while (h.trail.length && now - h.trail[0][0] > 140) h.trail.shift();
     (h.tips = h.tips || []).push([now, pts[8][0], pts[8][1]]); while (h.tips.length && now - h.tips[0][0] > 280) h.tips.shift();
+    // which way the hand points (wrist -> middle knuckle), for wrist flicks
+    (h.angs = h.angs || []).push([now, Math.atan2(pts[9][1] - pts[0][1], pts[9][0] - pts[0][0]), pts[0].slice()]);
+    while (h.angs.length && now - h.angs[0][0] > 220) h.angs.shift();
     if (CALIB.on) return;                       // lining up: pinches only mark the targets
     if (!was && h.pinch) pinchStart(h, id, now);
     if (was && !h.pinch) pinchEnd(h, id, now);
@@ -810,7 +795,7 @@ function pinchStart(h, id, now) {
   const hit = controlAt(h.p);
   if (hit) {
     if (hit.ctl.dataset.act === "slider") { h.slider = hit; slide(hit.c, hit.ctl, h.p); return; }
-    h.ctl = hit; hit.ctl.classList.add("near"); return;
+    h.ctl = Object.assign(hit, { t0: now }); hit.ctl.classList.add("near"); return;
   }
   const c = hitTest(h.p);
   if (!c) return;
@@ -829,7 +814,15 @@ function grab(h, id, c) {
 }
 function pinchEnd(h, id, now) {
   if (h.slider) { h.slider = null; return; }
-  if (h.ctl) { const { c: cc, ctl } = h.ctl; h.ctl = null; ctl.classList.remove("near"); if (!cc.dead) fire(cc, ctl); return; }
+  if (h.ctl) {
+    const { c: cc, ctl, t0 } = h.ctl, dur = now - (t0 || now); h.ctl = null; ctl.classList.remove("near");
+    // a pinch that flickers for a frame or two as your hand moves past isn't a press; resetting or closing
+    // something takes a real pinch (about a quarter of a second)
+    const careful = /^(t-reset|s-reset|sticky-done|confirm-yes|confirm-no)$/.test(ctl.dataset.act) || (ctl.dataset.act === "win" && ctl.dataset.what === "close");
+    if (!cc.dead && dur >= (careful ? 240 : 70)) fire(cc, ctl);
+    else if (careful && !cc.dead) toast("Hold the pinch a little longer to press that");
+    return;
+  }
   const c = h.card != null ? cards.get(h.card) : null; h.card = null;
   if (!c || c.dead) return;
   c.held.delete(id); c.two = null; c.twisting = false;
@@ -863,30 +856,55 @@ function shapeName(h) {
   return null;
 }
 const fingerCount = (sh) => sh.up.filter(Boolean).length + (sh.thumb > .8 ? 1 : 0);
+// Hands wobble: a shape is what the hand has mostly been doing for the last third of a second, not this one frame,
+// and a hold's countdown survives a brief slip instead of starting over.
+function mostly(h, key, value, now, span = 320) {
+  const hist = h[key] = h[key] || [];
+  hist.push([now, value]); while (hist.length && now - hist[0][0] > span) hist.shift();
+  const n = new Map(); hist.forEach(([, v]) => n.set(v, (n.get(v) || 0) + 1));
+  let best = value, bn = -1; n.forEach((c, v) => { if (c > bn || (c === bn && v === value)) { best = v; bn = c; } });
+  return best;
+}
 function held(h, name, now) {                    // how long this hand has held this shape
-  if (!h.g || h.g.name !== name) h.g = { name, since: now, fired: false, p: h.shape.palm.slice() };
+  if (h.g && h.g.name !== name && now - (h.g.ok || 0) < 300) return null;      // a slip: keep the old countdown
+  if (!h.g || h.g.name !== name) h.g = { name, since: now, fired: false, p: h.shape.palm.slice(), ok: now };
+  h.g.ok = now;
   return (now - h.g.since) / 1000;
+}
+function wristFlick(h, now) {                    // a quick snap of the wrist (the arm stays put): next / previous song
+  const a = h.angs;
+  if (!a || a.length < 4 || now - (h.born || now) < 400) return 0;
+  const wrap = (d) => { while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+  const [t0, ang0, w0] = a[0], [t1, ang1, w1] = a[a.length - 1];
+  const da = wrap(ang1 - ang0);
+  let peak = 0;                                              // fastest turn between two frames, radians a second
+  for (let i = 1; i < a.length; i++) { const dt = (a[i][0] - a[i - 1][0]) / 1000; if (dt > 0) peak = Math.max(peak, Math.abs(wrap(a[i][1] - a[i - 1][1])) / dt); }
+  if (t1 - t0 < 60 || Math.abs(da) < .55 || peak < 5) return 0;
+  if (dist(w0, w1) > h.shape.sizeS * .9) return 0;          // the whole arm moved: that's a sweep or a drag
+  return Math.sign(da);                                      // clockwise on screen = fingers go right = next
 }
 function shapes(h, id, now) {
   if (h.pinch || h.card != null || h.ctl || h.slider) { h.g = null; h.pointing = null; return; }
-  const sh = h.shape, name = shapeName(h), staged = stagedCard(), list = listOf(staged);
+  const sh = h.shape, name = mostly(h, "nameHist", shapeName(h), now), staged = stagedCard(), list = listOf(staged);
   h.pointing = name === "point" ? (hitTest(h.pts[8], 0) || {}).id ?? null : null;
   if (h.pointing != null && h.pointing !== GEST.point) { GEST.point = h.pointing; dirty = true; }
   const cool = now - GEST.at > 1400;
-  // a finger flicked sideways: next or previous song
-  if (name === "point" && h.tips && h.tips.length > 3 && cool) {
-    const f = h.tips[0], l = h.tips[h.tips.length - 1], dx = l[1] - f[1], dy = l[2] - f[2];
-    if (Math.abs(dx) > W * .2 && Math.abs(dy) < Math.abs(dx) * .5) { GEST.at = now; h.tips = []; act({ do: "media", what: dx > 0 ? "next" : "prev" }); toast(dx > 0 ? "Next song" : "Previous song"); return; }
+  // a flick of the wrist: next or previous song
+  const flick = cool && !h.inFist ? wristFlick(h, now) : 0;
+  if (flick) {
+    GEST.at = now; h.angs = []; h.g = null;
+    act({ do: "media", what: flick > 0 ? "next" : "prev" }); toast(flick > 0 ? "Next song" : "Previous song");
+    ripple(h.pts[9], hot(), 40); return;
   }
   // numbers on a list that's up close
   if (list && list.length && name !== "thumbsup" && name !== "thumbsdown") {
-    const n = fingerCount(sh), key = "n" + n, t = held(h, key, now);
-    if (n >= 1 && n <= Math.min(5, list.length) && t > 1 && !h.g.fired && cool && still(h)) { h.g.fired = true; GEST.at = now; pickNumber(staged, n); }
+    const n = mostly(h, "countHist", fingerCount(sh), now, 400), key = "n" + n, t = held(h, key, now);
+    if (t != null && n >= 1 && n <= Math.min(5, list.length) && t > 1 && !h.g.fired && cool && still(h)) { h.g.fired = true; GEST.at = now; pickNumber(staged, n); }
     if (n >= 1) return;
   }
-  if (!name) { h.g = null; return; }
+  if (!name) { if (h.g && now - (h.g.ok || 0) > 300) h.g = null; return; }
   const t = held(h, name, now);
-  if (h.g.fired || !cool) return;
+  if (t == null || h.g.fired || !cool) return;
   if (name === "thumbsup" || name === "thumbsdown") {
     if (t < .5) return;
     const ask = [...cards.values()].find((c) => c.d.kind === "approval" && !c.dead), yes = name === "thumbsup";
@@ -898,12 +916,19 @@ function shapes(h, id, now) {
     h.g.fired = true; GEST.at = now; act({ do: "media", what: "toggle" }); toast("Play / pause");
   }
 }
-const still = (h) => h.g && dist(h.shape.palm, h.g.p) < h.shape.sizeS * .35;
+// "Still" lets a hand sway and drift a little, the way a held-up hand does; only a real move breaks it.
+function still(h) {
+  if (!h.g) return false;
+  const a = h.g.p, p = h.shape.palm, ok = dist(p, a) < h.shape.sizeS * .55;
+  a[0] += (p[0] - a[0]) * .06; a[1] += (p[1] - a[1]) * .06;      // the anchor follows slow drift
+  return ok;
+}
 function bothHands(now) {                        // both palms open and still: bring the last card back
   const hs = [...HANDS.values()].filter((h) => h.shape && now - h.lastSeen < 200);
   if (hs.length !== 2 || !hs.every((h) => h.shape.open && !h.pinch)) { GEST.both = null; return; }
   if (!GEST.both) GEST.both = { since: now, p: hs.map((h) => h.shape.palm.slice()), fired: false };
-  const moved = hs.some((h, i) => dist(h.shape.palm, GEST.both.p[i]) > h.shape.sizeS * .4);
+  const moved = hs.some((h, i) => dist(h.shape.palm, GEST.both.p[i]) > h.shape.sizeS * .6);
+  hs.forEach((h, i) => { const a = GEST.both.p[i]; a[0] += (h.shape.palm[0] - a[0]) * .06; a[1] += (h.shape.palm[1] - a[1]) * .06; });
   if (moved) { GEST.both = null; return; }
   if (!GEST.both.fired && now - GEST.both.since > 1000 && now - GEST.at > 1400) {
     GEST.both.fired = true; GEST.at = now; hs.forEach((h) => { if (h.g) h.g.fired = true; });
@@ -922,13 +947,24 @@ function pickNumber(c, n) {
 function gestureExtras(h, id, now) {
   const sh = h.shape;
   shapes(h, id, now);
-  // fist held over a card: crumple it
-  if (sh.fist && !h.pinch) {
-    const c = hitTest(sh.palm, 0);
-    if (c && c.id === h.fistCard) { h.fistT += (now - (h.fistLast || now)) / 1000; if (h.fistT > .8) { dismiss(c, "crumple"); h.fistT = 0; h.fistCard = null; } }
-    else { h.fistCard = c ? c.id : null; h.fistT = 0; }
-    h.fistLast = now;
-  } else { h.fistT = 0; h.fistCard = null; h.fistLast = now; }
+  // fist held over a card: crumple it. A tight fist starts it, a relaxed one keeps it going, and a slip
+  // (the fist loosening or the hand drifting off the card for a moment) pauses the countdown instead of resetting it.
+  const dtF = Math.min(.1, (now - (h.fistLast || now)) / 1000); h.fistLast = now;
+  const fistNow = !h.pinch && (h.inFist ? sh.fistLoose : sh.fist);
+  if (fistNow) {
+    h.inFist = true; h.fistMiss = 0;
+    const c = hitTest(sh.palm, 30);
+    if (c && c.id !== h.fistCard && h.fistT > 0 && h.fistCard != null && cards.get(h.fistCard) && !cards.get(h.fistCard).dead) {
+      // moved onto a different card: start over on that one
+      h.fistCard = c.id; h.fistT = 0;
+    } else if (c) {
+      h.fistCard = c.id; h.fistT += dtF;
+      if (h.fistT > .8) { dismiss(c, "crumple"); h.fistT = 0; h.fistCard = null; }
+    }
+  } else {
+    h.fistMiss = (h.fistMiss || 0) + dtF;
+    if (h.fistMiss > .35) { h.inFist = false; h.fistT = 0; h.fistCard = null; }
+  }
   // an open hand swept fast across the screen: clear the glass
   if (sh.open && !h.pinch) {
     h.palmTrail.push([now, sh.palm[0]]); while (h.palmTrail.length && now - h.palmTrail[0][0] > 380) h.palmTrail.shift();
@@ -1011,7 +1047,6 @@ function tick(now) {
     const p = pts.find((q) => q && q[0] >= r.left && q[0] <= r.right && q[1] >= r.top - 30 && q[1] <= r.bottom + 30);
     if (p) c.scrub((p[0] - r.left) / r.width);
   });
-  perch(now);
   if (persona === "ultron" && now > (GEST.glitch || 0)) {
     GEST.glitch = now + 4000 + Math.random() * 7000;
     const live = [...cards.values()].filter((c) => !c.dead); const c = live[Math.floor(Math.random() * live.length)];
@@ -1023,19 +1058,6 @@ function tick(now) {
 }
 const easeOut = (x) => 1 - Math.pow(1 - x, 3);
 const FAST = new Set(["timer", "stopwatch", "model", "nowplaying", "game"]);
-// Juno sits on the top edge of the card you're holding (or the one up close), and turns with it
-const PERCH = $("#perch"); PERCH.src = "/ui/juno_sit.png?t=" + encodeURIComponent(TOKEN);
-let perchOn = false;
-function perch(now) {
-  let c = null, zz = -1;
-  cards.forEach((o) => { if (!o.dead && o.held.size && +o.el.style.zIndex > zz) { zz = +o.el.style.zIndex; c = o; } });
-  c = c || stagedCard();
-  const on = persona === "juno" && !!c && PERCH.naturalWidth > 0;
-  if (on !== perchOn) { perchOn = on; PERCH.classList.toggle("on", on); }
-  if (!on) return;
-  const pw = 92, ph = pw * PERCH.naturalHeight / PERCH.naturalWidth, bob = Math.sin(now / 420) * 1.5;
-  PERCH.style.transform = `translate(${c.x.toFixed(1)}px,${c.y.toFixed(1)}px) rotate(${c.rot.toFixed(4)}rad) scale(${c.s.toFixed(4)}) translate(${(c.w / 2 - pw - 34).toFixed(1)}px,${(-c.h / 2 - ph * .64 + bob).toFixed(1)}px)`;
-}
 function render(c) {
   c.el.style.transform = `translate(${(c.x - c.w / 2).toFixed(1)}px,${(c.y - c.h / 2).toFixed(1)}px) rotate(${c.rot.toFixed(4)}rad) scale(${c.s.toFixed(4)})`;
   const age = performance.now() - c.born;                         // fade in as it arrives, then leave opacity to the CSS

@@ -216,9 +216,6 @@ FIELDS = [
      "can't take mouse clicks, so there it's hands only. Needs \"Her world as your desktop\" on. Or just tell her: "
      "\"put glass mode on my desktop\".",
      [("window", "Its own window"), ("desktop", "On my desktop")]),
-    ("Music player", "JUNO_REACTIONS", "Little Juno reacts", "bool",
-     "The small her on the music player and glass cards cheers when you win, gets a heart when you thank her, pouts "
-     "when you're rude, and gets sleepy late at night.", None),
     ("Music player", "JUNO_MUSIC_PLAYER", "Music player pop-up", "bool",
      "When music plays she shows her player (with her sitting on it) instead of opening Spotify's window.", None),
 
@@ -274,6 +271,13 @@ FIELDS = [
      "Sends messages from YOUR account by typing into the Discord app, only when you ask, and you approve each one.", None),
     ("Discord bot", "DISCORD_BOT_REPLY", "Who she answers on Discord", "choice", "",
      [("everyone", "Everyone (rate limited)"), ("owner", "Only me"), ("off", "Nobody (read and send only)")]),
+    ("Discord bot", "DISCORD_UPDATES_CHANNEL", "Channel for her update notes", "text",
+     "Like #updates, or \"updates in My Server\", or a channel ID. After every update, her bot posts what's new there "
+     "(once per version). Anyone can also ask the bot \"what's new\" or \"changelog 1.0.25\".", None),
+    ("Discord bot", "DISCORD_UPDATES_MODE", "When she updates", "choice",
+     "Ask: after an update she asks if you want the notes posted (say yes, or tap Yes). Any time, you can also say "
+     "\"post the changelog\". On a server the bot can't ask you, so set it to post by itself there.",
+     [("ask", "Ask me, then post"), ("auto", "Post by herself"), ("off", "Only when I ask")]),
     ("Spotify", "SPOTIFY_CLIENT_ID", "Spotify Client ID", "text",
      "Needs Spotify Premium. developer.spotify.com > your app > Settings. Not the secret.", None),
     ("Netflix", "JARVIS_NETFLIX", "Open Netflix in", "choice", "",
@@ -344,7 +348,7 @@ DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir",
             "JUNO_DESK_QUALITY": "medium", "JUNO_FPS": "30", "JUNO_DESK_VIZ": "both", "JUNO_GLASS_WHERE": "window", "JUNO_DESK_WIDGETS": "true",
             "JUNO_DESK_WIDGETS_WHERE": "right", "JUNO_W_STATS": "true", "JUNO_W_MUSIC": "true", "JUNO_W_WEATHER": "true",
             "JUNO_W_CALENDAR": "true", "JUNO_W_NOTES": "true", "JUNO_W_DISCORD": "true", "JUNO_MUSIC_PLAYER": "true", "JARVIS_CAMERA": "true",
-            "JARVIS_DISCORD_READ": "true", "JUNO_PHONE_NOTIFS": "true", "JUNO_PHONE_SPEAK": "false", "JARVIS_KEEP_FOCUS": "true", "DISCORD_BOT_REPLY": "everyone",
+            "JARVIS_DISCORD_READ": "true", "JUNO_PHONE_NOTIFS": "true", "JUNO_PHONE_SPEAK": "false", "JARVIS_KEEP_FOCUS": "true", "DISCORD_BOT_REPLY": "everyone", "DISCORD_UPDATES_MODE": "ask",
             "JARVIS_NETFLIX": "auto", "JARVIS_NETFLIX_TRACK": "true", "JARVIS_EMAIL_ANNOUNCE": "false",
             "JARVIS_APPLE_MUSIC": "auto", "JARVIS_DISCORD_TYPE": "false",
             "JARVIS_READ_ANYWHERE": "true", "JARVIS_CAL_DEFAULT": "jarvis", "JARVIS_CAL_ALERT": "10",

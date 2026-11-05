@@ -1561,6 +1561,34 @@ class Core:
             print(f"[whats new] {seen_ver or seen} -> {cur or latest}: showing {', '.join(v for v, _ in picked)}")
             self.emit({"type": "whats_new", "version": cur or latest,       # the title: the version he's on now
                        "notes": changelog.as_markdown(picked)})
+            if config.DISCORD_UPDATES_MODE == "ask":
+                threading.Thread(target=self._offer_changelog_post, args=(latest,), daemon=True,
+                                 name="changelog-offer").start()
+
+    def _offer_changelog_post(self, version):
+        """Just updated: once her bot is online and you're around, she asks whether to post what's new on Discord."""
+        if not config.DISCORD_UPDATES_CHANNEL or config.DISCORD_BOT_ON_SERVER:
+            return
+        for _ in range(60):                                # the bot takes a few seconds to connect
+            b = getattr(self, "discord_bot", None)
+            if b is not None and b.status == "online":
+                break
+            if b is not None and b.status == "failed":
+                return
+            time.sleep(2)
+        else:
+            return
+        if b.announced() == version:
+            return
+        for _ in range(120):                               # wait for a quiet moment (not mid-answer, not mid-game)
+            if self.state == "idle" and self._turn is None and not tools.in_game():
+                break
+            time.sleep(5)
+        time.sleep(4)                                      # let the What's new pop-up land first
+        res = b.post_changelog(None, None, confirm=lambda t, d: tools._confirm(
+            f"I updated to {version}. Post what's new in {config.DISCORD_UPDATES_CHANNEL} on Discord?", d))
+        if res != "DENIED":
+            self.emit({"type": "toast", "text": res})
 
     def whats_new(self):
         import changelog

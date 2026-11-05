@@ -625,9 +625,6 @@ def _make_handler(hub):
                 evs, seq = hub.events_since(since, wait=15.0)
                 hub.last_seen = time.time()
                 return self._send(200, {"events": evs, "seq": seq})
-            if path == "/ui/juno_sit.png":                  # her picture, for sitting on the card you hold
-                f = hub.ui / "juno_sit.png"
-                return self._send(200, f.read_bytes(), "image/png", {"Cache-Control": "max-age=3600"}) if f.is_file() else self._send(404, {"error": "no"})
             m = re.fullmatch(r"/file/([\w-]{6,20})", path)
             if m:
                 p = hub.files.get(m.group(1))

@@ -37,7 +37,7 @@ IS_WINDOWS = sys.platform == "win32"
 MUSIC_APPS = ("spotify", "applemusic", "apple music", "zunemusic", "itunes", "tidal", "deezer", "amazon music",
               "amazonmusic", "musicbee", "foobar", "winamp", "aimp", "soundcloud", "pandora", "ytmdesktop",
               "youtube music", "cider", "qobuz", "audirvana", "dopamine", "plexamp")
-PASS = {"voice", "state", "fps", "react"}   # from her core: her voice (she glows when she talks) and frame rate changes
+PASS = {"voice", "state", "fps", "react", "persona"}   # from her core: her voice (she glows when she talks) and frame rate changes
 
 
 def _is_music(aumid):
@@ -237,7 +237,7 @@ class MusicPlayer:
     # ------------------------------------------------------------------ core events (her voice, for the grin)
     def feed(self, ev):
         t = ev.get("type")
-        if t in PASS and (self.visible or t == "fps"):
+        if t in PASS and (self.visible or t in ("fps", "persona")):
             self.em(ev)
 
     # ------------------------------------------------------------------ start
@@ -474,6 +474,9 @@ class MusicBridge:
 
     def ready(self):
         self._p.em.mark_ready()
+        core = getattr(self._p, "core", None)
+        if core is not None:                               # her colours match whoever you're talking to
+            self._p.em({"type": "persona", "key": getattr(core, "persona_key", "juno")})
         print("[music] player loaded")
         return True
 

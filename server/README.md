@@ -26,6 +26,8 @@ Linux server, so she answers in Discord while your PC is off.
    DISCORD_OWNER_ID=your Discord user id
    DISCORD_BOT_REPLY=everyone        # or owner, or off
    BOT_PERSONA=juno                  # or jarvis / ultron
+   DISCORD_UPDATES_CHANNEL=#updates  # where she posts what's new after you git pull a new version
+   DISCORD_UPDATES_MODE=auto         # the server can't ask you first, so it just posts
    JARVIS_DAILY_BUDGET=3             # dollars a day the bot may spend
    ```
    Then `chmod 600 .env` so only this user can read it.

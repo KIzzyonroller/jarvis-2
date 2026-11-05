@@ -194,6 +194,10 @@ class DiscordBot:
             self.status, self.error, self.name = "online", None, str(client.user)
             self.log(f"[discord bot] online as {client.user} in {len(client.guilds)} server(s)")
             self.on_change()
+            try:
+                await self._announce_updates()
+            except Exception as e:
+                self.log(f"[discord bot] couldn't post the update notes: {type(e).__name__}: {e}")
 
         @client.event
         async def on_guild_join(guild):
@@ -296,6 +300,19 @@ class DiscordBot:
         text = self._strip_mention(msg.clean_content)
         if not text:
             text = "(they just mentioned you)"
+        m = self.CHANGELOG_ASK.match(text.strip())
+        if m:                                             # "@Juno what's new" / "changelog 1.0.25": straight from the file
+            import changelog
+            ver = m.group(2) or m.group(4)
+            full = bool(m.group(1) or m.group(3) is not None)
+            parts = changelog.for_discord(ver, name=self._display_name(), full=full)
+            if not parts:
+                await msg.reply(f"There's no {ver} in my changelog." if ver else "No changelog yet.", mention_author=False)
+                return
+            await msg.reply(parts[0], mention_author=False)
+            for part in parts[1:]:
+                await msg.channel.send(part)
+            return
         where = "a DM" if msg.guild is None else f"#{getattr(msg.channel, 'name', 'channel')} in {msg.guild.name}"
         is_owner = self.owner_id is not None and msg.author.id == self.owner_id
         context = ""
@@ -323,6 +340,70 @@ class DiscordBot:
             else:
                 await msg.channel.send(part)
         self.on_chat({"where": where, "who": msg.author.display_name, "text": text, "reply": reply})
+
+    # ------------------------------------------------------------------ her own update notes
+    CHANGELOG_ASK = re.compile(r"^(?:what'?s new|changelog|change log|patch notes|update notes|updates?|"
+                               r"what changed)(\s+full|\s+in full|\s+everything)?(?:\s+(?:for\s+|in\s+)?v?(\d+\.\d+\.\d+))?\??$"
+                               r"|^full (?:changelog|patch notes)(\s*)(?:\s+(?:for\s+)?v?(\d+\.\d+\.\d+))?\??$", re.I)
+
+    async def _announce_updates(self):
+        """When set to post by herself: after an update, post what's new to the updates channel you picked
+        (Settings > Discord bot), once per version. First time: just the newest release, not the whole history."""
+        if config.DISCORD_UPDATES_MODE != "auto" or not config.DISCORD_UPDATES_CHANNEL:
+            return                                        # "ask" is handled by the app (core._offer_changelog_post)
+        import changelog
+        now = changelog.latest_version()
+        d = _load()
+        last = d.get("announced")
+        if not now or last == now:
+            return
+        ch, err = self._find_channel(config.DISCORD_UPDATES_CHANNEL)
+        if err:
+            self.log(f"[discord bot] updates channel: {err}")
+            return
+        picked = changelog.since(last) if last else changelog.sections()[:1]
+        name = self._display_name()
+        for v, notes in reversed(picked):                 # oldest first, so the newest ends up at the bottom
+            for part in changelog.for_discord(picked=[(v, notes)], name=name):
+                await ch.send(part)
+        d["announced"] = now
+        _save(d)
+        self.log(f"[discord bot] posted the {now} notes to #{ch.name}")
+
+    def announced(self):
+        return _load().get("announced")
+
+    def _display_name(self):
+        import personas
+        p = personas.PERSONAS.get(self.persona_key()) or {}
+        return p.get("name", "Juno")
+
+    def post_changelog(self, target=None, version=None, confirm=None, full=False):
+        """From the PC ("post the changelog to #updates"): shows the approval card, then posts."""
+        if self.status != "online":
+            return self._not_ready()
+        import changelog
+        msgs = changelog.for_discord(version, name=self._display_name(), full=full)
+        if not msgs:
+            return f"There's no release {version} in the changelog." if version else "The changelog is empty."
+        ch, err = self._find_channel(target or config.DISCORD_UPDATES_CHANNEL or "")
+        if err:
+            return err + " (Pick one, or set the updates channel in Settings > Discord bot.)"
+        if confirm and not confirm(f"Post the {version or changelog.latest_version()} changelog to #{ch.name} in {ch.guild.name}",
+                                   f"{len(msgs)} message{'s' if len(msgs) != 1 else ''}, starting:\n\n{msgs[0][:600]}"):
+            return "DENIED"
+
+        async def go():
+            for m in msgs:
+                await ch.send(m)
+        try:
+            self._call(go(), timeout=60)
+        except Exception as e:
+            return f"Discord didn't take it: {type(e).__name__}: {e}"
+        d = _load()
+        d["announced"] = changelog.latest_version()
+        _save(d)
+        return f"Posted the changelog to #{ch.name} ({len(msgs)} message{'s' if len(msgs) != 1 else ''})."
 
     def _strip_mention(self, text):
         me = self.client.user
