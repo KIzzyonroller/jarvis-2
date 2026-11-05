@@ -16,6 +16,7 @@ pyautogui
 pygetwindow
 pyperclip
 pillow
+mss                       # fast screen capture (screen watching)
 opencv-python
 screen-brightness-control
 send2trash

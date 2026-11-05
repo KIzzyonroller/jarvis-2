@@ -415,6 +415,11 @@ class Core:
     # ================================================================ lifecycle
     def start(self):
         threading.Thread(target=self._boot, daemon=True, name="boot").start()
+        try:
+            import screenwatch
+            screenwatch.start(self)
+        except Exception as e:
+            print(f"[screen watch] off: {e}")
 
     def shutdown(self):
         if getattr(self, "_shut", False):
@@ -432,6 +437,12 @@ class Core:
                 self.glass.stop()
             except Exception:
                 pass
+        try:
+            import screenwatch
+            if screenwatch.get() is not None:
+                screenwatch.get().stop()
+        except Exception:
+            pass
         for part in (getattr(self, "watchers", None), getattr(self, "activity", None)):
             if part is not None:
                 try:

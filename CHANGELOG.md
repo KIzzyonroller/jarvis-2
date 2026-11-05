@@ -3,6 +3,10 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.22
+- **He watches your screen while you talk to him.** Ask "what's this error?", "what am I looking at?" or "read this" and he already sees it, so he answers in one go instead of stopping to take a picture first. Usually a second or more faster. After he clicks something he waits only until the screen settles, and if nothing changed he doesn't look twice. It stays in memory (never saved), only while you're talking to him, and never during fullscreen games. Settings > Desktop to turn it off.
+- **Glass mode tracks your hands better.** Steadier (the whole hand is smoothed, not just the pointer, so no more jitter when you hold still), quicker when you move, pinches still count with your hand turned sideways, a blurry frame no longer drops the card you're holding, and two hands crossing over don't swap. It also asks your camera for 60 frames a second if it can do it.
+
 ## 1.0.21
 - **They're your desktop now.** Jarvis, Juno and Ultron live on your wallpaper across both monitors, with the new look. Whoever you're talking to listens, thinks and talks with you, raises his sword (or tears the air open) when he opens something for you, and squares up when he needs your OK. The second monitor gets a visualizer that moves with his voice.
 - **Juno takes the screen when he starts.** Her hands grab the edges, she opens her eyes, grins, and your old screen shatters into her world.

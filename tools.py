@@ -951,8 +951,45 @@ def clipboard(action, text=None):
 
 # =================================================================== screen
 def _grab():
+    import screenwatch
+    w = screenwatch.get()
+    if w is not None:
+        try:
+            return w.latest()                 # he's already watching: the frame is in memory
+        except Exception:
+            pass
     from PIL import ImageGrab
     return ImageGrab.grab(all_screens=True)
+
+
+# The last picture he was sent this turn, so an unchanged screen isn't sent twice.
+_LOOK_TURN = 0
+_LAST_SENT = {}
+OWN_TITLES = ("J.A.R.V.I.S.", "Jarvis Mini", "Jarvis Desktop", "Jarvis Glass")
+
+
+def new_turn():
+    global _LOOK_TURN
+    _LOOK_TURN += 1
+
+
+def preattach_target(kind):
+    """What to show when they ask about the screen: the window they're using, unless that's Jarvis himself
+    (then the monitor the mouse is on)."""
+    if kind == "all":
+        return "all"
+    try:
+        w = _find_window(None)
+        if w is not None and w.title and not any(w.title.startswith(t) for t in OWN_TITLES) and w.width > 300 and w.height > 200:
+            return "active"
+        import pyautogui
+        mx, my = pyautogui.position()
+        for i, (l, t, r, b) in enumerate(_monitors()):
+            if l <= mx < r and t <= my < b:
+                return f"monitor {i + 1}"
+    except Exception:
+        pass
+    return "all"
 
 
 def screenshot():
@@ -1066,6 +1103,17 @@ def look_at_screen(question="", target="all", detail="auto"):
         pass
     _LAST_VIEW = {"x0": ox + box[0], "y0": oy + box[1], "scale": scale, "w": img.width, "h": img.height,
                   "target": target, "t": time.time()}
+    # Same picture as the last look this turn? Say so instead of sending it again (faster for both of us).
+    try:
+        sig = hash(img.convert("L").resize((64, 36)).tobytes())
+        last = _LAST_SENT
+        if last.get("turn") == _LOOK_TURN and last.get("where") == where and last.get("sig") == sig and time.time() - last.get("t", 0) < 90:
+            return (f"Nothing has changed on {where} since your last look a moment ago (same picture). "
+                    "If you expected a change, it hasn't happened yet: wait a moment or try another way.")
+        _LAST_SENT.clear()
+        _LAST_SENT.update({"turn": _LOOK_TURN, "where": where, "sig": sig, "t": time.time()})
+    except Exception:
+        pass
     intro = (f"Here is {where} right now, {img.width}x{img.height} pixels. A magenta circle marks the mouse pointer. "
              "For the mouse tool, give x/y in THIS image's pixels." + (f" They asked: {question}" if question else ""))
     return _image_blocks(img, intro)
@@ -1124,7 +1172,15 @@ def mouse(action, what="", x=None, y=None, to_x=None, to_y=None, amount=3, risky
         return str(e)
     done = f"{action.replace('_', ' ').capitalize()}" + (f": {what}" if what else "") + "."
     if look_after:
-        time.sleep(0.6)
+        import screenwatch
+        w = screenwatch.get()
+        if w is not None:
+            try:
+                w.wait_still()                 # until the screen stops changing, not a fixed wait
+            except Exception:
+                time.sleep(0.6)
+        else:
+            time.sleep(0.6)
         view = look_at_screen(target=(v or {}).get("target", "all"))
         if isinstance(view, list):
             view[0]["text"] = done + " Screen afterwards: " + view[0]["text"]

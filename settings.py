@@ -42,6 +42,9 @@ FIELDS = [
      "Turn it off to get your normal desktop back.", None),
     ("Desktop", "JARVIS_DESK_INTRO", "Juno grabs the screen when he starts", "bool",
      "The startup animation. Off: they just appear.", None),
+    ("Desktop", "JARVIS_SCREEN_WATCH", "Let him watch my screen while we talk", "bool",
+     "Faster answers about what's on screen. Kept in memory only, never saved; only while you're talking to him "
+     "and never during fullscreen games. Off: he takes a picture each time he needs to look.", None),
     ("Netflix", "JARVIS_NETFLIX", "Open Netflix in", "choice", "",
      [("auto", "The app if installed"), ("web", "The website"), ("app", "The app")]),
     ("Netflix", "JARVIS_NETFLIX_TRACK", "Keep a log of what I watch", "bool", "Stays on this PC.", None),
@@ -102,7 +105,8 @@ DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir", "DISCORD_BOT
             "JARVIS_READ_ANYWHERE": "true", "JARVIS_CAL_DEFAULT": "jarvis", "JARVIS_CAL_ALERT": "10",
             "JARVIS_START_MODE": "full", "JARVIS_CAL_SPEAK": "true",
             "JARVIS_ACTIVITY": "false", "JARVIS_ACTIVITY_DAYS": "14",
-            "JARVIS_LIVING_DESKTOP": "true", "JARVIS_DESK_INTRO": "true"}
+            "JARVIS_LIVING_DESKTOP": "true", "JARVIS_DESK_INTRO": "true",
+            "JARVIS_SCREEN_WATCH": "true"}
 
 
 def _current(key):

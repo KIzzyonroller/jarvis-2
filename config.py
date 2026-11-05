@@ -201,6 +201,8 @@ MINI_HUD = os.environ.get("JARVIS_MINI", "true").lower() != "false"
 # The living desktop (livedesk.py): Jarvis, Juno and Ultron become the wallpaper while he runs, desktop icons hidden.
 LIVING_DESKTOP = os.environ.get("JARVIS_LIVING_DESKTOP", "true").lower() != "false"
 DESK_INTRO = os.environ.get("JARVIS_DESK_INTRO", "true").lower() != "false"     # Juno grabs the screen at startup
+# Screen watching (screenwatch.py): a live view of the screen in memory while you talk to him, so he sees what you mean.
+SCREEN_WATCH = os.environ.get("JARVIS_SCREEN_WATCH", "true").lower() != "false"
 # A briefing the first time you start or wake the PC each day (the day rolls over at 4 AM)
 MORNING_BRIEFING = os.environ.get("JARVIS_MORNING_BRIEFING", "true").lower() != "false"
 # Headlines for the briefing (any RSS feed). Empty = no news.

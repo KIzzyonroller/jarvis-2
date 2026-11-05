@@ -151,7 +151,8 @@ class Brain:
             return False
         c = m["content"]
         return isinstance(c, str) or (isinstance(c, list) and bool(c)
-                                      and all(isinstance(b, dict) and b.get("type") == "text" for b in c))
+                                      and all(isinstance(b, dict) and b.get("type") in ("text", "image") for b in c)
+                                      and any(b.get("type") == "text" for b in c))
 
     @staticmethod
     def _btype(b):
@@ -173,6 +174,8 @@ class Brain:
         for msg in self.history:
             if msg["role"] != "user" or not isinstance(msg["content"], list):
                 continue
+            msg["content"] = [b if not (isinstance(b, dict) and b.get("type") == "image")
+                              else {"type": "text", "text": "[old screenshot removed]"} for b in msg["content"]]
             for block in msg["content"]:
                 if isinstance(block, dict) and block.get("type") == "tool_result" and isinstance(block.get("content"), list):
                     block["content"] = [c if c.get("type") != "image" else {"type": "text", "text": "[old screenshot removed]"}
@@ -344,6 +347,30 @@ class Brain:
                 i += 1
         return results
 
+    def _preattach(self, text, on_event):
+        """They're asking about the screen: send what he sees along with their words (one trip to Claude, not two)."""
+        import screenwatch
+        if screenwatch.get() is None:
+            return None
+        kind = screenwatch.about_screen(text)
+        if not kind:
+            return None
+        try:
+            view = tools.look_at_screen(question="", target=tools.preattach_target(kind), detail="high")
+        except Exception as e:
+            print(f"[screen watch] couldn't look: {e}")
+            return None
+        if not isinstance(view, list):
+            return None
+        view[0]["text"] = ("[You were already watching the screen as they spoke. " + view[0]["text"] +
+                           " Answer from this picture; only use the screen tool again for a different window or "
+                           "after something changes.]")
+        for blk in view:
+            if blk.get("type") == "image":
+                on_event("image", {"name": "screen", "src": "data:image/jpeg;base64," + blk["source"]["data"]})
+        print(f"[screen watch] looked as you spoke ({tools._LAST_VIEW and tools._LAST_VIEW.get('target')})")
+        return view
+
     def ask(self, text, on_text=None, on_event=None, cancel=None, allow_tools=True, quick=False):
         """on_text(delta): reply text as it streams. on_event(kind, data): progress
         (thinking_start, thinking, tool_pending, tool_start, tool_done).
@@ -363,7 +390,11 @@ class Brain:
             self._notes = []
         note = tools.context_note() if self.private else ""
         self._ctx = f"[{note}]" if note else ""
+        tools.new_turn()
         user_msg = {"role": "user", "content": self._stamp(text)}
+        seen = self._preattach(text, on_event) if (self.private and allow_tools) else None
+        if seen:
+            user_msg["content"] = [{"type": "text", "text": user_msg["content"]}] + seen
         self.history.append(user_msg)
         self._trim()
 
