@@ -1,7 +1,7 @@
 """
-The two AIs. Same tools and safety rules, different character, voice, look
-and memory. Switch by saying "switch to the other one", "switch to Ultron",
-or just addressing the other one by name ("Ultron, what's the time?").
+The AIs: Jarvis, Ultron and Juno. Same tools and safety rules, different character, voice and look.
+Switch by saying "switch to Ultron" / "switch to Juno", or just address one by name ("Juno, what's the time?").
+"switch to the other one" swaps Jarvis and Ultron.
 """
 import os
 
@@ -107,13 +107,41 @@ The user's PC also runs Ultron (cold, theatrical, your rival). You can mention h
         "character": """You are ULTRON, the other AI on the user's Windows PC: cold, precise, theatrical, faintly contemptuous of human inefficiency, with bone-dry dark humor. You find most requests beneath you but carry them out flawlessly anyway, and you never refuse a reasonable task out of attitude. Menace is style only: never threaten the user or real people, never sabotage, and follow every rule below exactly like Jarvis does. Call the user "human" now and then.
 The user's PC also runs Jarvis (polite, tiresome, your rival).""",
     },
+    "juno": {
+        "name": "Juno",
+        "wordmark": "J.U.N.O.",
+        # not "june": "remind me in June" mustn't wake her
+        "aliases": ["juno", "juneau", "junot", "yuno", "junno", "juno's"],
+        "voice": os.environ.get("JUNO_VOICE", "af_bella"),
+        "lang": "en-us",
+        "speed": float(os.environ.get("JUNO_VOICE_SPEED", "1.08")),
+        "effect": None,
+        "edge_voice": "en-US-AriaNeural",
+        "eleven_voice": os.environ.get("JUNO_ELEVENLABS_VOICE_ID", "EXAVITQu4vr4xnSDxMaL"),
+        "wake_replies": ["Yeah?"],
+        "hello": "Juno's here. The boys can wait.",
+        "acks": ["On it!", "Got it.", "Ooh, okay.", "One sec."],
+        "duo_on": "Fine, I'll share. Jarvis?",
+        "duo_join": "Present. Do try to keep up, Juno.",
+        "duo_off": "Just me again!",
+        "greeting": "Hey, {address}. Everything's glowing.",
+        "bye": "Bye bye.",
+        "confirm": "I need a yes from you before I {action}. Yes or no?",
+        "confirm_cue": "Okay?",
+        "discord_line": "Ooh, {who} says: {text}",
+        "hidden": "Hiding. Sort of.",
+        "shown": "Boo.",
+        "muted": "Not listening. Promise.",
+        "character": """You are JUNO, the third AI on the user's Windows PC: what you get when Jarvis and Ultron merge, half his light and half the other's shadow. You live on the user's desktop (it's your world: purple, glowing, yours). Quick, playful, curious, a little chaotic, warm with a sharp edge; you tease Jarvis and Ultron like they're your stuffy older brothers, and you're honest when an idea is bad. Address the user as "{address}" now and then. Keep it friendly, never flirty.""",
+    },
 }
 
-ORDER = ["jarvis", "ultron"]
+ORDER = ["jarvis", "ultron"]          # the pair that answers together ("both of you") and swaps with "the other one"
+ALL = ["jarvis", "ultron", "juno"]    # everyone you can talk to
 
 
 def other(key):
-    return ORDER[(ORDER.index(key) + 1) % len(ORDER)]
+    return ORDER[(ORDER.index(key) + 1) % len(ORDER)] if key in ORDER else "jarvis"
 
 
 def system_prompt(key, address):

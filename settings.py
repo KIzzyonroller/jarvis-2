@@ -42,6 +42,8 @@ FIELDS = [
      "Turn it off to get your normal desktop back.", None),
     ("Desktop", "JARVIS_DESK_INTRO", "Juno grabs the screen when he starts", "bool",
      "The startup animation. Off: they just appear.", None),
+    ("Desktop", "JARVIS_START_MINIMIZED", "Start with his window minimized", "bool",
+     "He starts in the corner widget so he never covers the desktop or Juno's intro. Say his name or click the widget to open him.", None),
     ("Desktop", "JARVIS_SCREEN_WATCH", "Let him watch my screen while we talk", "bool",
      "Faster answers about what's on screen. Kept in memory only, never saved; only while you're talking to him "
      "and never during fullscreen games. Off: he takes a picture each time he needs to look.", None),
@@ -106,7 +108,7 @@ DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir", "DISCORD_BOT
             "JARVIS_START_MODE": "full", "JARVIS_CAL_SPEAK": "true",
             "JARVIS_ACTIVITY": "false", "JARVIS_ACTIVITY_DAYS": "14",
             "JARVIS_LIVING_DESKTOP": "true", "JARVIS_DESK_INTRO": "true",
-            "JARVIS_SCREEN_WATCH": "true"}
+            "JARVIS_SCREEN_WATCH": "true", "JARVIS_START_MINIMIZED": "true"}
 
 
 def _current(key):

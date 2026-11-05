@@ -232,7 +232,7 @@ function add(cls,text,who){const d=document.createElement("div");d.className="m 
 function on(e){switch(e.type){
   case"persona":ai=e.key;document.documentElement.dataset.ai=e.key;$("#wm").textContent=e.wordmark;break;
   case"state":document.body.className="st-"+e.state;$("#st").textContent=LABEL[e.state]||e.state;break;
-  case"msg":if(e.role==="user")add("user",e.text);else if(e.role==="system")add("sys",e.text);else add("ai",e.text,ai==="ultron"?"Ultron":"Jarvis");break;
+  case"msg":if(e.role==="user")add("user",e.text);else if(e.role==="system")add("sys",e.text);else add("ai",e.text,ai==="ultron"?"Ultron":ai==="juno"?"Juno":"Jarvis");break;
   case"turn_start":live[e.id]={who:e.who||"Jarvis",el:null,text:""};break;
   case"reply_delta":{const t=live[e.id];if(!t)break;t.text+=e.text;if(!t.el)t.el=add("ai","",t.who);t.el.textContent=t.text;log.scrollTop=log.scrollHeight;break}
   case"turn_end":{const t=live[e.id];if(t&&!t.el&&e.text)add("ai",e.text,t.who);else if(!t&&e.text)add("ai",e.text,"");delete live[e.id];break}

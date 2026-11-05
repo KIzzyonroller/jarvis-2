@@ -273,14 +273,14 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     bridge = Bridge(core, emitter)
     if desk:
         desk.core = core
-    window = webview.create_window(
-        "J.A.R.V.I.S.",
-        url=str(config.RES_DIR / "ui" / "index.html"),
-        js_api=bridge,
-        width=1360, height=840, min_size=(1100, 700),
-        background_color="#02060b",
-        frameless=True, easy_drag=False,
-    )
+    # Start tucked away (minimized, corner widget showing) so his window never covers Juno's intro or your work.
+    start_min = start_hidden or config.START_MINIMIZED
+    kw = dict(url=str(config.RES_DIR / "ui" / "index.html"), js_api=bridge, width=1360, height=840, min_size=(1100, 700),
+              background_color="#02060b", frameless=True, easy_drag=False)
+    try:
+        window = webview.create_window("J.A.R.V.I.S.", minimized=start_min, **kw)
+    except TypeError:                      # older pywebview without minimized=
+        window = webview.create_window("J.A.R.V.I.S.", **kw)
     emitter.window = window
     bridge._win = window
     if mini:
@@ -361,11 +361,14 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     core.on_restore = restore
     if show_hook is not None:
         show_hook["fn"] = restore              # someone launched Jarvis again: bring this copy forward
-    if start_hidden:
-        def tuck_away():                       # started with Windows: straight to the corner widget
-            if emitter.ready.wait(60):
-                time.sleep(0.8)
-                minimize()
+    if start_min:
+        def tuck_away():                       # straight to the corner widget
+            if emitter.ready.wait(40):
+                time.sleep(0.3)
+                minimize()                     # already minimized: this just shows the corner widget
+            else:
+                print("[window] his window never finished loading minimized; showing it")
+                restore()
         threading.Thread(target=tuck_away, daemon=True, name="start-hidden").start()
     if mini:
         mini.on_expand = restore

@@ -68,7 +68,7 @@ function applyJarvis(q, t) {
   set("j-sash", `rotate(${q.sash} 62 -362)`);
   set("j-chest", `translate(0 ${q.breath})`);
   set("j-sword", `translate(${q.swordX} ${q.sword}) rotate(${q.swordR} 0 -340)`);
-  $("j-sword").style.filter = `drop-shadow(0 0 ${(4 + q.swordGlow * 10).toFixed(1)}px rgba(143,243,255,${clamp(q.swordGlow, 0, 1).toFixed(2)}))`;
+  // (a CSS glow redrawn every frame cost more than everything else on him; the blade's own aura does the job)
   // once the sword floats up out of his hands it moves in front of him
   const sw = $("j-sword"), front = q.sword < -25;
   if (front !== sw._front) { sw._home = sw._home || sw.nextSibling; sw.parentNode.insertBefore(sw, front ? $("j-fx") : sw._home); sw._front = front; }
@@ -134,16 +134,23 @@ const CastEngine = (() => {
     if (!ANIMS[anim]) anim = "idle";
     if (who[name].anim !== anim) { who[name].anim = anim; who[name].t0 = performance.now() / 1000; }
   }
-  function step(now, dt, voices) {
+  let frameN = 0;
+  function step(now, dt, voices, focus) {
     const t = now / 1000;
+    frameN++;
     for (const name of ["jarvis", "ultron", "juno"]) {
+      // someone just idling in the background only needs half the frames (saves a lot on a big desktop)
+      if (focus && name !== focus && who[name].anim === "idle" && frameN % 2) continue;
       const a = who[name].anim, ta = t - who[name].t0, v = (voices && voices[name]) || 0;
       const tgt = Object.assign({}, DEFAULTS[name], ANIMS[a][name](a === "summon" ? ta : t, a === "talk" ? (voices ? v : voice(t)) : 0));
       const k = 1 - Math.exp(-dt * (a === "happy" || a === "talk" ? 14 : 7));
       for (const key in tgt) cur[name][key] += (tgt[key] - cur[name][key]) * (key === "ring" || key === "rift" ? 1 : k);
     }
     haloAng += cur.jarvis.halo * dt;
-    applyJarvis(cur.jarvis, t); applyUltron(cur.ultron, t); applyJuno(cur.juno, t, dt);
+    const half = (n) => focus && n !== focus && who[n].anim === "idle" && frameN % 2;
+    if (!half("jarvis")) applyJarvis(cur.jarvis, t);
+    if (!half("ultron")) applyUltron(cur.ultron, t);
+    if (!half("juno")) applyJuno(cur.juno, t, dt);
   }
   return { play, step, who, cur };
 })();

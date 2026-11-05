@@ -12,7 +12,7 @@ const pairD = (d, a) => path(d, a) + el("g", { transform: "scale(-1,1)" }, path(
 
 function defs() {
   return `<defs>
-  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   <filter id="bigglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   <filter id="smoke" x="-30%" y="-30%" width="160%" height="160%"><feTurbulence type="fractalNoise" baseFrequency=".018" numOctaves="3" seed="4"/><feDisplacementMap in="SourceGraphic" scale="40"/><feGaussianBlur stdDeviation="4"/></filter>
   <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="2" result="n"/><feColorMatrix in="n" type="saturate" values="0"/><feComposite in2="SourceGraphic" operator="in"/><feBlend in="SourceGraphic" mode="multiply"/></filter>
@@ -33,6 +33,7 @@ function defs() {
   <linearGradient id="mane" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#7b2bff"/><stop offset=".5" stop-color="#c13dff"/><stop offset="1" stop-color="#ff5ae0"/></linearGradient>
   <linearGradient id="grid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b44dff" stop-opacity="0"/><stop offset="1" stop-color="#b44dff" stop-opacity=".55"/></linearGradient>
   <radialGradient id="floorJ"><stop offset="0" stop-color="#8ff3ff" stop-opacity=".35"/><stop offset="1" stop-color="#8ff3ff" stop-opacity="0"/></radialGradient>
+  <radialGradient id="uSmoke"><stop offset="0" stop-color="#3a0d1a" stop-opacity=".9"/><stop offset=".6" stop-color="#1a0a12" stop-opacity=".5"/><stop offset="1" stop-color="#1a0a12" stop-opacity="0"/></radialGradient>
   <radialGradient id="floorU"><stop offset="0" stop-color="#ff2a45" stop-opacity=".35"/><stop offset="1" stop-color="#ff2a45" stop-opacity="0"/></radialGradient>
   </defs>`;
 }
@@ -80,8 +81,6 @@ function jarvis() {
   s += el("circle", { cx: 0, cy: -588, r: 62, fill: "none", stroke: "url(#gold)", "stroke-width": 3 });
   s += el("circle", { cx: 0, cy: -588, r: 70, fill: "none", stroke: "#8ff3ff", "stroke-width": 1, "stroke-dasharray": "2 7", filter: "url(#glow)" });
   s += C;
-  // second sword on the back, hilt over his shoulder
-  s += el("g", { transform: "translate(118,-612) rotate(-152)" }, greatsword(c, 470, { bladeFill: "url(#lightBlade)", metal: "url(#gold)" }));
   s += O("j-cloak");
   // cloak
   s += path("M -84 -508 C -150 -470 -168 -300 -196 -40 C -150 -22 -120 -38 -86 -24 C -40 -36 -10 -20 30 -30 C 80 -20 120 -36 196 -40 C 168 -300 150 -470 84 -508 Z", { fill: "url(#jCloth)", stroke: "#0d1724", "stroke-width": 2.2 });
@@ -185,8 +184,7 @@ function ultron() {
   s += C;
   s += O("u-smoke");
   // smoke rising off him
-  s += el("g", { filter: "url(#smoke)", opacity: .75 },
-    path("M -170 -20 C -210 -200 -150 -380 -120 -520 C -60 -600 60 -600 120 -520 C 150 -380 210 -200 170 -20 Z", { fill: "#1a0a12" }));
+  s += el("ellipse", { cx: 0, cy: -300, rx: 230, ry: 330, fill: "url(#uSmoke)", opacity: .9 });
   s += C;
   s += O("u-hisword");
   // the raised sword, held over his left shoulder, blade back behind his head
@@ -273,7 +271,7 @@ function ultron() {
   s += crack([[22, -624], [14, -604], [22, -590]]);
   s += C;
   s += O("u-embers");
-  for (let i = 0; i < 26; i++) { const x = Math.sin(i * 12.9898) * 190, y = -60 - ((i * 97) % 640), r = 1.2 + (i % 4) * .6; s += el("circle", { cx: x.toFixed(1), cy: y, r, fill: i % 3 ? "#ff2a45" : "#ff8a3a", opacity: .4 + (i % 5) * .1, filter: "url(#glow)" }); }
+  for (let i = 0; i < 26; i++) { const x = Math.sin(i * 12.9898) * 190, y = -60 - ((i * 97) % 640), r = 1.2 + (i % 4) * .6; s += el("circle", { cx: x.toFixed(1), cy: y, r, fill: i % 3 ? "#ff2a45" : "#ff8a3a", opacity: .4 + (i % 5) * .1 }); }
   s += C;
   return s;
 }
@@ -341,7 +339,7 @@ function juno() {
   // shards orbiting her (moved every frame)
   s += O("n-shards");
   for (const [f, k] of [[cy, 1], [pink, 1.2], [v, .9], [cy, 1], [pink, .8], [v, .7], [cy, .8], [pink, 1]])
-    s += el("g", {}, el("g", { transform: `scale(${k})` }, path(P([[0, -16], [6, 0], [0, 16], [-6, 0]]), { fill: f, filter: "url(#glow)" }) + path(P([[0, -16], [6, 0], [0, 0]]), { fill: "#fff", opacity: .35 })));
+    s += el("g", {}, el("g", { transform: `scale(${k})` }, path(P([[0, -16], [6, 0], [0, 16], [-6, 0]]), { fill: f }) + path(P([[0, -16], [6, 0], [0, 0]]), { fill: "#fff", opacity: .35 })));
   s += C;
   return s;
 }

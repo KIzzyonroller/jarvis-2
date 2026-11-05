@@ -27,6 +27,12 @@
   --top:52px; --dw:clamp(260px,22vw,316px); --lw:var(--dw); --rw:var(--dw);
   --side:max(var(--lw),var(--rw)); --sub:25px;
 }
+:root[data-ai=juno]{
+  --void:#07040d; --vrgb:7,4,13; --ink:#f1e6ff; --c:#c97bff; --crgb:201,123,255; --deep:#6a2bc4;
+  --you:#46f0ff; --dim:#8a76a3; --alarm:#ff5ae0; --argb:255,90,224;
+}
+/* Juno borrows Jarvis's face and effects, recoloured purple */
+:root[data-ai=juno] #fx,:root[data-ai=juno] #bg{filter:hue-rotate(80deg) saturate(1.2)}
 :root[data-ai=ultron]{
   --void:#080203; --vrgb:8,2,3; --ink:#f4e9e4; --c:#ff3046; --crgb:255,48,70; --deep:#8a1020;
   --you:#ff8a3d; --dim:#86636a; --alarm:#ffd34d; --argb:255,211,77;
@@ -107,7 +113,7 @@ body.booting #top,body.booting #cmd{opacity:0}
 .m .ts{font-size:11px;color:var(--dim);margin-right:8px}
 .m .who{display:inline;font:var(--dispw) 10px var(--display);letter-spacing:.18em;color:var(--c)}
 :root[data-ai=ultron] .m .who{font-size:12.5px;letter-spacing:.1em}
-.who.ai-jarvis{color:#7fe7ff!important}.who.ai-ultron{color:#ff3046!important}
+.who.ai-jarvis{color:#7fe7ff!important}.who.ai-ultron{color:#ff3046!important}.who.ai-juno{color:#c97bff!important}
 .m .txt{margin-top:2px;white-space:pre-wrap}
 .m.user .txt{color:var(--you)}
 .m.system{font-size:12.5px;color:var(--dim);padding-left:10px;border-left:2px solid rgba(var(--crgb),.22)}
@@ -516,7 +522,7 @@ body.swap #stage{animation:swap .6s steps(6)}
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h14M3 8h9M3 12h14M3 16h7"/></svg></button>
   <div class="drag pywebview-drag-region"><span id="wordmark" class="pywebview-drag-region">J.A.R.V.I.S.</span></div>
   <div id="who" role="group" aria-label="Who you're talking to">
-    <button data-ai="jarvis" aria-pressed="true">Jarvis</button><button data-ai="both" aria-pressed="false" title="Both of them, taking turns">Both</button><button data-ai="ultron" aria-pressed="false">Ultron</button>
+    <button data-ai="jarvis" aria-pressed="true">Jarvis</button><button data-ai="both" aria-pressed="false" title="Both of them, taking turns">Both</button><button data-ai="ultron" aria-pressed="false">Ultron</button><button data-ai="juno" aria-pressed="false">Juno</button>
   </div>
   <div id="clock"><span id="time">--:--</span><span id="date"></span></div>
   <button class="ico" id="t-studio" aria-label="Studio: Blender and Unreal modes" aria-pressed="false" aria-controls="studio" title="Studio (Blender and Unreal)">
@@ -711,7 +717,9 @@ const cv = $("#fx"), g = cv.getContext("2d");
 const COL = {
   jarvis: { c: [127, 231, 255], deep: [27, 143, 179], hot: [223, 246, 255], alarm: [255, 157, 46], dim: [95, 127, 143] },
   ultron: { c: [255, 48, 70], deep: [110, 10, 24], hot: [255, 138, 61], bone: [244, 233, 228], alarm: [255, 211, 77], dim: [134, 99, 106] },
+  juno: { c: [201, 123, 255], deep: [106, 43, 196], hot: [255, 90, 224], alarm: [255, 90, 224], dim: [138, 118, 163] },
 };
+const faceFor = (k) => (k === "juno" ? "jarvis" : k);     // Juno uses Jarvis's face, recoloured (see the CSS)
 const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
 const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
@@ -752,7 +760,7 @@ let venv = null, vsync = 16.7, lastRaf = 0, tick = 0, presenceBox = null;
 let speedS = .3, last = 0, raf = 0, askT0 = 0, askSecs = 45, frameAvg = 16.7, slowPC = false;
 
 function targets() {
-  const solo = duoOn ? null : (aiKey || "jarvis");
+  const solo = duoOn ? null : faceFor(aiKey || "jarvis");
   for (const k of ["jarvis", "ultron"]) {
     const L = look[k];
     if (solo) { L.ta = k === solo ? 1 : 0; L.tx = 0; L.ts = k === solo ? 1 : .8; }
@@ -1172,7 +1180,7 @@ function frame(now) {
     const x = cx + L.x * dd, r = R * L.s;
     const face = FACES[faceKey] || FACES.classic;
     face.draw[k](x, cy, r, L.a, t, b);
-    if (k === (duoOn ? speaker : aiKey || "jarvis")) drawFX(x, cy, r, k, L.a, dt, t, !face.fx);
+    if (k === faceFor(duoOn ? speaker : aiKey || "jarvis")) drawFX(x, cy, r, k, L.a, dt, t, !face.fx);
   }
   raf = requestAnimationFrame(frame);
 }

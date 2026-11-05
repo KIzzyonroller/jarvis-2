@@ -67,7 +67,12 @@ def _u():
             "SendMessageTimeoutW": ([H, wt.UINT, wt.WPARAM, wt.LPARAM, wt.UINT, wt.UINT, P(ctypes.c_size_t)], ctypes.c_ssize_t),
             "SetParent": ([H, H], H),
             "GetParent": ([H], H),
+            "GetAncestor": ([H, wt.UINT], H),
+            "GetDesktopWindow": ([], H),
+            "ArrangeIconicWindows": ([H], wt.UINT),
+            "SystemParametersInfoW": ([wt.UINT, wt.UINT, ctypes.c_void_p, wt.UINT], wt.BOOL),
             "IsWindow": ([H], wt.BOOL),
+            "IsIconic": ([H], wt.BOOL),
             "ShowWindow": ([H, ctypes.c_int], wt.BOOL),
             "IsWindowVisible": ([H], wt.BOOL),
             "SetWindowPos": ([H, H, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wt.UINT], wt.BOOL),
@@ -167,6 +172,38 @@ def _icons(defview, show):
     return bool(lv)
 
 
+_MINMETRICS = None
+
+
+def _hide_minimized_strips(hide):
+    """Windows draws minimized windows that have no taskbar button as little title bars in the bottom-left
+    corner (NVIDIA's overlay leaves one there). While they're the desktop, park those off-screen instead.
+    Only for this session (never saved), and put back exactly as it was when he closes."""
+    global _MINMETRICS
+    import ctypes
+    from ctypes import wintypes as wt
+
+    class MM(ctypes.Structure):
+        _fields_ = [("cbSize", wt.UINT), ("iWidth", ctypes.c_int), ("iHorzGap", ctypes.c_int), ("iVertGap", ctypes.c_int), ("iArrange", ctypes.c_int)]
+    u = _u()
+    try:
+        if hide:
+            if _MINMETRICS is None:
+                cur = MM(); cur.cbSize = ctypes.sizeof(MM)
+                if not u.SystemParametersInfoW(0x002B, ctypes.sizeof(MM), ctypes.byref(cur), 0):   # SPI_GETMINIMIZEDMETRICS
+                    return
+                _MINMETRICS = (cur.iWidth, cur.iHorzGap, cur.iVertGap, cur.iArrange)
+            new = MM(ctypes.sizeof(MM), _MINMETRICS[0], _MINMETRICS[1], _MINMETRICS[2], _MINMETRICS[3] | 8)   # ARW_HIDE
+            u.SystemParametersInfoW(0x002C, ctypes.sizeof(MM), ctypes.byref(new), 0)               # 0 = this session only
+        elif _MINMETRICS is not None:
+            old = MM(ctypes.sizeof(MM), *_MINMETRICS)
+            u.SystemParametersInfoW(0x002C, ctypes.sizeof(MM), ctypes.byref(old), 0)
+            _MINMETRICS = None
+        u.ArrangeIconicWindows(u.GetDesktopWindow())
+    except Exception as e:
+        print(f"[desktop] minimized windows: {e}")
+
+
 def recover_icons():
     """At startup: if a previous run hid the icons and never put them back (crash, power cut), show them."""
     if not IS_WINDOWS or not _flags(FLAG):
@@ -220,6 +257,10 @@ class LiveDesk:
             if ev.get("kind") != "tool_start":
                 return
             ev = {"type": "activity", "kind": "tool_start", "data": {"name": (ev.get("data") or {}).get("name", "")}}
+        elif t == "msg":
+            if ev.get("role") != "user":
+                return
+            ev = {"type": "msg", "role": "user", "text": str(ev.get("text", ""))[:200]}
         elif t not in PASS:
             return
         if t in ("persona", "state", "merged"):
@@ -264,6 +305,14 @@ class LiveDesk:
             return False
         self.layer, self.defview = layer, dv
         self._style()
+        # A true child window (WS_CHILD, no popup/caption/min-max): then "Show desktop" and minimize-all can't
+        # minimize it, and Windows never parks it as a little "Jarvis Desktop" bar in the bottom-left corner.
+        GWL_STYLE = -16
+        st = u.GetWindowLongPtrW(self.hwnd, GWL_STYLE)
+        st = (st & ~0x80000000 & ~0x00C00000 & ~0x00040000 & ~0x00020000 & ~0x00010000 & ~0x00080000) | 0x40000000
+        u.SetWindowLongPtrW(self.hwnd, GWL_STYLE, st)
+        if u.IsIconic(self.hwnd):
+            u.ShowWindow(self.hwnd, 9)                    # SW_RESTORE
         u.SetParent(self.hwnd, layer)
         vx, vy, vw, vh = virtual_rect()
         lr = wt.RECT()
@@ -272,6 +321,7 @@ class LiveDesk:
         u.SetWindowPos(self.hwnd, wt.HWND(1), vx - lr.left, vy - lr.top, vw, vh, 0x0010 | 0x0040 | 0x0020)
         self._vrect = (vx, vy, vw, vh)
         _icons(dv, False)
+        _hide_minimized_strips(True)
         self.attached = True
         return True
 
@@ -322,11 +372,16 @@ class LiveDesk:
         u = _u()
         while not self._stop.wait(1.5):
             try:
-                if not u.IsWindow(self.layer) or u.GetParent(self.hwnd) != self.layer:     # Explorer restarted
+                # GA_PARENT: the real parent. (GetParent gives the OWNER for our kind of window, so it never matched
+                # and 1.0.21 re-attached and redrew everything every 1.5 seconds: the flashing.)
+                if not u.IsWindow(self.layer) or (u.GetAncestor(self.hwnd, 1) or 0) != (self.layer or 0):   # Explorer restarted
                     self.attached = False
                     if self._attach():
                         print("[desktop] Explorer restarted; back on the desktop")
                         self.em({"type": "desk_layout", "monitors": monitors()})
+                    continue
+                if u.IsIconic(self.hwnd):                      # something minimized it anyway: put it back
+                    self._attach()
                     continue
                 v = virtual_rect()
                 if v != self._vrect:                                   # monitor added, removed or resized
@@ -350,7 +405,10 @@ class LiveDesk:
         try:
             u = _u()
             _icons(self.defview or find_wallpaper_layer()[1], True)
+            _hide_minimized_strips(False)
             if self.hwnd and self.attached:
+                st = u.GetWindowLongPtrW(self.hwnd, -16)
+                u.SetWindowLongPtrW(self.hwnd, -16, (st & ~0x40000000) | 0x80000000)     # back to a normal popup
                 u.SetParent(self.hwnd, None)
                 u.SetWindowPos(self.hwnd, None, PARK, PARK, 0, 0, 0x0001 | 0x0004 | 0x0010)
             if self.layer:

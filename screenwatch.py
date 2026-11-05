@@ -22,7 +22,7 @@ import time
 import config
 
 IS_WINDOWS = sys.platform == "win32"
-FPS = 3                    # plenty to know what's there and when it settles
+FPS = 2                    # plenty to know what's there and when it settles (light on the CPU)
 AWAKE_FOR = 90             # keep watching this long after the last time you talked to him
 
 # Things you say that are about what's on the screen. Kept tight: a false match sends a picture for nothing.
@@ -105,7 +105,7 @@ class ScreenWatch:
 
     def grab_now(self):
         img = self._capture()
-        small = img.convert("L").resize((96, 54))
+        small = img.reduce(max(1, img.width // 96)).convert("L").resize((96, 54))     # reduce() first: much cheaper
         now = time.time()
         with self._lock:
             if self._small is None or _diff(small, self._small) > 2.0:

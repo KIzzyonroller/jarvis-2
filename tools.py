@@ -2629,7 +2629,7 @@ def voice_settings_tool(action="list", who=None, voice=None, speed=None, pitch=N
     if _VOICE_CORE is None:
         return "Voice settings aren't available."
     key = (who or getattr(_CTX, "persona", None) or _VOICE_CORE.persona_key).lower()
-    key = "ultron" if "ultron" in key else "jarvis" if "jarvis" in key else key
+    key = "ultron" if "ultron" in key else "jarvis" if "jarvis" in key else "juno" if "juno" in key else key
     if key not in personas.PERSONAS:
         return f"No one called {who}."
     if action == "reset":

@@ -203,6 +203,8 @@ LIVING_DESKTOP = os.environ.get("JARVIS_LIVING_DESKTOP", "true").lower() != "fal
 DESK_INTRO = os.environ.get("JARVIS_DESK_INTRO", "true").lower() != "false"     # Juno grabs the screen at startup
 # Screen watching (screenwatch.py): a live view of the screen in memory while you talk to him, so he sees what you mean.
 SCREEN_WATCH = os.environ.get("JARVIS_SCREEN_WATCH", "true").lower() != "false"
+# Start with his window minimized (the corner widget shows him), so he never covers the desktop intro or your work.
+START_MINIMIZED = os.environ.get("JARVIS_START_MINIMIZED", "true").lower() != "false"
 # A briefing the first time you start or wake the PC each day (the day rolls over at 4 AM)
 MORNING_BRIEFING = os.environ.get("JARVIS_MORNING_BRIEFING", "true").lower() != "false"
 # Headlines for the briefing (any RSS feed). Empty = no news.

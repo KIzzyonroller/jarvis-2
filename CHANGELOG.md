@@ -3,6 +3,15 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.23
+- **You can talk to Juno now.** Say "Juno, ..." or "switch to Juno", or press Juno at the top of his window. She has her own voice, her own personality and a purple theme. The secret code still merges them into her.
+- **No more flashing.** The desktop thought Explorer had restarted every second and a half and redrew everything. Fixed, and that was also a big part of the CPU use.
+- **Much lighter on your PC.** The heaviest effects are gone (Ultron's smoke and a lot of separate glows), the voice visualizers are drawn a cheaper way, and they slow to 10 frames a second while nobody's talking.
+- **He starts minimized** (the corner widget shows him), so he never covers Juno's intro. Settings > Desktop to change it.
+- Say "open", "summon", "launch", "pull up" and so on and whoever you're talking to plays the summon move, every time.
+- The sword floating over Jarvis's shoulder is gone.
+- A small voice visualizer now sits in the bottom-left corner of your main screen, and the little leftover window bar Windows was parking there is hidden while they're your desktop.
+
 ## 1.0.22
 - **He watches your screen while you talk to him.** Ask "what's this error?", "what am I looking at?" or "read this" and he already sees it, so he answers in one go instead of stopping to take a picture first. Usually a second or more faster. After he clicks something he waits only until the screen settles, and if nothing changed he doesn't look twice. It stays in memory (never saved), only while you're talking to him, and never during fullscreen games. Settings > Desktop to turn it off.
 - **Glass mode tracks your hands better.** Steadier (the whole hand is smoothed, not just the pointer, so no more jitter when you hold still), quicker when you move, pinches still count with your hand turned sideways, a blurry frame no longer drops the card you're holding, and two hands crossing over don't swap. It also asks your camera for 60 frames a second if it can do it.

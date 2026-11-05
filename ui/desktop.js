@@ -18,7 +18,46 @@
     wx: m.wx * innerWidth, wy: m.wy * innerHeight, ww: m.ww * innerWidth, wh: m.wh * innerHeight });
   const primary = () => px(S.monitors.find((m) => m.primary) || S.monitors[0]);
   const others = () => S.monitors.filter((m) => !m.primary).map(px);
-  let bars = [], motes = [];
+  let VIZ = [], motes = [];
+  // one small canvas per visualizer, just big enough for it: redrawing a whole-screen canvas costs more than it saves
+  function sizeViz() {
+    const box = document.getElementById("vizbox"), d = devicePixelRatio || 1;
+    box.innerHTML = "";
+    for (const vc of VIZ) {
+      const half = Math.ceil(vc.r * 1.35), c = document.createElement("canvas");
+      c.style.left = vc.x - half + "px"; c.style.top = vc.y - half + "px"; c.style.width = c.style.height = half * 2 + "px";
+      c.width = c.height = Math.ceil(half * 2 * d);
+      const g = c.getContext("2d"); g.setTransform(d, 0, 0, d, half - vc.x, half - vc.y);   // draw in page coordinates
+      box.appendChild(c); vc.g = g; vc.half = half;
+    }
+  }
+  const hexRGB = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  // The voice visualizers, drawn on a plain canvas: far cheaper than redrawing a hundred SVG lines every frame.
+  function drawViz(t, lvl, col) {
+    const [r, g, b] = hexRGB(col);
+    for (const vc of VIZ) {
+      const vg = vc.g; if (!vg) continue;
+      vg.clearRect(vc.x - vc.half, vc.y - vc.half, vc.half * 2, vc.half * 2);
+      const glow = vg.createRadialGradient(vc.x, vc.y, 0, vc.x, vc.y, vc.r * .5);
+      glow.addColorStop(0, `rgba(${r},${g},${b},${(.35 + lvl * .5).toFixed(2)})`); glow.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      vg.fillStyle = glow; vg.beginPath(); vg.arc(vc.x, vc.y, vc.r * .5, 0, 6.283); vg.fill();
+      vg.strokeStyle = "rgba(193,61,255,.45)"; vg.lineWidth = 1.5; vg.beginPath(); vg.arc(vc.x, vc.y, vc.r * .62, 0, 6.283); vg.stroke();
+      vg.beginPath(); vg.moveTo(vc.x, vc.y - vc.r * .3); vg.lineTo(vc.x + vc.r * .12, vc.y); vg.lineTo(vc.x, vc.y + vc.r * .3); vg.lineTo(vc.x - vc.r * .12, vc.y); vg.closePath();
+      vg.fillStyle = "#0d0a14"; vg.fill(); vg.strokeStyle = "#ff5ae0"; vg.lineWidth = 2; vg.stroke();
+      const w = Math.max(2, vc.r * .035), r0 = vc.r * .7;
+      vg.lineCap = "round";
+      for (const [lw, a] of [[w * 2.6, .18], [w, .95]]) {          // a soft wide pass, then the bright bar: a glow without blur
+        vg.lineWidth = lw; vg.strokeStyle = `rgba(${r},${g},${b},${a})`; vg.beginPath();
+        for (let i = 0; i < vc.n; i++) {
+          const an = i / vc.n * 6.283 - t * .15;
+          const len = vc.r * (.08 + .05 * Math.sin(t * 2 + an * 3) + lvl * .55 * (.5 + .5 * Math.sin(an * 7 + t * 9)));
+          const c = Math.cos(an), s2 = Math.sin(an);
+          vg.moveTo(vc.x + c * r0, vc.y + s2 * r0); vg.lineTo(vc.x + c * (r0 + len), vc.y + s2 * (r0 + len));
+        }
+        vg.stroke();
+      }
+    }
+  }
 
   function build() {
     const W = innerWidth, H = innerHeight;
@@ -39,26 +78,20 @@
     const p = primary(), ground = p.wy + p.wh * .88, k = p.wh * .64 / 860;
     const place = (name, fx, scale) => el("g", { id: `place-${name}`, transform: `translate(${p.x + p.w * fx},${ground}) scale(${k * scale})`, style: `opacity:${S.shown ? 1 : 0}` },
       el("g", { id: name }, { jarvis, ultron, juno }[name]()));
-    // the voice visualizer: on the second monitor if there is one, otherwise faint behind Juno
-    const o = others()[0];
-    const vc = o ? { x: o.x + o.w / 2, y: o.wy + o.wh * .45, r: Math.min(o.w, o.wh) * .2, a: 1 } : { x: p.x + p.w / 2, y: p.wy + p.wh * .36, r: p.wh * .2, a: .35 };
-    let v = `<g id="viz" opacity="${vc.a}">`;
-    v += el("circle", { cx: vc.x, cy: vc.y, r: vc.r * .62, fill: "none", stroke: "#c13dff", "stroke-width": 1.5, opacity: .5, filter: "url(#glow)" });
-    v += el("circle", { id: "viz-core", cx: vc.x, cy: vc.y, r: vc.r * .18, fill: "#c13dff", opacity: .7, filter: "url(#bigglow)" });
-    v += path(P([[vc.x, vc.y - vc.r * .3], [vc.x + vc.r * .12, vc.y], [vc.x, vc.y + vc.r * .3], [vc.x - vc.r * .12, vc.y]]), { id: "viz-gem", fill: "#0d0a14", stroke: "#ff5ae0", "stroke-width": 2, filter: "url(#glow)" });
-    for (let i = 0; i < 72; i++) v += el("line", { class: "bar", "stroke-linecap": "round", "stroke-width": Math.max(2, vc.r * .03), stroke: "#c13dff", filter: "url(#glow)" });
-    v += "</g>";
-    s += v;
+    // the voice visualizer: small in the main monitor's bottom-left corner, big in the middle of the second one
+    const o = others()[0], vr = p.wh * .075;
+    const vizzes = [{ x: p.wx + vr * 1.7, y: p.wy + p.wh - vr * 1.7, r: vr, a: 1, n: 40 }];
+    if (o) vizzes.push({ x: o.x + o.w / 2, y: o.wy + o.wh * .45, r: Math.min(o.w, o.wh) * .2, a: 1, n: 72 });
+    VIZ = vizzes;
     // drifting shards over every monitor
     let ms = '<g id="motes">';
-    const nM = 14 * mons.length;
-    for (let i = 0; i < nM; i++) ms += el("g", {}, path(P([[0, -9], [3.5, 0], [0, 9], [-3.5, 0]]), { fill: ["#46f0ff", "#ff5ae0", "#c13dff"][i % 3], filter: "url(#glow)" }));
+    const nM = 8 * mons.length;
+    for (let i = 0; i < nM; i++) ms += el("g", {}, path(P([[0, -9], [3.5, 0], [0, 9], [-3.5, 0]]), { fill: ["#46f0ff", "#ff5ae0", "#c13dff"][i % 3] }));
     ms += "</g>";
     s += ms;
     s += place("jarvis", .2, 1.05) + place("ultron", .8, 1.05) + place("juno", .5, 1);
     svg.innerHTML = s;
-    bars = [...svg.querySelectorAll("#viz .bar")].map((e, i) => ({ e, a: i / 72 * Math.PI * 2 }));
-    bars.forEach((b) => { b.cx = vc.x; b.cy = vc.y; b.r = vc.r; });
+    sizeViz();
     motes = [...svg.querySelectorAll("#motes > g")].map((e, i) => {
       const m = mons[i % mons.length];
       return { e, m, fx: Math.random(), fy: Math.random(), sp: .006 + Math.random() * .012, ph: Math.random() * 6.28, r: Math.random() * 360 };
@@ -68,7 +101,7 @@
   }
 
   // ------------------------------------------------------------------ who does what
-  const active = () => (S.merged ? "juno" : (S.speaker || S.persona));
+  const active = () => S.speaker || S.persona;            // Juno included: she's a persona now
   function stateAnim() {
     if (S.confirm) return "battle";
     return { listening: "listen", awaiting: "listen", dictating: "listen", thinking: "think", speaking: "talk" }[S.state] || "idle";
@@ -84,7 +117,10 @@
     }
   }
   function oneShot(anim, who, secs) { S.oneShot = anim; S.oneShotWho = who; S.oneShotUntil = performance.now() + secs * 1000; refresh(); setTimeout(refresh, secs * 1000 + 30); }
-  const OPENERS = /^(open|spotify|youtube|netflix|apple_music|launch|browser)/;
+  const OPENERS = /^(open|spotify|youtube|netflix|apple_music|launch|browser|glass)/;
+  const SAYS_OPEN = /\b(open|opening|summon|launch|start up|pull up|bring up|boot up|fire up|load up|put on|play)\b/i;
+  let lastSummon = 0;
+  function summon() { const now = performance.now(); if (now - lastSummon < 2500) return; lastSummon = now; oneShot("summon", active(), 3.4); }
 
   const handlers = {
     desk_init(e) {
@@ -93,7 +129,7 @@
       build();
       if (e.intro && !still) playIntro(e.shot); else reveal(0);
     },
-    desk_layout(e) { S.monitors = e.monitors; build(); },
+    desk_layout(e) { if (JSON.stringify(e.monitors) !== JSON.stringify(S.monitors)) { S.monitors = e.monitors; build(); } },
     desk_pause(e) { S.paused = !!e.on; if (!S.paused) kick(); },
     persona(e) { S.persona = e.key || S.persona; refresh(); },
     merged(e) { S.merged = !!e.on; if (S.merged) oneShot("happy", "juno", 3); refresh(); },
@@ -101,7 +137,8 @@
     voice(e) { S.level = e.v || 0; S.levelT = performance.now(); },
     turn_start(e) { const k = String(e.who || "").toLowerCase(); S.speaker = NAMES.includes(k) ? k : null; refresh(); },
     turn_end() { S.speaker = null; refresh(); },
-    activity(e) { const d = e.data || {}; if (e.kind === "tool_start" && OPENERS.test(String(d.name || ""))) oneShot("summon", active(), 3.4); },
+    activity(e) { const d = e.data || {}; if (e.kind === "tool_start" && OPENERS.test(String(d.name || ""))) summon(); },
+    msg(e) { if (e.role === "user" && SAYS_OPEN.test(String(e.text || ""))) summon(); },
     confirm() { S.confirm = true; refresh(); },
     confirm_done() { S.confirm = false; refresh(); },
   };
@@ -116,23 +153,16 @@
   function frame(now) {
     if (S.paused) { running = false; return; }
     requestAnimationFrame(frame);
-    if (now - last < 32) return;
+    const busy = S.state !== "idle" && S.state !== "booting" || (S.oneShot && now < S.oneShotUntil) || S.confirm;
+    if (now - last < (busy ? 41 : 100)) return;          // 24 fps while something's happening, 10 while they idle
     const dt = Math.min(.1, (now - last) / 1000); last = now;
     if (!S.built) return;
     const fresh = now - S.levelT < 400 ? S.level : 0;
     lvl += (fresh - lvl) * Math.min(1, dt * 12);
     const voices = { jarvis: 0, ultron: 0, juno: 0 }; voices[active()] = lvl;
-    CastEngine.step(now, dt, voices);
+    CastEngine.step(now, dt, voices, active());
     const t = now / 1000, col = COLOR[active()];
-    for (const b of bars) {
-      const len = b.r * (.08 + .05 * Math.sin(t * 2 + b.a * 3) + lvl * .55 * (.5 + .5 * Math.sin(b.a * 7 + t * 9)));
-      const c = Math.cos(b.a - t * .15), s2 = Math.sin(b.a - t * .15), r0 = b.r * .7;
-      b.e.setAttribute("x1", (b.cx + c * r0).toFixed(1)); b.e.setAttribute("y1", (b.cy + s2 * r0).toFixed(1));
-      b.e.setAttribute("x2", (b.cx + c * (r0 + len)).toFixed(1)); b.e.setAttribute("y2", (b.cy + s2 * (r0 + len)).toFixed(1));
-      b.e.setAttribute("stroke", col);
-    }
-    const core = document.getElementById("viz-core");
-    if (core) { core.setAttribute("fill", col); core.setAttribute("opacity", (.45 + lvl * .55).toFixed(2)); }
+    drawViz(t, lvl, col);
     for (const m of motes) {
       m.fy -= m.sp * dt * 3; if (m.fy < -.05) { m.fy = 1.05; m.fx = Math.random(); }
       const x = m.m.x + (m.fx + Math.sin(t * .5 + m.ph) * .02) * m.m.w, y = m.m.y + m.fy * m.m.h;
@@ -245,7 +275,8 @@
   }
 
   // ------------------------------------------------------------------ start
-  addEventListener("resize", () => { if (S.built) build(); });
+  let rz = 0, lastWH = "";
+  addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { const wh = innerWidth + "x" + innerHeight; if (S.built && wh !== lastWH) { lastWH = wh; build(); } }, 250); });
   const hello = () => { try { window.pywebview.api.ready(); } catch (e) { /* not inside Jarvis */ } };
   if (window.pywebview && window.pywebview.api) hello(); else addEventListener("pywebviewready", hello);
   kick();

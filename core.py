@@ -538,7 +538,7 @@ class Core:
                 self.listener.expecting = lambda: (self._hold is not None or self._turn is not None
                                                    or self._engaged() or self._pending is not None)
                 self.listener.start()
-                self._log('ALWAYS LISTENING  [SAY "JARVIS" OR "ULTRON"]')
+                self._log('ALWAYS LISTENING  [SAY "JARVIS", "ULTRON" OR "JUNO"]')
                 self._start_hotkey()
             except Exception as e:
                 self.listener = None
@@ -1405,7 +1405,7 @@ class Core:
             self._set_duo(False)
             return
         if SWITCH_RE.search(text) or (self.duo and re.match(r"^(just|only)\b", low)):
-            target = next((k for k in personas.ORDER if any(a in low.split() for a in personas.PERSONAS[k]["aliases"])),
+            target = next((k for k in personas.ALL if any(a in low.split() for a in personas.PERSONAS[k]["aliases"])),
                           personas.other(self.persona_key))
             if self.duo:
                 self._set_duo(False, speak=False)
@@ -1787,16 +1787,15 @@ class Core:
             print(f"[activity] {e}")
 
     def secret_code(self, source="voice"):
-        """Up up down down left right left right B A start: the two of them merge into one (or split again).
-        The merged form needs the desktop characters; until those exist this just remembers the choice."""
+        """Up up down down left right left right B A start: the two of them merge into Juno (or split again)."""
         on = not self._state_flag("merged")
         self._state_flag("merged", on)
         print(f"[secret] merged {'on' if on else 'off'} ({source})")
         self.emit({"type": "merged", "on": on})
-        self.emit({"type": "toast", "text": ("Code accepted. The merge is armed: you'll see it once they have bodies on your desktop."
-                                            if on else "Split again.")})
-        line = random.choice(["Interesting choice.", "Two minds, one body. Soon."] if on else ["Back to two of us."])
-        self.say_line(line) if self.persona_key == "ultron" else self.emit({"type": "msg", "role": "system", "text": line})
+        self.emit({"type": "toast", "text": "Code accepted. They merged: Juno's here." if on else "Split again."})
+        if self.duo:
+            self._set_duo(False, speak=False)
+        self._switch("juno" if on else "jarvis")
 
     def glass_hub(self):
         """Glass mode's little local server, started the first time it's needed."""
@@ -2057,7 +2056,7 @@ class Core:
             {"bm_george", "bm_lewis", "bm_daniel", "bm_fable", "am_michael", "am_adam", "am_onyx", "am_puck",
              "bf_emma", "af_heart", "af_bella", "af_nicole"})
         return {"personas": [{"key": k, "name": personas.PERSONAS[k]["name"], **voice_settings.current(k)}
-                             for k in personas.ORDER],
+                             for k in personas.ALL],
                 "voices": [{"id": v, "label": voice_settings.describe(v)} for v in avail],
                 "engine": self.speaker.engine_name if self.speaker else "none",
                 "speed": list(voice_settings.SPEED), "pitch": list(voice_settings.PITCH)}
@@ -2564,7 +2563,7 @@ class Core:
         common += [f"Volume {v}." for v in range(10, 101, 10)]
         common += [f"Timer set for {n} minutes." for n in (1, 2, 3, 5, 10, 15, 20, 30)]
         items = []
-        for key in personas.ORDER:
+        for key in personas.ALL:
             p = personas.PERSONAS[key]
             lines = [p["confirm_cue"]] + list(p.get("acks", [])) + [p["hidden"], p["shown"], p["muted"]] + common
             items += [(line, p) for line in lines]
