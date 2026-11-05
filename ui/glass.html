@@ -11,6 +11,7 @@
 @font-face{font-family:Michroma;src:url(/fonts/michroma-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Big Shoulders";src:url(/fonts/big-shoulders-display-latin-700-normal.woff2) format("woff2");font-weight:700}
 :root{--c:#7fe7ff;--crgb:127,231,255;--hot:#dff6ff;--ink:#e8f7fb;--dim:#8fb3c2;--deep:#06222c;--alarm:#ff9d2e;--head:Michroma,sans-serif;--glass:rgba(8,22,30,.46)}
+body.juno{--c:#c97bff;--crgb:201,123,255;--hot:#ff5ae0;--ink:#f3eaff;--dim:#a99bc0;--deep:#1a0c2e;--glass:rgba(22,10,40,.5)}
 body.ultron{--c:#ff3046;--crgb:255,48,70;--hot:#ff8a3d;--ink:#f8ebe7;--dim:#c09aa0;--deep:#2a0509;--head:"Big Shoulders",sans-serif;--glass:rgba(30,6,10,.5)}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:#02060b;color:var(--ink);font:400 15px/1.5 Jost,system-ui,sans-serif;user-select:none;-webkit-user-select:none}
@@ -86,7 +87,7 @@ body.ultron #him-state{font-size:13px;letter-spacing:.14em}
 @media (prefers-reduced-motion:reduce){.card{transition:none}}
 </style>
 </head>
-<body class="jarvis">
+<body class="juno">
 <video id="cam" autoplay playsinline muted></video>
 <div id="veil"></div>
 <div id="board"></div>
@@ -123,9 +124,9 @@ function resize() { W = innerWidth; H = innerHeight; const d = Math.min(devicePi
 addEventListener("resize", resize);
 const store = { get(k, d) { try { const v = localStorage.getItem("glass." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem("glass." + k, JSON.stringify(v)); } catch (e) {} } };
-let persona = "jarvis", himState = "idle", voice = 0, voiceAt = 0;
-const rgb = () => persona === "ultron" ? [255, 48, 70] : [127, 231, 255];
-const hot = () => persona === "ultron" ? [255, 138, 61] : [223, 246, 255];
+let persona = "juno", himState = "idle", voice = 0, voiceAt = 0;
+const rgb = () => persona === "ultron" ? [255, 48, 70] : persona === "juno" ? [201, 123, 255] : [127, 231, 255];
+const hot = () => persona === "ultron" ? [255, 138, 61] : persona === "juno" ? [255, 90, 224] : [223, 246, 255];
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${clamp(a, 0, 1).toFixed(3)})`;
 
 // =============================================================== cards
@@ -427,7 +428,7 @@ const STATE_WORD = { idle: "Standby", listening: "Listening", transcribing: "Hea
 let capTimer = null;
 function onHim(e) {
   if (e.type === "state") { himState = e.state; $("#him-state").textContent = STATE_WORD[e.state] || e.state; }
-  if (e.type === "persona") { persona = e.key === "ultron" ? "ultron" : "jarvis"; document.body.classList.toggle("ultron", persona === "ultron"); document.body.classList.toggle("jarvis", persona !== "ultron"); document.title = (e.name || "Jarvis") + " Glass"; cards.forEach(measure); }
+  if (e.type === "persona") { persona = ["ultron", "juno"].includes(e.key) ? e.key : "jarvis"; document.body.classList.toggle("ultron", persona === "ultron"); document.body.classList.toggle("juno", persona === "juno"); document.body.classList.toggle("jarvis", persona === "jarvis"); document.title = (e.name || "Jarvis") + " Glass"; cards.forEach(measure); }
   if (e.type === "voice") { voice = Math.max(voice, +e.v || 0); voiceAt = performance.now(); }
   if (e.type === "caption" && e.text) { const c = $("#caption"); c.textContent = e.text; c.classList.add("on"); clearTimeout(capTimer); capTimer = setTimeout(() => c.classList.remove("on"), 5000); }
   if (e.type === "turn_end") { clearTimeout(capTimer); capTimer = setTimeout(() => $("#caption").classList.remove("on"), 2500); }

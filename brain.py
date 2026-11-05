@@ -42,7 +42,7 @@ class Brain:
     _done_calls = {}
     _started = {}
 
-    def __init__(self, persona="jarvis", on_tool=None):
+    def __init__(self, persona="juno", on_tool=None):
         if not config.ANTHROPIC_API_KEY or "paste-yours" in config.ANTHROPIC_API_KEY:
             raise SystemExit("No API key set. Open the .env file in the Jarvis folder and paste your Anthropic API key.")
         try:      # keep the connection to Claude open between requests (saves a TLS handshake each time)

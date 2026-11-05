@@ -263,7 +263,7 @@ def _start_apps():
 # focus, so we ask nicely (SW_SHOWNOACTIVATE) and then, for a few seconds,
 # quietly hand focus back to the user's window if the new app steals it.
 # If the user clicks or alt-tabs somewhere themselves, we back off immediately.
-SELF_TITLES = {"J.A.R.V.I.S.", "U.L.T.R.O.N.", "Jarvis Mini"}
+SELF_TITLES = {"J.U.N.O.", "J.A.R.V.I.S.", "U.L.T.R.O.N.", "Jarvis Mini", "Jarvis Desktop"}
 _SHELL_CLASSES = {
     "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "Windows.UI.Core.CoreWindow",
     "NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland", "XamlExplorerHostIslandWindow",
@@ -965,7 +965,7 @@ def _grab():
 # The last picture he was sent this turn, so an unchanged screen isn't sent twice.
 _LOOK_TURN = 0
 _LAST_SENT = {}
-OWN_TITLES = ("J.A.R.V.I.S.", "Jarvis Mini", "Jarvis Desktop", "Jarvis Glass")
+OWN_TITLES = ("J.U.N.O.", "J.A.R.V.I.S.", "Jarvis Mini", "Jarvis Desktop", "Jarvis Glass", "Juno Glass")
 
 
 def new_turn():
@@ -1191,7 +1191,7 @@ def mouse(action, what="", x=None, y=None, to_x=None, to_y=None, amount=3, risky
 def look_at_camera(question=""):
     """One frame from the webcam. The camera is opened, read, and released immediately."""
     if not config.CAMERA_ENABLED:
-        return "The camera is turned off in Jarvis's settings (JARVIS_CAMERA=false)."
+        return "The camera is turned off in Settings > Application access."
     os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")   # keep the console readable
     try:
         import cv2
@@ -2561,9 +2561,9 @@ def screen(question="", target="all", save=False, detail="auto"):
     return look_at_screen(question, target, detail)
 
 
-def spotify_tool(action, query=None, kind="auto", value=None, shuffle=None, owner=None):
+def spotify_tool(action, query=None, kind="auto", value=None, shuffle=None, owner=None, show=False):
     import spotify
-    return spotify.control(action, query, kind, value, shuffle=shuffle, owner=owner)
+    return spotify.control(action, query, kind, value, shuffle=shuffle, owner=owner, show=show)
 
 
 _DISCORD = None
@@ -2580,7 +2580,7 @@ def background_tool(action="start", goal=None, id=None):
     if _JOBS is None:
         return "Background jobs aren't available."
     if action == "start":
-        job, msg = _JOBS.start(goal or "", getattr(_CTX, "persona", "jarvis"))
+        job, msg = _JOBS.start(goal or "", getattr(_CTX, "persona", "juno"))
         return msg + (". Tell the user in a few words that you're on it and they'll hear when it's done." if job else "")
     if action == "cancel":
         hit = _JOBS.cancel(int(id) if id else None)
@@ -2629,7 +2629,7 @@ def voice_settings_tool(action="list", who=None, voice=None, speed=None, pitch=N
     if _VOICE_CORE is None:
         return "Voice settings aren't available."
     key = (who or getattr(_CTX, "persona", None) or _VOICE_CORE.persona_key).lower()
-    key = "ultron" if "ultron" in key else "jarvis" if "jarvis" in key else "juno" if "juno" in key else key
+    key = personas.DEFAULT
     if key not in personas.PERSONAS:
         return f"No one called {who}."
     if action == "reset":
@@ -2841,7 +2841,10 @@ TOOL_SPECS = [
           {"action": {"type": "string", "enum": ["play", "queue", "pause", "resume", "next", "previous", "now_playing",
                                                  "like", "shuffle", "repeat", "volume"]},
            "query": S, "kind": {"type": "string", "enum": ["auto", "track", "playlist", "album", "artist", "liked"]},
-           "value": S, "shuffle": B, "owner": S}, ["action"]),
+           "value": S, "shuffle": B, "owner": S,
+           "show": {"type": "boolean", "description": "true ONLY if they asked to open or see the Spotify window "
+                    "('open Spotify and play...'). Otherwise Spotify stays in the background and my music player shows it."}},
+          ["action"]),
     _spec("youtube", "Play YouTube videos for real (finds the video and starts it, not a search link). play: query = what "
                      "they asked for, worded like a YouTube search ('dune part two official trailer', 'lofi hip hop'); or "
                      "index = a number from the last search ('the second one' = 2); or video = a YouTube link/id. "
@@ -3038,8 +3041,32 @@ def all_specs():
 
 
 
+# Tools that act inside other apps: the "apps she may never touch" list (Settings > Application access) applies.
+_APP_TOOLS = {"open", "window_control", "keyboard_input", "mouse", "close_app", "screen", "media_control"}
+
+
+def _blocked_app(name, args):
+    if not config.BLOCKED_APPS or name not in _APP_TOOLS or not isinstance(args, dict):
+        return None
+    text = " ".join(str(v) for v in args.values() if isinstance(v, (str, int, float))).lower()
+    try:
+        w = _find_window(None) if name in ("keyboard_input", "mouse") else None    # typing/clicking acts on the window in front
+        if w is not None and w.title:
+            text += " " + w.title.lower()
+    except Exception:
+        pass
+    for app in config.BLOCKED_APPS:
+        if app and re.search(r"(?<![a-z0-9])" + re.escape(app) + r"(?![a-z0-9])", text):
+            return (f"Blocked: the user doesn't allow me to use {app} (Settings > Application access). "
+                    "Tell them briefly; don't try another way.")
+    return None
+
+
 def run_tool(name, args):
     """Returns a string, or a list of content blocks (for images)."""
+    blocked = _blocked_app(name, args)
+    if blocked:
+        return blocked
     fn = FUNCS.get(name)
     if not fn and _CONNECTORS is not None and _CONNECTORS.has(name):
         try:

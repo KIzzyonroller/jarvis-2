@@ -4,13 +4,16 @@
 "use strict";
 (() => {
   const svg = document.getElementById("desk"), cvs = document.getElementById("intro");
-  const NAMES = ["jarvis", "ultron", "juno"];
+  const NAMES = ["juno"];                                   // she's the only one now
   const COLOR = { jarvis: "#8ff3ff", ultron: "#ff2a45", juno: "#c13dff" };
   const S = {
     monitors: [{ x: 0, y: 0, w: 1, h: 1, wx: 0, wy: 0, ww: 1, wh: 1, primary: true }],
-    persona: "jarvis", merged: false, speaker: null, state: "booting", confirm: false,
+    persona: "juno", merged: false, speaker: null, state: "booting", confirm: false,
     oneShot: null, oneShotWho: null, oneShotUntil: 0, level: 0, levelT: 0, paused: false, shown: false, built: false,
+    quality: "medium", viz: "both",
   };
+  // Settings > Appearance & animations: frame rates (busy, idle) and how many drifting shards per monitor
+  const QUALITY = { low: [15, 6, 3], medium: [24, 10, 8], high: [30, 15, 14] };
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ------------------------------------------------------------------ scene
@@ -59,6 +62,80 @@
     }
   }
 
+  const glc = document.getElementById("juno-gl"), fxc = document.getElementById("juno-fx");
+  let JG = null;
+  try { JG = JunoGL.create(glc, fxc, "juno.png"); } catch (e) { console.error("Juno's renderer:", e); }
+  // Most of the time she's her standing picture, and now and then she walks somewhere else on the screen (both from
+  // juno_rig.js), pointing when she opens something, pointing up while she thinks. The leaping picture
+  // (juno_gl.js) is her entrance.
+  const rigc = document.getElementById("juno-rig");
+  let RIG = null;
+  try {
+    RIG = JunoRig.create(rigc, async (name) => { const x = window.pywebview && window.pywebview.api; return x && x.picture ? await x.picture(name) : ""; });
+  } catch (e) { console.error("Juno's rig:", e); }
+  const ME = { x: 0, ground: 0, scale: 1, wscale: 1, minX: 0, maxX: 1, facing: 1, walkTo: null, ph: 0, glitch: 0,
+               nextWalk: performance.now() + 25000, anim: "idle", leaping: null };
+  const LEAP_ONLY = new Set();                  // the old leaping picture now only draws the pixel blocks
+  function placeJuno() {
+    const r = S.junoRect; if (!r) return;
+    for (const c of [glc, fxc]) { c.style.left = r.left + "px"; c.style.top = r.top + "px"; c.style.width = r.w + "px"; c.style.height = r.h + "px"; }
+    if (JG) JG.size(r.w, r.h);
+    const q = S.rigRect;
+    if (q && RIG) { rigc.style.left = q.left + "px"; rigc.style.top = q.top + "px"; rigc.style.width = q.w + "px"; rigc.style.height = q.h + "px"; RIG.size(q.w, q.h); }
+    if (!S.shown) for (const c of [glc, fxc, rigc]) { c.style.opacity = 0; c.style.transform = "scale(1.6) translateY(8%)"; }
+  }
+  window.junoWalk = () => { ME.nextWalk = 0; };            // for testing: send her for a walk now
+  function followHer() {                       // the leaping picture and the pixel blocks go wherever she is
+    const r = S.junoRect, q = S.rigRect; if (!r || !q) return;
+    const left = q.left + ME.x - r.w / 2;
+    if (Math.abs(left - r.left) > .5) { r.left = left; for (const c of [glc, fxc]) c.style.left = left + "px"; }
+  }
+  function stepHer(now, dt, lvl) {
+    if (!RIG || !S.rigRect) return;
+    const t = now / 1000;
+    const leap = S.oneShot && LEAP_ONLY.has(S.oneShot) && now < S.oneShotUntil;
+    if (leap !== ME.leaping) {                 // swap pictures behind a glitch
+      ME.leaping = leap; ME.glitch = .8;
+      glc.style.visibility = leap ? "visible" : "hidden"; rigc.style.visibility = leap ? "hidden" : "visible";
+      if (JG) JG.glitch(.8);
+      if (leap && ME.walkTo != null) ME.walkTo = null;
+    }
+    ME.glitch = Math.max(0, ME.glitch - dt * 2.2);
+    if (leap) return;
+    const idle = ME.anim === "idle";
+    if (ME.walkTo != null) {
+      if (!idle) { ME.walkTo = null; ME.glitch = .5; }
+      else {
+        const half = .55, speed = 255 * ME.wscale / half;       // one step every ~half second, feet roughly planted
+        ME.ph = (ME.ph + dt * Math.PI / half) % (Math.PI * 2);
+        const dir = Math.sign(ME.walkTo - ME.x), nx = ME.x + dir * speed * dt;
+        if ((ME.walkTo - nx) * dir <= 0) { ME.x = ME.walkTo; ME.walkTo = null; ME.glitch = .5; ME.nextWalk = now + 30000 + Math.random() * 50000; }
+        else ME.x = nx;
+        followHer();
+      }
+    } else if (idle && S.shown && now > ME.nextWalk && !still) {
+      let to = ME.minX + Math.random() * (ME.maxX - ME.minX);
+      if (Math.abs(to - ME.x) < (ME.maxX - ME.minX) * .2) to = ME.x < (ME.minX + ME.maxX) / 2 ? ME.maxX - Math.random() * 60 : ME.minX + Math.random() * 60;
+      ME.walkTo = to; ME.facing = to > ME.x ? 1 : -1; ME.ph = 0; ME.glitch = .5;
+    }
+    // her entrance: she leaps in from the right in an arc and lands standing
+    if (ME.anim === "leap" && S.rigRect) {
+      const u = Math.min(1, (now - (S.oneShotUntil - 1800)) / 1100);
+      if (u < 1) {
+        if (ME.pic !== "dash") { ME.pic = "dash"; ME.glitch = .6; }
+        const e = 1 - Math.pow(1 - u, 2), p = primary();
+        RIG.draw("dash", JunoRig.heroPose(t, 0, "dash"), ME.x + (1 - e) * p.ww * .45, ME.ground - Math.sin(u * Math.PI) * p.wh * .2,
+                 ME.scale * 555 / RIG.faceToFoot("dash"), -1, t, ME.glitch, 1);
+        return;
+      }
+    }
+    // which picture: walking, pointing (opening something), pointing up (thinking), or standing
+    const pic = ME.walkTo != null ? "walk" : ME.anim === "summon" ? "point" : ME.anim === "think" ? "up" : "stand";
+    if (pic !== ME.pic) { if (ME.pic) ME.glitch = Math.max(ME.glitch, .6); ME.pic = pic; }
+    const k = ME.scale * 555 / RIG.faceToFoot(pic);          // same body height whichever picture it is
+    const pose = pic === "walk" ? JunoRig.walkPose(ME.ph, t) : pic === "stand" ? JunoRig.standPose(ME.anim === "leap" ? "happy" : ME.anim, t, lvl) : JunoRig.heroPose(t, lvl, pic);
+    RIG.draw(pic, pose, ME.x, ME.ground, k, pic === "walk" ? ME.facing : 1, t, ME.glitch, 1);
+  }
   function build() {
     const W = innerWidth, H = innerHeight;
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -80,18 +157,27 @@
       el("g", { id: name }, { jarvis, ultron, juno }[name]()));
     // the voice visualizer: small in the main monitor's bottom-left corner, big in the middle of the second one
     const o = others()[0], vr = p.wh * .075;
-    const vizzes = [{ x: p.wx + vr * 1.7, y: p.wy + p.wh - vr * 1.7, r: vr, a: 1, n: 40 }];
-    if (o) vizzes.push({ x: o.x + o.w / 2, y: o.wy + o.wh * .45, r: Math.min(o.w, o.wh) * .2, a: 1, n: 72 });
+    const vizzes = [];
+    if (S.viz === "both" || S.viz === "corner" || (S.viz === "second" && !o)) vizzes.push({ x: p.wx + vr * 1.7, y: p.wy + p.wh - vr * 1.7, r: vr, a: 1, n: 40 });
+    if (o && (S.viz === "both" || S.viz === "second")) vizzes.push({ x: o.x + o.w / 2, y: o.wy + o.wh * .45, r: Math.min(o.w, o.wh) * .2, a: 1, n: 72 });
     VIZ = vizzes;
     // drifting shards over every monitor
     let ms = '<g id="motes">';
-    const nM = 8 * mons.length;
+    const nM = (QUALITY[S.quality] || QUALITY.medium)[2] * mons.length;
     for (let i = 0; i < nM; i++) ms += el("g", {}, path(P([[0, -9], [3.5, 0], [0, 9], [-3.5, 0]]), { fill: ["#46f0ff", "#ff5ae0", "#c13dff"][i % 3] }));
     ms += "</g>";
     s += ms;
-    s += place("jarvis", .2, 1.05) + place("ultron", .8, 1.05) + place("juno", .5, 1);
+    // Juno herself: her artwork on the graphics card (juno_gl.js), standing on the main monitor's floor
+    const jh = p.wh * .86, jw = jh * (JG ? JG.aspect : .78);
+    S.rigRect = { left: p.x, top: p.y, w: p.w, h: p.h };
+    ME.ground = ground - p.y + p.wh * .015;
+    ME.scale = p.wh * .7 / 753; ME.wscale = ME.scale * 555 / 533;      // same body height in every picture
+    ME.minX = p.wx - p.x + p.ww * .15; ME.maxX = p.wx - p.x + p.ww * .85;
+    if (!ME.x || ME.x < ME.minX || ME.x > ME.maxX) ME.x = p.wx - p.x + p.ww * .5;
+    S.junoRect = { left: p.x + ME.x - jw / 2, top: ground + p.wh * .02 - jh * (JG ? JG.footFrac : .93), w: jw, h: jh };
     svg.innerHTML = s;
     sizeViz();
+    placeJuno();
     motes = [...svg.querySelectorAll("#motes > g")].map((e, i) => {
       const m = mons[i % mons.length];
       return { e, m, fx: Math.random(), fy: Math.random(), sp: .006 + Math.random() * .012, ph: Math.random() * 6.28, r: Math.random() * 360 };
@@ -113,7 +199,8 @@
       let anim = "idle";
       if (S.oneShot && now < S.oneShotUntil && n === S.oneShotWho) anim = S.oneShot;
       else if (n === a) anim = stateAnim();
-      CastEngine.play(n, anim);
+      if (JG) JG.play(anim === "leap" ? "summon" : anim);
+      ME.anim = anim;
     }
   }
   function oneShot(anim, who, secs) { S.oneShot = anim; S.oneShotWho = who; S.oneShotUntil = performance.now() + secs * 1000; refresh(); setTimeout(refresh, secs * 1000 + 30); }
@@ -125,17 +212,18 @@
   const handlers = {
     desk_init(e) {
       S.monitors = e.monitors && e.monitors.length ? e.monitors : S.monitors;
-      S.persona = e.persona || S.persona; S.merged = !!e.merged;
+      S.persona = "juno"; S.merged = !!e.merged;
+      if (e.quality) S.quality = e.quality; if (e.viz) S.viz = e.viz;
       build();
       if (e.intro && !still) playIntro(e.shot); else reveal(0);
     },
     desk_layout(e) { if (JSON.stringify(e.monitors) !== JSON.stringify(S.monitors)) { S.monitors = e.monitors; build(); } },
     desk_pause(e) { S.paused = !!e.on; if (!S.paused) kick(); },
-    persona(e) { S.persona = e.key || S.persona; refresh(); },
+    persona() { refresh(); },
     merged(e) { S.merged = !!e.on; if (S.merged) oneShot("happy", "juno", 3); refresh(); },
     state(e) { S.state = e.state; if (S.state === "idle") S.speaker = null; refresh(); },
     voice(e) { S.level = e.v || 0; S.levelT = performance.now(); },
-    turn_start(e) { const k = String(e.who || "").toLowerCase(); S.speaker = NAMES.includes(k) ? k : null; refresh(); },
+    turn_start() { refresh(); },
     turn_end() { S.speaker = null; refresh(); },
     activity(e) { const d = e.data || {}; if (e.kind === "tool_start" && OPENERS.test(String(d.name || ""))) summon(); },
     msg(e) { if (e.role === "user" && SAYS_OPEN.test(String(e.text || ""))) summon(); },
@@ -153,14 +241,16 @@
   function frame(now) {
     if (S.paused) { running = false; return; }
     requestAnimationFrame(frame);
-    const busy = S.state !== "idle" && S.state !== "booting" || (S.oneShot && now < S.oneShotUntil) || S.confirm;
-    if (now - last < (busy ? 41 : 100)) return;          // 24 fps while something's happening, 10 while they idle
+    const busy = S.state !== "idle" && S.state !== "booting" || (S.oneShot && now < S.oneShotUntil) || S.confirm || ME.walkTo != null;
+    const q = QUALITY[S.quality] || QUALITY.medium;
+    if (now - last < 1000 / (busy ? q[0] : q[1])) return;
     const dt = Math.min(.1, (now - last) / 1000); last = now;
     if (!S.built) return;
     const fresh = now - S.levelT < 400 ? S.level : 0;
     lvl += (fresh - lvl) * Math.min(1, dt * 12);
     const voices = { jarvis: 0, ultron: 0, juno: 0 }; voices[active()] = lvl;
-    CastEngine.step(now, dt, voices, active());
+    if (JG) JG.step(now, dt, lvl);
+    stepHer(now, dt, lvl);
     const t = now / 1000, col = COLOR[active()];
     drawViz(t, lvl, col);
     for (const m of motes) {
@@ -172,7 +262,8 @@
   }
   function reveal(ms) {
     S.shown = true;
-    for (const n of NAMES) { const g = document.getElementById(`place-${n}`); if (g) { g.style.transition = `opacity ${ms}ms`; g.style.opacity = 1; } }
+    for (const c of [glc, fxc, rigc]) { c.style.transition = `opacity ${ms}ms, transform ${ms}ms cubic-bezier(.2,1.4,.4,1)`; c.style.opacity = 1; c.style.transform = "none"; }
+    if (JG && ms) { JG.glitch(1); oneShot("leap", "juno", 1.8); }      // she leaps in, then lands standing
   }
 
   // ------------------------------------------------------------------ Juno takes the screen (startup)
@@ -216,8 +307,8 @@
         const tipY = yy + (curl + grip * .25) * len * .5;
         ctx.beginPath(); ctx.moveTo(-40 * sc, yy - w); ctx.lineTo(len * .78, yy - w * .6 + (tipY - yy) * .5); ctx.lineTo(len, tipY); ctx.lineTo(len * .78, yy + w * .6 + (tipY - yy) * .5); ctx.lineTo(-40 * sc, yy + w); ctx.closePath();
         ctx.fillStyle = "#0d0a14"; ctx.fill(); ctx.lineWidth = 4 * sc; ctx.strokeStyle = "#a24dff"; ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(len * .8, (yy + tipY) / 2 - 3 * sc); ctx.lineTo(len, tipY); ctx.lineTo(len * .8, (yy + tipY) / 2 + 6 * sc); ctx.closePath(); ctx.fillStyle = "#46f0ff"; ctx.fill();
-        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(len * .7, yy + (tipY - yy) * .4); ctx.strokeStyle = "#46f0ff"; ctx.lineWidth = 2 * sc; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(len * .8, (yy + tipY) / 2 - 3 * sc); ctx.lineTo(len, tipY); ctx.lineTo(len * .8, (yy + tipY) / 2 + 6 * sc); ctx.closePath(); ctx.fillStyle = "#20d27e"; ctx.fill();
+        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(len * .7, yy + (tipY - yy) * .4); ctx.strokeStyle = "#20d27e"; ctx.lineWidth = 2 * sc; ctx.stroke();
       });
       ctx.restore();
     };
@@ -244,6 +335,16 @@
           ctx.restore();
         }
       }
+      // her pixel blocks start eating the screen before it breaks
+      if (t > 1.0 && shatter <= .2) {
+        const n = Math.min(160, Math.floor((t - 1.0) * 70)), cs = Math.max(18, p.h / 34);
+        for (let i = 0; i < n; i++) {
+          const rx = ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1, ry = ((Math.sin(i * 78.233) * 12345.678) % 1 + 1) % 1;
+          const x = Math.floor(rx * W / cs) * cs, y = Math.floor(ry * H / cs) * cs, run = 1 + (i % 4);
+          ctx.fillStyle = "#2a0e63"; ctx.fillRect(x + 5, y + 5, cs * run, cs);
+          ctx.fillStyle = i % 3 === 0 ? "#20d27e" : "#4b1fa3"; ctx.fillRect(x, y, cs * run, cs);
+        }
+      }
       // her hands grip the edges, then rip outward
       const reach = Math.min(1, Math.max(0, (t - .35) / .6)), grip = Math.min(1, Math.max(0, (t - 1.0) / .4));
       const out = Math.min(1, shatter / .5);
@@ -251,7 +352,7 @@
       // her face rises up the main monitor, eyes snap open, then the grin
       const rise = Math.min(1, Math.max(0, (t - .9) / .9)), ease = 1 - (1 - rise) ** 3;
       face = Math.max(0, 1 - Math.max(0, shatter - .2) / .7);
-      if (rise > 0 && face > 0) {
+      if (false && rise > 0 && face > 0) {          // (the old drawn face; she now leaps in for real, see reveal)
         const k = p.h * .5 / 90, cx = fc.x, cy = fc.y + (1 - ease) * p.h * .9 + 560 * k;
         ctx.save(); ctx.globalAlpha = face; ctx.translate(cx, cy); ctx.scale(k * (1 + (1 - face) * .3), k * (1 + (1 - face) * .3));
         ctx.shadowColor = "#3a1cff"; ctx.shadowBlur = 0;
@@ -269,7 +370,7 @@
         if (gr > 0) { ctx.save(); ctx.translate(0, -543); ctx.scale(gr, gr); ctx.translate(0, 543); ctx.shadowBlur = 0; ctx.fillStyle = "#fff"; ctx.fill(grin); ctx.restore(); }
         ctx.restore();
       }
-      if (t > 3.1 && !S.shown) { reveal(900); oneShot("happy", "juno", 2.2); }
+      if (t > 2.75 && !S.shown) { reveal(700); oneShot("happy", "juno", 2.2); }
       if (t < 4.3) requestAnimationFrame(step); else { ctx.clearRect(0, 0, W, H); cvs.width = cvs.height = 0; }
     })(T0);
   }
@@ -281,5 +382,5 @@
   if (window.pywebview && window.pywebview.api) hello(); else addEventListener("pywebviewready", hello);
   kick();
   // opened on its own in a browser (no Jarvis): show the scene with a made-up monitor so it can be looked at
-  setTimeout(() => { if (!S.built && !window.pywebview) handlers.desk_init({ intro: true, persona: "jarvis" }); }, 400);
+  setTimeout(() => { if (!S.built && !window.pywebview) handlers.desk_init({ intro: true }); }, 400);
 })();

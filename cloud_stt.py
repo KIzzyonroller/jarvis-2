@@ -91,8 +91,9 @@ class CloudSTT:
         try:
             r = self._s().post(URL, timeout=(2.5, 4),       # Groq normally answers in well under a second
                                files={"file": ("speech.wav", _wav_bytes(audio), "audio/wav")},
-                               data={"model": self.model, "language": "en", "temperature": "0",
-                                     "response_format": "json", "prompt": (prompt or "")[-600:]})
+                               data={k: v for k, v in {"model": self.model, "language": config.HEAR_LANGUAGE,
+                                     "temperature": "0", "response_format": "json",
+                                     "prompt": (prompt or "")[-600:]}.items() if v is not None})
         except Exception as e:
             self.fails += 1
             self._pause(30, f"no answer ({type(e).__name__})")   # don't make you wait on it twice

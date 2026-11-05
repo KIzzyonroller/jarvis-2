@@ -148,9 +148,10 @@ const CastEngine = (() => {
     }
     haloAng += cur.jarvis.halo * dt;
     const half = (n) => focus && n !== focus && who[n].anim === "idle" && frameN % 2;
-    if (!half("jarvis")) applyJarvis(cur.jarvis, t);
-    if (!half("ultron")) applyUltron(cur.ultron, t);
-    if (!half("juno")) applyJuno(cur.juno, t, dt);
+    const here = (n) => !!document.getElementById(n);              // only the ones actually on the page
+    if (here("jarvis") && !half("jarvis")) applyJarvis(cur.jarvis, t);
+    if (here("ultron") && !half("ultron")) applyUltron(cur.ultron, t);
+    if (here("juno") && !half("juno")) applyJuno(cur.juno, t, dt);
   }
   return { play, step, who, cur };
 })();

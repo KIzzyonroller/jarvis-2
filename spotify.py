@@ -280,13 +280,37 @@ def _what(query):
     return "your Liked Songs" if app_link(query) == "spotify:collection:tracks" else f"a search for '{_clean_query(query)}'"
 
 
+_SHOW = {"on": False}     # did they ask to SEE Spotify ("open Spotify and play...")? Otherwise it stays out of the way
+
+
+def _tuck_away(prev):
+    """Music is playing, nobody asked for the window: minimize Spotify without activating anything and hand focus
+    back to what you were using. Juno's own music player shows what's on instead."""
+    import ctypes
+    import media_buttons
+    import tools
+    try:
+        for w in media_buttons._windows("spotify"):
+            h = int(w.NativeWindowHandle or 0)
+            if h:
+                ctypes.windll.user32.ShowWindowAsync(h, 7)          # SW_SHOWMINNOACTIVE
+        if prev and tools._fg() != prev:
+            tools._force_foreground(prev)
+    except Exception as e:
+        print(f"[spotify] couldn't tuck the window away: {e}")
+
+
 def _open_in_app(uri_or_search, what, why, hint="", shuffle=None):
     """Spotify won't take a play command from us: open exactly that thing in the Spotify app, then press its Play
-    button the way a screen reader would (media_buttons.py). Never switches to another service."""
+    button the way a screen reader would (media_buttons.py). Never switches to another service.
+    Unless you asked to see Spotify, its window is minimized again once it's playing (the button has to be pressed
+    while the window is up, so it can't stay minimized the whole time)."""
     import app_ready
     import media_buttons
     import tools
-    front = not tools.fullscreen_app()
+    show = _SHOW["on"]
+    prev = tools._fg()
+    front = show and not tools.fullscreen_app()
     # Closed? Open Spotify and let it finish loading BEFORE giving it the link: a cold-started Spotify often
     # drops the link, and pressing Play while it's still on its loading screen did nothing.
     _, state, _ = app_ready.ensure("spotify", front=front)
@@ -296,6 +320,9 @@ def _open_in_app(uri_or_search, what, why, hint="", shuffle=None):
     tools.open_url(uri_or_search, front=front)
     done, how = media_buttons.press_play("spotify", hint=hint, shuffle=shuffle, before=before)
     if done:
+        if not show:
+            _tuck_away(prev)
+            how += " (Spotify's window is tucked away; it's showing in my music player)"
         return f"{why}, so I opened {what} in the Spotify app and {how}. Don't retry or try other services."
     return (f"{why}, so I opened {what} in the Spotify app, but {how}." + media_buttons.mouse_fallback("spotify")
             + " Don't try other services.")
@@ -408,8 +435,9 @@ def find_playlist(sp, name, who=None):
     return max(found, key=lambda p: _name_score(name, p.get("name"))), None
 
 
-def control(action, query=None, kind="auto", value=None, shuffle=None, owner=None):
-    """The Jarvis tool. Returns a short plain-English result."""
+def control(action, query=None, kind="auto", value=None, shuffle=None, owner=None, show=False):
+    """The Juno tool. Returns a short plain-English result. show: they asked to see the Spotify window."""
+    _SHOW["on"] = bool(show)
     sp = client()
     if not sp.configured:
         if (action or "").lower() in ("play", "queue") and query:

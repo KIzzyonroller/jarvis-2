@@ -255,6 +255,10 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     import livedesk
     livedesk.recover_icons()                       # a crash last time may have left the desktop icons hidden
     desk = livedesk.LiveDesk(Emitter) if config.LIVING_DESKTOP and sys.platform == "win32" else None
+    music = None
+    if config.MUSIC_PLAYER and sys.platform == "win32":
+        from music import MusicPlayer
+        music = MusicPlayer(Emitter)
 
     phone = []
 
@@ -264,6 +268,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
             mini.feed(ev)
         if desk:
             desk.feed(ev)
+        if music:
+            music.feed(ev)
         if phone:
             phone[0].feed(ev)
 
@@ -278,9 +284,9 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     kw = dict(url=str(config.RES_DIR / "ui" / "index.html"), js_api=bridge, width=1360, height=840, min_size=(1100, 700),
               background_color="#02060b", frameless=True, easy_drag=False)
     try:
-        window = webview.create_window("J.A.R.V.I.S.", minimized=start_min, **kw)
+        window = webview.create_window("J.U.N.O.", minimized=start_min, **kw)
     except TypeError:                      # older pywebview without minimized=
-        window = webview.create_window("J.A.R.V.I.S.", **kw)
+        window = webview.create_window("J.U.N.O.", **kw)
     emitter.window = window
     bridge._win = window
     if mini:
@@ -289,6 +295,13 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         except Exception as e:
             print(f"[mini] couldn't create the mini HUD: {e}")
             mini = None
+
+    if music:
+        try:
+            music.create(webview)
+        except Exception as e:
+            print(f"[music] couldn't create the music player: {e}")
+            music = None
 
     if desk:
         try:
@@ -303,6 +316,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
             desk.close()    # icons back, normal wallpaper back
         if mini:
             mini.close()    # otherwise the hidden widget keeps the app alive
+        if music:
+            music.close()
         core.shutdown()
 
     window.events.closing += on_closing
@@ -331,6 +346,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
             desk.close()
         if mini:
             mini.hide()
+        if music:
+            music.hide()
         threading.Timer(2.0, window.destroy).start()
 
     core.on_quit = quit_app
@@ -373,9 +390,12 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     if mini:
         mini.on_expand = restore
         mini.bridge._core = core
-        threading.Thread(target=mini.settle, args=("J.A.R.V.I.S.",), daemon=True, name="mini-settle").start()
+        threading.Thread(target=mini.settle, args=("J.U.N.O.",), daemon=True, name="mini-settle").start()
     if desk:
         threading.Thread(target=desk.start, daemon=True, name="living-desktop").start()
+    if music:
+        music.core = core
+        threading.Thread(target=music.settle, daemon=True, name="music-settle").start()
     core.start()
     webview.start()
     emitter.close()
@@ -383,6 +403,8 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         desk.close()
     if mini:
         mini.close()
+    if music:
+        music.close()
     core.shutdown()
 
 
@@ -411,7 +433,7 @@ def run_console(voice):
             phone[0].feed(ev)
         t = ev.get("type")
         if t == "msg":
-            who = {"user": "You", "jarvis": "Jarvis", "system": "**"}[ev["role"]]
+            who = {"user": "You", "jarvis": "Juno", "system": "**"}[ev["role"]]
             if ev["role"] != "user" or ev.get("source") == "voice":
                 print(f"{who}: {ev['text']}")
         elif t == "dictation":

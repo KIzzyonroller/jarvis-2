@@ -100,6 +100,13 @@ WHISPER_FAST = os.environ.get("JARVIS_WHISPER_FAST", "tiny.en")   # just listens
 WHISPER_THREADS = int(os.environ.get("JARVIS_WHISPER_THREADS", "4"))  # cap so listening never hogs every core
 WHISPER_ACCURATE = os.environ.get("JARVIS_WHISPER", "auto")
 WHISPER_DEVICE = os.environ.get("JARVIS_WHISPER_DEVICE", "auto").lower()   # auto, cpu, cuda
+# Languages (langs.py): "en" = English only; "auto" = whatever you speak; or one of es fr it pt hi.
+# Anything but English switches hearing to Whisper's multilingual models, and her replies and voice follow.
+LANGUAGE = os.environ.get("JUNO_LANGUAGE", "en").lower()
+LANGUAGES = LANGUAGE != "en"
+HEAR_LANGUAGE = "en" if not LANGUAGES else (None if LANGUAGE == "auto" else LANGUAGE)
+if LANGUAGES and not os.environ.get("JARVIS_WHISPER_FAST"):
+    WHISPER_FAST = "tiny"            # the English-only tiny model can't hear her name inside another language
 MEMORY_FILE_NAME = "memory.json"
 ROUTINES_FILE_NAME = "routines.json"
 MEMORY_LIMIT = 200            # facts kept
@@ -109,7 +116,8 @@ WHISPER_VOCAB = os.environ.get("JARVIS_VOCAB", "Spotify, Discord, YouTube, Chrom
                                                "Valorant, Fortnite, Minecraft, Twitch, OBS, VS Code, Reddit, Gmail.")
 # Global hotkey to mute/unmute the mic, works even when Jarvis isn't focused
 MUTE_HOTKEY = os.environ.get("JARVIS_MUTE_HOTKEY", "ctrl+alt+m")
-MIN_SPEECH_RMS = 400      # mic loudness that counts as speech; raise if noise keeps triggering it
+MIN_SPEECH_RMS = int(os.environ.get("JUNO_MIC_FLOOR", "400"))   # mic loudness that counts as speech; raise if noise keeps triggering it
+MIC_DEVICE = os.environ.get("JUNO_MIC", "default")              # Settings > Microphone (a device name, or default)
 SILENCE_SECONDS = float(os.environ.get("JARVIS_PAUSE", "1.5"))  # pause length that ends a sentence
 # After you finish, he waits a beat before answering, and longer if it sounds unfinished
 # ("Jarvis, open the..." / just "Jarvis"). Start talking again in that window and he keeps listening.
@@ -123,7 +131,7 @@ WHISPER_BEAM = int(os.environ.get("JARVIS_WHISPER_BEAM", "0"))   # careful-pass 
 HOLD_UNFINISHED = 2.5       # ends with "and", "the", "to", a comma...
 HOLD_NAME_ONLY = 1.6        # just "Jarvis" (then he says "Yes?")
 MAX_RECORD_SECONDS = 20
-FOLLOW_UP_TIMEOUT = 8     # after he asks you something (or says "Yes?"), answer without his name for this long
+FOLLOW_UP_TIMEOUT = float(os.environ.get("JUNO_FOLLOW_UP", "8"))   # after she asks you something, answer without her name for this long
 MERGE_SECONDS = 3.0       # pause mid-command and keep talking within this, and he stitches it together
 # He reads out about this many words, then finishes the paragraph (the idea) he's on, up to 1.6x this.
 # Anything after that stays on screen and he says so. Ask for detail ("explain", "tell me more") for no limit.
@@ -191,6 +199,8 @@ MODELS_3D_DIR = JARVIS_DIR / "3D"
 # Webcam: Jarvis only takes a photo when you ask him to look, then releases the camera.
 CAMERA_ENABLED = os.environ.get("JARVIS_CAMERA", "true").lower() != "false"
 CAMERA_INDEX = int(os.environ.get("JARVIS_CAMERA_INDEX", "0"))   # try 1 if you have several cameras
+# Apps she may never open, close, type into or click in (Settings > Application access), comma separated
+BLOCKED_APPS = [a.strip().lower() for a in os.environ.get("JUNO_BLOCKED_APPS", "").split(",") if a.strip()]
 
 # --- staying out of your way
 # Things he opens while you're in another app open BEHIND it, so you keep focus.
@@ -198,13 +208,22 @@ KEEP_FOCUS = os.environ.get("JARVIS_KEEP_FOCUS", "true").lower() != "false"
 KEEP_FOCUS_SECONDS = 12      # how long after launching he guards your focus against apps that grab it
 # A small always-on-top HUD in the top-right corner while the main window is minimized.
 MINI_HUD = os.environ.get("JARVIS_MINI", "true").lower() != "false"
-# The living desktop (livedesk.py): Jarvis, Juno and Ultron become the wallpaper while he runs, desktop icons hidden.
+# The living desktop (livedesk.py): Juno becomes the wallpaper while she runs, desktop icons hidden.
 LIVING_DESKTOP = os.environ.get("JARVIS_LIVING_DESKTOP", "true").lower() != "false"
 DESK_INTRO = os.environ.get("JARVIS_DESK_INTRO", "true").lower() != "false"     # Juno grabs the screen at startup
+DESK_QUALITY = os.environ.get("JUNO_DESK_QUALITY", "medium").lower()   # low / medium / high: frame rate and detail
+DESK_VIZ = os.environ.get("JUNO_DESK_VIZ", "both").lower()             # both / corner / second / off
+# Her music player (music.py): pops up while music plays, with her sitting on it. Spotify stays in the background.
+MUSIC_PLAYER = os.environ.get("JUNO_MUSIC_PLAYER", "true").lower() != "false"
 # Screen watching (screenwatch.py): a live view of the screen in memory while you talk to him, so he sees what you mean.
 SCREEN_WATCH = os.environ.get("JARVIS_SCREEN_WATCH", "true").lower() != "false"
 # Start with his window minimized (the corner widget shows him), so he never covers the desktop intro or your work.
 START_MINIMIZED = os.environ.get("JARVIS_START_MINIMIZED", "true").lower() != "false"
+# She starts conversations about what you're doing (proactive.py)
+CHAT_FIRST = os.environ.get("JUNO_CHAT_FIRST", "true").lower() != "false"
+CHAT_EVERY = os.environ.get("JUNO_CHAT_EVERY", "normal").lower()              # rarely / normal / often
+QUIET_HOURS = os.environ.get("JUNO_QUIET_HOURS", "23-8")                     # "23-8" = 11 PM to 8 AM; empty = none
+CHAT_NEVER = [a.strip().lower() for a in os.environ.get("JUNO_CHAT_NEVER", "").split(",") if a.strip()]
 # A briefing the first time you start or wake the PC each day (the day rolls over at 4 AM)
 MORNING_BRIEFING = os.environ.get("JARVIS_MORNING_BRIEFING", "true").lower() != "false"
 # Headlines for the briefing (any RSS feed). Empty = no news.
@@ -256,6 +275,8 @@ INSTANT_ACK = os.environ.get("JARVIS_INSTANT_ACK", "true").lower() != "false"
 
 # Voice model: auto (setup.bat measures which is faster on your PC), full, or lite (compressed)
 KOKORO_MODEL = os.environ.get("JARVIS_KOKORO", "auto").lower()
+# Her voice effect's strength (Settings > Voice & effects): 0 = none of it, 1 = all of it
+VOICE_FX_STRENGTH = float(os.environ.get("JUNO_EFFECT_STRENGTH", "0.6"))
 
 # --- hearing
 # Cancel his own voice out of the mic so you can talk over him on speakers (no headphones needed)

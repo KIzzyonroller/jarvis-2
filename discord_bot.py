@@ -75,7 +75,7 @@ def _norm(s):
 
 
 class DiscordBot:
-    def __init__(self, make_brain, persona_key=lambda: "jarvis", on_change=None, on_chat=None, log=print):
+    def __init__(self, make_brain, persona_key=lambda: "juno", on_change=None, on_chat=None, log=print):
         self.make_brain = make_brain              # persona -> fresh Brain
         self.persona_key = persona_key
         self.on_change = on_change or (lambda: None)
@@ -273,8 +273,7 @@ class DiscordBot:
     @staticmethod
     def _character(persona):
         import personas
-        p = personas.PERSONAS.get(persona) or personas.PERSONAS["jarvis"]
-        return p["character"].format(address="sir" if persona == "jarvis" else "human")
+        return personas.character("you")
 
     async def _on_message(self, msg):
         if msg.author.bot or msg.author == self.client.user:

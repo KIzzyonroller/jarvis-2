@@ -305,12 +305,12 @@ class Core:
         self.events = queue.Queue()
         self.brains = {}
         st = self._load_state()
-        self.persona_key = st.get("persona", "jarvis")
-        self.duo = bool(st.get("duo", False))   # "both of you" mode: every request goes to both
+        self.persona_key = st.get("persona", personas.DEFAULT)
+        self.duo = False                        # there's only Juno now: no "both of you" mode
         self._duo_once = None             # lead key for a one-off duo turn ("Jarvis and Ultron?" then the question)
         self._duo_capture = None          # tool results from the lead, handed to the second
-        if self.persona_key not in personas.PERSONAS:     # e.g. left on a retired persona
-            self.persona_key = "jarvis"
+        if self.persona_key not in personas.PERSONAS:     # e.g. left on Jarvis or Ultron, who are retired
+            self.persona_key = personas.DEFAULT
             self._save_state()
         self.listener = None
         try:
@@ -420,6 +420,11 @@ class Core:
             screenwatch.start(self)
         except Exception as e:
             print(f"[screen watch] off: {e}")
+        try:
+            import proactive
+            self.proactive = proactive.Proactive(self).start()
+        except Exception as e:
+            print(f"[chat first] off: {e}")
 
     def shutdown(self):
         if getattr(self, "_shut", False):
@@ -443,6 +448,8 @@ class Core:
                 screenwatch.get().stop()
         except Exception:
             pass
+        if getattr(self, "proactive", None) is not None:
+            self.proactive.stop()
         for part in (getattr(self, "watchers", None), getattr(self, "activity", None)):
             if part is not None:
                 try:
@@ -538,7 +545,7 @@ class Core:
                 self.listener.expecting = lambda: (self._hold is not None or self._turn is not None
                                                    or self._engaged() or self._pending is not None)
                 self.listener.start()
-                self._log('ALWAYS LISTENING  [SAY "JARVIS", "ULTRON" OR "JUNO"]')
+                self._log('ALWAYS LISTENING  [SAY "JUNO"]')
                 self._start_hotkey()
             except Exception as e:
                 self.listener = None
@@ -1107,6 +1114,9 @@ class Core:
                 self.set_state(self._rest_state())
 
     def _handle(self, kind, payload):
+        if kind == "chat_first":                       # proactive.py: she starts a conversation
+            self._chat_first(payload)
+            return
         if kind == "say":
             self.emit({"type": "msg", "role": "jarvis", "text": payload})
             self.speak(payload)
@@ -1229,6 +1239,10 @@ class Core:
         return text, False
 
     def _set_duo(self, on, speak=True):
+        if on and len(personas.ORDER) < 2:
+            if speak:
+                self.speak("It's just me.")
+            return
         if on == self.duo:
             if speak:
                 self.speak("They're both here already." if on else "Already just me.")
@@ -1272,8 +1286,9 @@ class Core:
 
     def _command(self, text, source, ended):
         duo_hit = False
+        single = len(personas.ORDER) < 2           # Juno only: nobody to share a turn with
         if not SWITCH_RE.search(text):            # "switch to Ultron" names him but isn't for both
-            text, duo_hit = self._split_duo(text)
+            text, duo_hit = self._split_duo(text) if not single else (text, False)
         once, self._duo_once = self._duo_once, None
         if duo_hit and not [w for w in _words(text) if w not in FILLERS]:
             self._wake_duo(self.persona_key)
@@ -1424,7 +1439,7 @@ class Core:
             return
         if config.INSTANT_COMMANDS and not duo_hit and self._instant(text):
             return
-        if duo_hit or once or self.duo:
+        if not single and (duo_hit or once or self.duo):
             self._duo_turn(text, source, ended, lead=once if once in personas.PERSONAS else None)
             return
         self._run_turn(text, source, ended)
@@ -1751,7 +1766,7 @@ class Core:
         try:
             if tools.IS_WINDOWS and not tools._is_jarvis_focused():
                 import calendar_mode
-                calendar_mode.notify("Jarvis noticed something" if self.persona_key == "jarvis" else "Ultron noticed something", info)
+                calendar_mode.notify(f"{self.persona['name']} noticed something", info)
         except Exception as e:
             print(f"[watch] notification failed: {e}")
         self.events.put(("watch_alert", (w, line)))
@@ -1795,7 +1810,8 @@ class Core:
         self.emit({"type": "toast", "text": "Code accepted. They merged: Juno's here." if on else "Split again."})
         if self.duo:
             self._set_duo(False, speak=False)
-        self._switch("juno" if on else "jarvis")
+        if on:
+            self.speak("Ooh. That tickled.")
 
     def glass_hub(self):
         """Glass mode's little local server, started the first time it's needed."""
@@ -2088,7 +2104,7 @@ class Core:
         if self._turn is not None or not self.speaker:
             return
         p = personas.PERSONAS[key]
-        line = p.get("voice_preview") or ("How's this, then?" if key == "jarvis" else "Is this voice adequate, human?")
+        line = p.get("voice_preview") or "How's this?"
         before = dict(self.speaker.persona), self.speaker.who
         self.speaker.set_persona(p)
         try:
@@ -2310,6 +2326,22 @@ class Core:
         except OSError:
             pass
         return value
+
+    def _chat_first(self, info):
+        import proactive
+        if self.state != "idle" or self._turn is not None:
+            return
+        got = proactive.opener(self, info)
+        if not got or self.state != "idle" or self._turn is not None:
+            return
+        text, ask = got
+        print(f"[chat first] {info['what']} ({info['mins']} min): {text}")
+        b = self.brain
+        if b is not None and isinstance(getattr(b, "history", None), list) and (not b.history or b.history[-1]["role"] == "assistant"):
+            b.history.append({"role": "user", "content": ask})                 # so her next answer knows how this began
+            b.history.append({"role": "assistant", "content": [{"type": "text", "text": text}]})
+        self.say_line(text)
+        self._engage(config.FOLLOW_UP_TIMEOUT + 10)     # answer without saying her name
 
     def say_line(self, line):
         self.emit({"type": "msg", "role": "jarvis", "text": line})

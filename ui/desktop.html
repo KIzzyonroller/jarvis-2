@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>Jarvis Desktop</title>
+<title>Juno Desktop</title>
 <style>
 /* The living desktop: this page IS the wallpaper (livedesk.py puts its window behind the desktop icons).
    It spans every monitor; livedesk tells it where each monitor sits. Nothing here takes clicks. */
@@ -8,12 +8,18 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0d0a16;cur
 svg,canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 canvas{pointer-events:none}
 #vizbox canvas{position:fixed;inset:auto;width:auto;height:auto}
+#juno-gl,#juno-fx,#juno-rig{position:fixed;inset:auto;opacity:0;transform-origin:50% 90%}
+#juno-gl{visibility:hidden}
 </style></head>
 <body>
 <svg id="desk" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
 <div id="vizbox"></div>
+<canvas id="juno-rig" aria-hidden="true"></canvas>
+<canvas id="juno-gl" aria-hidden="true"></canvas>
+<canvas id="juno-fx" aria-hidden="true"></canvas>
 <canvas id="intro"></canvas>
 <script src="cast.js"></script>
-<script src="cast_anim.js"></script>
+<script src="juno_gl.js"></script>
+<script src="juno_rig.js"></script>
 <script src="desktop.js"></script>
 </body></html>

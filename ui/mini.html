@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-ai="juno">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,6 +14,9 @@
 :root{
   --void:#02060b; --c:#7fe7ff; --crgb:127,231,255; --ink:#dff6ff; --dim:#5f7f8f; --alarm:#ff9d2e; --argb:255,157,46;
   --display:"Michroma",sans-serif; --dispw:400; --dsize:9.5px; --dtrack:.16em; --text:"Jost","Segoe UI",sans-serif; --textw:400;
+}
+:root[data-ai="juno"]{
+  --void:#07040d; --c:#c97bff; --crgb:201,123,255; --ink:#f1e6ff; --dim:#8a76a3; --alarm:#ff5ae0; --argb:255,90,224;
 }
 :root[data-ai="ultron"]{
   --void:#080203; --c:#ff3046; --crgb:255,48,70; --ink:#f4e9e4; --dim:#86636a; --alarm:#ffd34d; --argb:255,211,77;
@@ -76,7 +79,7 @@ body.confirming .confirm{display:flex}
   <div class="reactor" title="Double-click to open"><canvas id="cv" width="126" height="126"></canvas></div>
   <div class="info">
     <div class="top">
-      <span class="wm" id="wm">J.A.R.V.I.S.</span>
+      <span class="wm" id="wm">J.U.N.O.</span>
       <span class="st" id="st">Standby</span>
       <span class="btns">
         <button class="b stop" id="b-stop" title="Stop"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7"/></svg></button>
@@ -114,7 +117,7 @@ const STEP = { web_search: "Searching", look_at_screen: "Looking", look_at_camer
   memory: "Memory", reminders: "Reminder", display: "Display", system_info: "System", self_control: "Myself" };
 const stepName = (n) => STEP[n] || n.replace(/_/g, " ");
 
-let state = "idle", ai = "jarvis", muted = false, visible = false;
+let state = "idle", ai = "juno", muted = false, visible = false;
 let voice = 0, mic = 0, energy = 0, lastEvent = performance.now();
 
 // ---------------------------------------------------------------- events from Python
@@ -163,9 +166,9 @@ window.J = {
       case "sync": (e.events || []).forEach((x) => window.J.on(x)); break;
       case "window": visible = !!e.visible; if (visible) wake(); break;
       case "persona":
-        ai = e.key === "ultron" ? "ultron" : "jarvis";
+        ai = COL[e.key] ? e.key : "juno";
         document.documentElement.dataset.ai = ai;
-        $("#wm").textContent = e.wordmark || (ai === "ultron" ? "U.L.T.R.O.N." : "J.A.R.V.I.S.");
+        $("#wm").textContent = e.wordmark || "J.U.N.O.";
         break;
       case "state": setState(e.state); break;
       case "mic": muted = !!e.muted; document.body.classList.toggle("muted", muted);
@@ -225,7 +228,8 @@ const DPR = Math.min(1.5, window.devicePixelRatio || 1), SIZE = 84;
 cv.width = cv.height = Math.round(SIZE * DPR);
 const C = SIZE / 2;
 const COL = { jarvis: { c: [127, 231, 255], hot: [223, 246, 255], alarm: [255, 157, 46], dim: [95, 127, 143] },
-              ultron: { c: [255, 48, 70], deep: [110, 10, 24], hot: [255, 138, 61], bone: [244, 233, 228], alarm: [255, 211, 77], dim: [134, 99, 106] } };
+              ultron: { c: [255, 48, 70], deep: [110, 10, 24], hot: [255, 138, 61], bone: [244, 233, 228], alarm: [255, 211, 77], dim: [134, 99, 106] },
+              juno: { c: [201, 123, 255], hot: [255, 186, 246], alarm: [255, 90, 224], dim: [138, 118, 163] } };
 const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
 const mixc = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
 function rot(p, ax, ay, ax2) {

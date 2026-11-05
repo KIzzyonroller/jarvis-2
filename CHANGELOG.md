@@ -1,7 +1,22 @@
 # What's new
 
-Newest first. After an update, Jarvis shows everything added since the version you had before.
+Newest first. After an update, Juno shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
+
+## 1.0.24
+- **It's just Juno now.** Jarvis and Ultron are gone: one assistant, her voice, her look, everywhere (the window, the corner widget, the desktop, Glass mode, your phone, Discord). The installer and your saved data keep their old folder names so nothing gets lost.
+- **She lives on your desktop, made from her own art.** She stands there breathing, her hair flowing and twinkling, and gestures while she talks. Every now and then she walks somewhere else on the screen. She points up while she's thinking, points out when she opens something for you, and leaps in from the side when she starts. The green and purple pixel blocks glitch around her.
+- **Her music player.** When music plays she pops up a player in the bottom-right corner: now playing, the sound waves, the time (1:03 / 3:31), the song and who made it, a progress bar you can click, and previous / pause / next. She sits on top of it (from her own sitting picture) with her feet dangling, nodding to the beat while her shins kick and her hair sways. It works with Spotify, Apple Music, Media Player and most music apps, goes away 15 seconds after you pause, hides during fullscreen games, and you can drag it or close it. Settings > Appearance & animations to turn it off.
+- **Spotify stays out of your way.** Asking for a song no longer throws Spotify's window in your face; it plays in the background. Say "open Spotify and play..." if you want to see it.
+- **She'll start conversations.** Now and then (about every half hour to 45 minutes by default), when you've been in something a while and paused, she says something about what you're doing. She only knows the app and window title, never your screen. Quiet hours, how often, and apps she should never bring up are in Settings > Conversation & personality.
+- **Settings rebuilt.** A sidebar with its own page for each area: General, Conversation & personality, Voice & effects, Languages, Microphone, Appearance & animations, Window dimming, Application access and Connected apps, with a lot more you can change:
+  - Her personality, humor, how much she says, and notes in your own words.
+  - Voice effects (echo, ethereal, robot, glitch, radio, synth) and how strong they are.
+  - The language she speaks and hears.
+  - Which microphone she uses and how loud you have to be.
+  - Desktop animation quality and where the visualizer goes.
+  - Window dimming: fade her window when you're not using it, and bring it back brighter and more solid while she talks. (Windows can't make this kind of window see-through, so fading dims it instead.)
+  - Apps she's never allowed to touch.
 
 ## 1.0.23
 - **You can talk to Juno now.** Say "Juno, ..." or "switch to Juno", or press Juno at the top of his window. She has her own voice, her own personality and a purple theme. The secret code still merges them into her.

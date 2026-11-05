@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Juno Music</title>
+<style>
+@font-face{font-family:"Chakra Petch";font-weight:500;font-display:block;src:url(fonts/chakra-petch-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Chakra Petch";font-weight:600;font-display:block;src:url(fonts/chakra-petch-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-weight:400;font-display:block;src:url(fonts/jost-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-weight:500;font-display:block;src:url(fonts/jost-latin-500-normal.woff2) format("woff2")}
+/* her colors, taken from her picture: violet mane, near-black body, mint mask, lilac glow */
+:root{
+  --ink:#f3eeff; --dim:#a99bc4; --faint:#6d5f8a;
+  --violet:#5c1aac; --deep:#1f075d; --night:#0a0416; --lilac:#8e55de; --glow:#b79cff; --mint:#2ee59d;
+  --panel-top:158px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:400px;height:360px;overflow:hidden;background:var(--night);color:var(--ink);
+  font:400 13px/1.3 "Jost","Segoe UI",sans-serif;user-select:none;-webkit-user-select:none;cursor:default}
+
+/* the bar she sits on: angular corners like her art, a lilac lip along the top */
+.panel{position:absolute;left:6px;right:6px;top:var(--panel-top);bottom:6px;
+  clip-path:polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px);
+  background:linear-gradient(170deg,#1a0b38 0%,#110628 45%,#0b0419 100%)}
+.panel::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 60% at 50% 0%,rgba(142,85,222,.22),transparent 60%)}
+.lip{position:absolute;left:22px;right:6px;top:var(--panel-top);height:3px;background:var(--lilac);
+  box-shadow:0 0 12px 1px rgba(183,156,255,.55)}
+.lip::before{content:"";position:absolute;left:-16px;top:0;width:18px;height:3px;background:var(--lilac);
+  transform-origin:right;transform:skewX(-45deg)}
+.inner{position:absolute;inset:0;padding:12px 18px 12px 20px;display:grid;
+  grid-template-rows:30px 34px 42px 18px 1fr;row-gap:2px}
+
+.row1{display:flex;align-items:center;justify-content:space-between}
+.np{font:600 11px/1 "Chakra Petch",sans-serif;letter-spacing:.22em;color:var(--glow);display:flex;align-items:center;gap:8px}
+.np i{width:7px;height:7px;background:var(--mint);transform:rotate(45deg);box-shadow:0 0 8px var(--mint)}
+body.paused .np{color:var(--dim)} body.paused .np i{background:var(--faint);box-shadow:none}
+#waves{width:132px;height:30px;display:block}
+
+.time{font:500 27px/34px "Chakra Petch",sans-serif;letter-spacing:.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.time .of{color:var(--faint);font-size:19px}
+.song{min-width:0;display:flex;flex-direction:column;justify-content:flex-end}
+.title{font:500 16px/1.25 "Jost",sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.artist{font-size:13px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.bar{position:relative;height:18px;cursor:pointer}
+.bar .track{position:absolute;left:0;right:0;top:7px;height:4px;background:rgba(243,238,255,.1)}
+.bar .fill{position:absolute;left:0;top:7px;height:4px;width:0;background:linear-gradient(90deg,var(--lilac),var(--mint))}
+.bar .knob{position:absolute;top:4px;width:10px;height:10px;margin-left:-5px;left:0;background:var(--mint);transform:rotate(45deg);
+  box-shadow:0 0 10px rgba(46,229,157,.7)}
+.bar:hover .track{background:rgba(243,238,255,.16)}
+
+.ctl{display:flex;align-items:center;justify-content:center;gap:22px}
+.ctl button{appearance:none;border:0;background:none;color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.ctl .skip{width:38px;height:38px;color:var(--dim)}
+.ctl .skip:hover{color:var(--ink)}
+.ctl .play{width:48px;height:48px;background:var(--mint);color:var(--night);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.ctl .play:hover{filter:brightness(1.1)}
+.ctl button:active{transform:scale(.94)}
+.ctl button:focus-visible{outline:2px solid var(--glow);outline-offset:3px}
+.ctl svg{display:block}
+.play .i-pause{display:none} body.playing .play .i-pause{display:block} body.playing .play .i-play{display:none}
+.x{position:absolute;right:10px;top:10px;width:20px;height:20px;border:0;background:none;color:var(--faint);
+  font:500 16px/20px "Jost",sans-serif;cursor:pointer;opacity:0;transition:opacity .2s}
+.panel:hover .x{opacity:1} .x:hover{color:var(--ink)}
+.x:focus-visible{opacity:1;outline:1px solid var(--glow)}
+.panel .row1{padding-right:18px}
+
+/* glitch pixels breaking off the lip on big beats */
+#px{position:absolute;inset:0;pointer-events:none}
+#px b{position:absolute;width:6px;height:6px}
+
+#juno{position:absolute;left:0;top:0;width:400px;height:360px;pointer-events:none;filter:drop-shadow(0 0 2.5px rgba(183,156,255,.75))}
+@media (prefers-reduced-motion:reduce){ .x{transition:none} }
+</style>
+</head>
+<body class="paused">
+<div class="panel" id="panel">
+  <div class="inner">
+    <div class="row1"><div class="np"><i></i><span id="np">NOW PLAYING</span></div><canvas id="waves" width="264" height="60"></canvas></div>
+    <div class="time" id="time">0:00<span class="of"> / 0:00</span></div>
+    <div class="song"><div class="title" id="title">Nothing playing</div><div class="artist" id="artist"></div></div>
+    <div class="bar" id="bar" role="slider" aria-label="Position in the song" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+      <div class="track"></div><div class="fill" id="fill"></div><div class="knob" id="knob"></div></div>
+    <div class="ctl">
+      <button class="skip" id="prev" aria-label="Previous song"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M4 3h2.5v14H4zM17 3v14L7.5 10z" fill="currentColor"/></svg></button>
+      <button class="play" id="play" aria-label="Play or pause">
+        <svg class="i-play" width="20" height="20" viewBox="0 0 20 20"><path d="M5 2.5v15L17.5 10z" fill="currentColor"/></svg>
+        <svg class="i-pause" width="20" height="20" viewBox="0 0 20 20"><path d="M4.5 3h4v14h-4zM11.5 3h4v14h-4z" fill="currentColor"/></svg></button>
+      <button class="skip" id="next" aria-label="Next song"><svg width="20" height="20" viewBox="0 0 20 20"><path d="M13.5 3H16v14h-2.5zM3 3v14l9.5-7z" fill="currentColor"/></svg></button>
+    </div>
+  </div>
+  <button class="x" id="close" aria-label="Close the music player">×</button>
+</div>
+<div class="lip"></div>
+<div id="px"></div>
+
+<!-- Juno, from her sitting picture, bent on the graphics card: head nods, hair sways, both shins kick -->
+<canvas id="juno"></canvas>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const api = () => (window.pywebview && window.pywebview.api) || null;
+const call = (fn, ...a) => { const x = api(); if (x && x[fn]) try { x[fn](...a); } catch (e) {} };
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ---------------------------------------------------------------- song state
+const S = { title: "", artist: "", playing: false, pos: 0, dur: 0, at: performance.now(), visible: true };
+const fmt = (s) => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+function posNow() { return Math.min(S.dur || 1e9, S.pos + (S.playing ? (performance.now() - S.at) / 1000 : 0)); }
+function setTrack(e) {
+  S.title = e.title || ""; S.artist = e.artist || ""; S.playing = !!e.playing; S.pos = +e.pos || 0; S.dur = +e.dur || 0;
+  S.at = performance.now();
+  $("#title").textContent = S.title || "Nothing playing";
+  $("#artist").textContent = S.artist || e.app || "";
+  $("#np").textContent = S.playing ? "NOW PLAYING" : "PAUSED";
+  document.body.classList.toggle("playing", S.playing);
+  document.body.classList.toggle("paused", !S.playing);
+}
+let lastTime = "";
+function drawTime() {
+  const p = posNow(), d = S.dur;
+  const t = fmt(p) + "|" + (d ? fmt(d) : "");
+  if (t !== lastTime) {
+    lastTime = t;
+    const el = $("#time"); el.firstChild.textContent = fmt(p); el.lastChild.textContent = d ? " / " + fmt(d) : "";
+  }
+  const f = d ? Math.min(1, p / d) : 0;
+  $("#fill").style.width = (f * 100) + "%"; $("#knob").style.left = (f * 100) + "%";
+  $("#bar").setAttribute("aria-valuenow", Math.round(f * 100));
+}
+
+// ---------------------------------------------------------------- loudness -> waves and the beat
+let level = 0, env = 0, slow = 0.05, voice = 0;
+let beatPhase = 0, beatPeriod = 0.6, lastBeat = 0, kick = 0;
+const beats = [];
+function onLevel(v) {
+  level = v;
+  slow += (v - slow) * 0.03;
+  const now = performance.now() / 1000;
+  if (S.playing && v > slow * 1.35 + 0.03 && now - lastBeat > 0.26) {       // a hit
+    if (lastBeat) {
+      const gap = now - lastBeat;
+      if (gap > 0.27 && gap < 1.4) { beats.push(gap); if (beats.length > 12) beats.shift(); }
+      const sorted = beats.slice().sort((a, b) => a - b);
+      if (sorted.length >= 4) beatPeriod += (sorted[sorted.length >> 1] - beatPeriod) * 0.3;
+    }
+    lastBeat = now;
+    // pull her nod onto the hit
+    const err = ((beatPhase + 0.5) % 1) - 0.5;
+    beatPhase -= err * 0.5;
+    kick = Math.min(1, (v - slow) * 4);
+    if (kick > 0.45) spark();
+  }
+}
+
+const wv = $("#waves"), wg = wv.getContext("2d");
+const BARS = 26, bars = new Float32Array(BARS), seeds = Array.from({ length: BARS }, (_, i) => 0.55 + 0.45 * Math.abs(Math.sin(i * 12.9898) * 1.7 % 1));
+const grad = wg.createLinearGradient(0, 0, 264, 0); grad.addColorStop(0, "#8e55de"); grad.addColorStop(1, "#2ee59d");
+function drawWaves(t) {
+  const W = 264, H = 60, mid = H / 2, bw = 5, gap = (W - BARS * bw) / (BARS - 1);
+  wg.clearRect(0, 0, W, H); wg.fillStyle = grad;
+  for (let i = 0; i < BARS; i++) {
+    const wob = 0.6 + 0.4 * Math.sin(t * (3.1 + seeds[i] * 2.3) + i * 1.9);
+    const target = S.playing ? Math.min(1, level * 1.5 * seeds[i] * wob + kick * 0.25 * seeds[(i + 7) % BARS]) : 0;
+    bars[i] += (target - bars[i]) * (target > bars[i] ? 0.55 : 0.18);
+    const h = Math.max(3, bars[i] * (H - 4));
+    wg.fillRect(i * (bw + gap), mid - h / 2, bw, h);
+  }
+}
+
+// ---------------------------------------------------------------- glitch pixels off the lip
+const px = $("#px");
+function spark() {
+  if (reduced || px.childElementCount > 14) return;
+  const left = Math.random() < .5, x0 = left ? 30 + Math.random() * 90 : 280 + Math.random() * 80;
+  const n = 3 + (Math.random() * 4 | 0);
+  for (let k = 0; k < n; k++) {
+    const b = document.createElement("b");
+    b.style.left = (x0 + k * 6 * (left ? 1 : -1)) + "px";
+    b.style.top = (164 + (k % 3) * 6 + (Math.random() < .3 ? 6 : 0)) + "px";
+    b.style.background = Math.random() < .55 ? "#2ee59d" : "#5c1aac";
+    px.appendChild(b);
+    setTimeout(() => b.remove(), 120 + Math.random() * 260);
+  }
+}
+
+// ---------------------------------------------------------------- her: the picture on a bendable mesh
+// Points in the picture (juno_sit.png, 522 x 651): where she bends and where she sits.
+const P = { neck: [262, 238], kneeF: [404, 398], footF: [492, 532], kneeB: [382, 414], footB: [345, 565],
+  shoulder: [238, 298], hand: [150, 404], seat: 412 };
+const IMG_W = 522, IMG_H = 651, SC = 0.4, OX = 17, OY = 158 - P.seat * SC;     // her seat on the lip
+const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function segD(p, a, b) {
+  const vx = b[0] - a[0], vy = b[1] - a[1], L = vx * vx + vy * vy;
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / L));
+  return [Math.hypot(p[0] - a[0] - vx * t, p[1] - a[1] - vy * t), ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / L];
+}
+function weights(x, y) {
+  const arm = 1 - sm(14, 30, segD([x, y], P.shoulder, P.hand)[0]);
+  // head and neck above the shoulders; the hair hanging down her back follows more loosely
+  const headW = (1 - sm(222, 252, y)) * sm(150, 200, x) ;
+  const hairW = (1 - sm(250, 350, y)) * (1 - sm(200, 245, x)) * .75;
+  const head = Math.max(headW, hairW, (1 - sm(222, 252, y)) * .85) * (1 - arm);
+  const hair = (1 - sm(150, 330, Math.hypot(x - 170, y - 200) - 0)) * (1 - arm) * sm(0, 1, 1 - headW * .6);
+  // the two shins, split down the gap between them
+  const split = 401 + (y - 425) * 0.2;
+  const below = sm(398, 424, y);
+  const front = below * sm(split - 4, split + 4, x) * (1 - sm(40, 70, segD([x, y], P.kneeF, P.footF)[0]));
+  const back = below * (1 - sm(split - 4, split + 4, x)) * sm(300, 330, x) * (1 - sm(40, 70, segD([x, y], P.kneeB, P.footB)[0]));
+  return [head, hair, front, back];
+}
+const VS = `
+attribute vec2 aPos; attribute vec4 aW;
+uniform vec4 uB;      // head angle, hair sway, front shin, back shin
+uniform vec4 uM;      // time, body dip, -, -
+uniform vec2 uView;   // canvas size in page px
+varying vec2 vUv;
+vec2 rot(vec2 p, vec2 c, float a) { float s = sin(a), k = cos(a); p -= c; return c + vec2(p.x * k - p.y * s, p.x * s + p.y * k); }
+void main() {
+  vec2 q = aPos;
+  q += aW.y * vec2(sin(uM.x * 1.7 + aPos.y * .02) * 2.5 + uB.y * (1.0 - aPos.y / 400.0) * 5.0, cos(uM.x * 1.3 + aPos.x * .02) * 1.6);
+  q = mix(q, rot(q, vec2(${P.neck}), uB.x), aW.x);
+  q = mix(q, rot(q, vec2(${P.kneeF}), uB.z), aW.z);
+  q = mix(q, rot(q, vec2(${P.kneeB}), uB.w), aW.w);
+  q.y += uM.y * (1.0 - smoothstep(330.0, 412.0, aPos.y)) * (1.0 - aW.z) * (1.0 - aW.w);
+  vec2 page = vec2(${OX}.0, ${OY.toFixed(2)}) + q * ${SC};
+  gl_Position = vec4(page.x / uView.x * 2.0 - 1.0, 1.0 - page.y / uView.y * 2.0, 0.0, 1.0);
+  vUv = aPos / vec2(${IMG_W}.0, ${IMG_H}.0);
+}`;
+const FS = `
+precision mediump float;
+varying vec2 vUv; uniform sampler2D uTex; uniform vec4 uFx;   // time, glow, twinkle
+float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void main() {
+  vec4 c = texture2D(uTex, vUv);
+  float lum = dot(c.rgb, vec3(.33));
+  if (lum > 0.6) {                                   // the specks in her hair twinkle
+    vec2 cell = floor(vUv * vec2(${IMG_W}.0, ${IMG_H}.0) / 4.0);
+    c.rgb += uFx.z * pow(max(0.0, sin(uFx.x * (1.5 + h(cell) * 2.5) + h(cell + 3.1) * 6.28)), 8.0) * .5;
+  }
+  c.rgb += uFx.y * .18 * vec3(.55, .3, 1.0);           // she glows while she talks
+  gl_FragColor = vec4(c.rgb * c.a, c.a);
+}`;
+const her = (() => {
+  const cv = $("#juno"), Wc = 400, Hc = 360, dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = Wc * dpr; cv.height = Hc * dpr; cv.style.width = Wc + "px"; cv.style.height = Hc + "px";
+  const gl = cv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: true });
+  if (!gl) return null;
+  const sh = (t, src) => { const x = gl.createShader(t); gl.shaderSource(x, src); gl.compileShader(x);
+    if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(pr); gl.useProgram(pr);
+  const NX = 70, NY = 88, v = new Float32Array((NX + 1) * (NY + 1) * 6), idx = [];
+  let o = 0;
+  for (let j = 0; j <= NY; j++) for (let i = 0; i <= NX; i++) {
+    const x = i / NX * IMG_W, y = j / NY * IMG_H; v.set([x, y, ...weights(x, y)], o); o += 6;
+  }
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) { const a = j * (NX + 1) + i, b = a + 1, c = a + NX + 1, d = c + 1; idx.push(a, b, c, b, d, c); }
+  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, v, gl.STATIC_DRAW);
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW);
+  const at = (n, size, off) => { const l = gl.getAttribLocation(pr, n); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, size, gl.FLOAT, false, 24, off * 4); };
+  at("aPos", 2, 0); at("aW", 4, 2);
+  const U = {}; ["uB", "uM", "uView", "uFx", "uTex"].forEach((n) => U[n] = gl.getUniformLocation(pr, n));
+  gl.uniform2f(U.uView, Wc, Hc);
+  gl.viewport(0, 0, cv.width, cv.height);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  const img = new Image(), tex = gl.createTexture(); let ready = false;
+  const loaded = new Promise((res) => { img.onload = async () => {
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); }
+    catch (e) {                                   // a file:// page: ask Python for the picture instead
+      if (img.src.startsWith("data:")) return;
+      const x = api() || await new Promise((r) => window.addEventListener("pywebviewready", () => r(api()), { once: true }));
+      const d = x && x.picture ? await x.picture("juno_sit.png") : "";
+      if (d) img.src = d;
+      return;
+    }
+    for (const [k, val] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, val);
+    ready = true; res(img); }; });
+  img.src = "juno_sit.png";
+  return {
+    img, loaded,
+    draw(t, o) {
+      if (!ready) return;
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.uniform4f(U.uB, o.head, o.hair, o.shinF, o.shinB);
+      gl.uniform4f(U.uM, t, o.dip, 0, 0);
+      gl.uniform4f(U.uFx, t, o.glow, .9, 0);
+      gl.drawElements(gl.TRIANGLES, idx.length, gl.UNSIGNED_SHORT, 0);
+    },
+  };
+})();
+let hairLag = 0;
+function pose(t, o) {
+  // o: nod 0..1 (on the beat), side -1..1, swingL/swingR degrees, open (her voice) 0..1
+  hairLag += (o.side - hairLag) * 0.1;
+  if (her) her.draw(t, { head: (o.nod * 4.5 + o.side * 2) * Math.PI / 180, hair: hairLag + o.nod * .4,
+    shinF: o.swingL * Math.PI / 180, shinB: o.swingR * Math.PI / 180, dip: o.nod * 1.6, glow: o.open });
+}
+
+// ---------------------------------------------------------------- loop (about 30 fps, stops while parked)
+let raf = 0, prev = 0, side = 1, lastHalf = 0;
+function frame(ms) {
+  raf = requestAnimationFrame(frame);
+  if (ms - prev < 32) return;
+  const dt = Math.min(.1, (ms - (prev || ms)) / 1000); prev = ms;
+  const t = ms / 1000;
+  env += (level - env) * 0.3; kick *= 0.86; voice *= 0.9;
+  const playing = S.playing;
+  // the nod: a phase that runs at the song's tempo, snapped to hits by onLevel
+  const rate = playing ? 1 / beatPeriod : 0.25;
+  beatPhase = (beatPhase + dt * rate) % 1;
+  const half = beatPhase < .5 ? 0 : 1;
+  if (half !== lastHalf && half === 0) side = -side;           // headbang side to side, one beat each way
+  lastHalf = half;
+  const pulse = Math.pow(Math.max(0, Math.cos(beatPhase * Math.PI * 2)), 3);   // sharp dip on the beat
+  const energy = playing ? Math.min(1, .45 + env * 1.4) : .12;
+  const nod = reduced ? 0 : pulse * energy;
+  const sideAmt = reduced ? 0 : side * (0.35 + 0.65 * energy) * (playing ? 1 : .25) * (0.6 + 0.4 * pulse);
+  const swing = reduced ? 0 : (playing ? 9 + env * 10 : 3);
+  const kickPhase = t * (playing ? Math.PI * 2 / (beatPeriod * 2) : 1.2);
+  pose(t, { nod, side: sideAmt, swingL: Math.sin(kickPhase) * swing, swingR: Math.sin(kickPhase + Math.PI * .85) * swing,
+    open: Math.min(1, voice * 1.6) });
+  drawWaves(t);
+  drawTime();
+}
+function run(on) {
+  S.visible = on;
+  if (on && !raf) { prev = 0; raf = requestAnimationFrame(frame); }
+  if (!on && raf) { cancelAnimationFrame(raf); raf = 0; }
+}
+
+// ---------------------------------------------------------------- the window's outline: the panel plus her shape
+// Rendered once at a few extremes of her movement and grown a few pixels, so nothing she does gets clipped.
+async function outline() {
+  const W = 400, H = 360, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.fillStyle = "#000";
+  const p = $("#panel").getBoundingClientRect(), k = 16;
+  g.beginPath(); g.moveTo(p.left + k, p.top - 2); g.lineTo(p.right, p.top - 2); g.lineTo(p.right, p.bottom - k);
+  g.lineTo(p.right - k, p.bottom); g.lineTo(p.left, p.bottom); g.lineTo(p.left, p.top + k - 2); g.closePath(); g.fill();
+  if (!her) return null;
+  const img = await her.loaded;
+  const put = (ang, piv, clipY0, clipY1, dx, dy) => {         // her picture (or a slice of it) turned about a joint
+    g.save(); g.translate(OX + dx, OY + dy); g.scale(SC, SC);
+    g.beginPath(); g.rect(0, clipY0, IMG_W, clipY1 - clipY0); g.clip();
+    g.translate(piv[0], piv[1]); g.rotate(ang * Math.PI / 180); g.translate(-piv[0], -piv[1]);
+    g.drawImage(img, 0, 0, IMG_W, IMG_H); g.restore();   // the picture may be stored bigger than its layout size
+  };
+  const ring = [[0, 0], [-2.5, 0], [2.5, 0], [0, -2.5], [0, 2.5]];
+  for (const [dx, dy] of ring) {
+    put(0, P.neck, 0, IMG_H, dx, dy);
+    for (const a of [-7.5, 7.5]) put(a, P.neck, 0, 360, dx, dy);                 // head and hair at full nod
+    for (const a of [-26, 26]) { put(a, P.kneeF, 398, IMG_H, dx, dy); put(a, P.kneeB, 398, IMG_H, dx, dy); }
+  }
+  let data;
+  try { data = g.getImageData(0, 0, W, H).data; } catch (e) { return null; }
+  const runs = [];
+  let prevKey = "", open = [];
+  for (let y = 0; y <= H; y++) {
+    const row = [];
+    if (y < H) {
+      let x0 = -1;
+      for (let x = 0; x <= W; x++) {
+        const on = x < W && data[(y * W + x) * 4 + 3] > 110;
+        if (on && x0 < 0) x0 = x;
+        if (!on && x0 >= 0) { row.push([x0, x]); x0 = -1; }
+      }
+    }
+    const key = row.map((r) => r.join(",")).join(";");
+    if (key !== prevKey) {
+      for (const r of open) runs.push([r[0], r[2], r[1] - r[0], y - r[2]]);
+      open = row.map((r) => [r[0], r[1], y]);
+      prevKey = key;
+    }
+  }
+  return runs;
+}
+
+// ---------------------------------------------------------------- events from Python
+window.J = {
+  on(e) {
+    switch (e.type) {
+      case "track": setTrack(e); break;
+      case "level": onLevel(+e.v || 0); break;
+      case "voice": voice = Math.max(voice, +e.level || +e.v || 0); break;
+      case "window": run(!!e.visible); break;
+    }
+  },
+  batch(list) { list.forEach((e) => this.on(e)); },
+};
+
+// ---------------------------------------------------------------- controls
+$("#play").addEventListener("click", () => {
+  S.pos = posNow(); S.at = performance.now(); setTrack({ ...S, playing: !S.playing });   // feels instant
+  call("toggle");
+});
+$("#next").addEventListener("click", () => call("next"));
+$("#prev").addEventListener("click", () => call("prev"));
+$("#close").addEventListener("click", () => call("close"));
+function seekTo(f) {
+  if (!S.dur) return;
+  const s = Math.max(0, Math.min(1, f)) * S.dur;
+  S.pos = s; S.at = performance.now(); call("seek", s);
+}
+$("#bar").addEventListener("click", (ev) => { const r = ev.currentTarget.getBoundingClientRect(); seekTo((ev.clientX - r.left) / r.width); });
+$("#bar").addEventListener("keydown", (ev) => {
+  if (!S.dur) return;
+  if (ev.key === "ArrowRight") seekTo((posNow() + 5) / S.dur);
+  if (ev.key === "ArrowLeft") seekTo((posNow() - 5) / S.dur);
+});
+
+// drag it anywhere that isn't a control
+let drag = null, dragRaf = 0;
+document.addEventListener("mousedown", (ev) => {
+  if (ev.button !== 0 || ev.target.closest("button,.bar")) return;
+  drag = { x: ev.screenX, y: ev.screenY, dx: 0, dy: 0 }; call("drag_start");
+});
+document.addEventListener("mousemove", (ev) => {
+  if (!drag) return;
+  const r = window.devicePixelRatio || 1;
+  drag.dx = Math.round((ev.screenX - drag.x) * r); drag.dy = Math.round((ev.screenY - drag.y) * r);
+  if (!dragRaf) dragRaf = requestAnimationFrame(() => { dragRaf = 0; if (drag) call("drag_to", drag.dx, drag.dy); });
+});
+const endDrag = () => { if (drag) { drag = null; call("drag_end"); } };
+document.addEventListener("mouseup", endDrag);
+window.addEventListener("blur", endDrag);
+
+// ---------------------------------------------------------------- boot
+let booted = false;
+async function boot() {
+  if (booted || !api()) return;
+  booted = true;
+  try { await document.fonts.ready; } catch (e) {}
+  const runs = await outline().catch(() => null);
+  if (runs && runs.length) call("shape", runs);
+  call("ready");
+}
+window.addEventListener("pywebviewready", boot);
+if (window.pywebview && window.pywebview.api) boot();
+pose(0, { nod: 0, side: 0, swingL: 0, swingR: 0, open: 0 });
+run(true);
+
+// demo for screenshots: music.html?demo
+(function demo() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has("demo")) return;
+  setTrack({ title: q.get("t") || "Midnight Circuit", artist: q.get("a") || "Neon Arcade", playing: !q.has("paused"), pos: 63, dur: 211 });
+  let t0 = 0;
+  setInterval(() => { t0 += 1 / 30; const b = (t0 % .5) < .06 ? .9 : .35 + .15 * Math.sin(t0 * 7); onLevel(S.playing ? b : 0); }, 33);
+  if (q.has("talk")) setInterval(() => window.J.on({ type: "voice", level: Math.random() }), 90);
+  if (q.has("outline")) outline().then((r) => { window.__runs = r; });
+})();
+</script>
+</body>
+</html>

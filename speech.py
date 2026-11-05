@@ -38,6 +38,53 @@ def _rms(chunk):
     return float(np.sqrt(np.mean(chunk.astype(np.float32) ** 2)))
 
 
+def mic_devices():
+    """Microphones Windows offers, for Settings > Microphone: [(value, label)]."""
+    try:
+        import sounddevice as sd
+        seen, out = set(), [("default", "Windows default")]
+        apis = sd.query_hostapis()
+        for i, d in enumerate(sd.query_devices()):
+            if d.get("max_input_channels", 0) < 1:
+                continue
+            api = apis[d["hostapi"]]["name"] if d.get("hostapi") is not None else ""
+            if "WDM-KS" in api:                         # low-level duplicates of the same mics
+                continue
+            name = d["name"].strip()
+            if name in seen:
+                continue
+            seen.add(name)
+            out.append((name, name))
+        return out
+    except Exception:
+        return [("default", "Windows default")]
+
+
+def _open_mic(sd, callback):
+    """The mic chosen in Settings (by name), or Windows' default if it's gone or won't open."""
+    want = (config.MIC_DEVICE or "default").strip()
+    dev = None
+    if want and want != "default":
+        try:
+            for i, d in enumerate(sd.query_devices()):
+                if d.get("max_input_channels", 0) > 0 and d["name"].strip() == want:
+                    dev = i
+                    break
+            if dev is None:
+                print(f"[voice] the mic '{want}' isn't connected; using Windows' default")
+        except Exception:
+            dev = None
+    try:
+        return sd.InputStream(samplerate=config.SAMPLE_RATE, channels=1, dtype="int16", device=dev,
+                              blocksize=config.CHUNK, callback=callback)
+    except Exception as e:
+        if dev is None:
+            raise
+        print(f"[voice] couldn't open '{want}' ({e}); using Windows' default")
+        return sd.InputStream(samplerate=config.SAMPLE_RATE, channels=1, dtype="int16",
+                              blocksize=config.CHUNK, callback=callback)
+
+
 def _add_cuda_dlls():
     """If the NVIDIA cuBLAS/cuDNN pip packages are installed, let Windows find their DLLs."""
     if sys.platform != "win32":
@@ -284,11 +331,11 @@ class Listener:
         # Pass 2 (only when you're talking to him): bigger and careful. Loads in the background.
         self.accurate = None
         self.accurate_name = (config.WHISPER_ACCURATE if config.WHISPER_ACCURATE != "auto"
-                              else ("large-v3-turbo" if self.device == "cuda" else "distil-small.en"))
+                              else ("large-v3-turbo" if self.device == "cuda"
+                                    else "small" if config.LANGUAGES else "distil-small.en"))
         self._log = log
         threading.Thread(target=self._load_accurate, daemon=True, name="whisper-load").start()
-        self.stream = sd.InputStream(samplerate=config.SAMPLE_RATE, channels=1, dtype="int16",
-                                     blocksize=config.CHUNK, callback=self._callback)
+        self.stream = _open_mic(sd, self._callback)
 
     def _watch_speed(self, model, secs, audio_secs):
         """Measure how fast the local careful model really is on this PC. Too slow: swap to a lighter
@@ -301,7 +348,8 @@ class Listener:
 
     def _maybe_downgrade(self):
         est = self.careful_estimate()
-        lighter = {"distil-small.en": "base.en", "small.en": "base.en", "medium.en": "base.en"}.get(self.accurate_name)
+        lighter = {"distil-small.en": "base.en", "small.en": "base.en", "medium.en": "base.en",
+                   "small": "base", "medium": "base"}.get(self.accurate_name)
         fast = getattr(self, "_fast_secs", None)
         lighter_ok = fast is not None and fast * self.COST_VS_TINY["base.en"] <= config.CAREFUL_BUDGET * 1.2
         if (config.WHISPER_ACCURATE == "auto" and lighter and est is not None and est > config.CAREFUL_BUDGET
@@ -379,6 +427,7 @@ class Listener:
     # Whisper always works on a fixed 30-second window, so each pass costs about the same whatever
     # the clip length. Relative cost of each model vs tiny.en on a CPU (int8), roughly:
     COST_VS_TINY = {"tiny.en": 1.0, "base.en": 2.0, "distil-small.en": 3.5, "small.en": 6.0,
+                    "tiny": 1.0, "base": 2.0, "small": 6.0, "medium": 15.0,
                     "distil-medium.en": 7.0, "medium.en": 15.0}
 
     def _fast_pass(self, audio):
@@ -450,7 +499,7 @@ class Listener:
 
     def _transcribe(self, model, audio, beam_size, prompt):
         """Returns (list of segments, info). Never lets a broken optional piece stop him hearing you."""
-        kw = dict(language="en", beam_size=beam_size, vad_filter=Listener._vad_filter, initial_prompt=prompt,
+        kw = dict(language=config.HEAR_LANGUAGE, beam_size=beam_size, vad_filter=Listener._vad_filter, initial_prompt=prompt,
                   condition_on_previous_text=False, without_timestamps=True)
         a = _normalize(audio)
         try:

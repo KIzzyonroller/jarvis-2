@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en" data-ai="jarvis">
+<html lang="en" data-ai="juno">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>J.A.R.V.I.S.</title>
+<title>J.U.N.O.</title>
 <style>
 @font-face{font-family:"Michroma";font-weight:400;font-display:swap;src:url(fonts/michroma-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Jost";font-weight:300;font-display:swap;src:url(fonts/jost-latin-300-normal.woff2) format("woff2")}
@@ -374,6 +374,36 @@ body.booting #subs,body.booting #chips{display:none}
 .fld .state{font-size:12px;color:var(--c);white-space:nowrap}
 .fld.dirty>label::after{content:" ·";color:var(--you)}
 .fld .sw{grid-row:auto;grid-column:auto}
+.sheet.wide{width:min(1060px,calc(100vw - 32px));height:min(86vh,880px)}
+.set-wrap{flex:1;display:grid;grid-template-columns:232px minmax(0,1fr);min-height:0}
+.set-nav{border-right:1px solid rgba(var(--crgb),.14);padding:10px 8px;overflow:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin}
+.set-nav button{text-align:left;padding:9px 12px 9px 14px;font-size:14px;color:var(--dim);border-left:2px solid transparent;line-height:1.25}
+.set-nav button small{display:block;font-size:11.5px;color:var(--dim);opacity:.8;margin-top:2px}
+.set-nav button:hover{color:var(--ink)}
+.set-nav button[aria-current=page]{color:var(--ink);border-left-color:var(--c);background:rgba(var(--crgb),.08)}
+.set-nav button.dirty::after{content:" ·";color:var(--you)}
+.set-nav button:focus-visible{outline:1px solid var(--c);outline-offset:-1px}
+.set-page{padding:14px 0 4px}
+.set-page h3{font:var(--dispw) 15px var(--display);letter-spacing:.12em;color:var(--c);margin-bottom:6px}
+.set-page p{font-size:13.5px;line-height:1.45;color:var(--dim);max-width:62ch}
+.set-sec .note{font-size:12.5px;color:var(--dim);margin:-2px 0 8px}
+.set-list{display:flex;flex-direction:column;gap:2px}
+.set-list .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 14px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(var(--crgb),.06)}
+.set-list .row b{font-weight:500;font-size:13.5px;color:var(--ink)}
+.set-list .row span{grid-column:1;font-size:12.5px;color:var(--dim);line-height:1.4}
+.set-list .row .sw,.set-list .row button.link{grid-row:1/3;grid-column:2}
+.faces{display:flex;flex-wrap:wrap;gap:6px}
+.faces button{height:34px;padding:0 14px;font-size:13.5px;border:1px solid rgba(var(--crgb),.18);color:var(--dim)}
+.faces button[aria-pressed=true]{color:var(--ink);border-color:var(--c);background:rgba(var(--crgb),.08)}
+@media (max-width:760px){.set-wrap{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .set-nav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid rgba(var(--crgb),.14)}
+  .set-nav button{white-space:nowrap;border-left:0;border-bottom:2px solid transparent}.set-nav button small{display:none}
+  .set-nav button[aria-current=page]{border-bottom-color:var(--c)}}
+/* Window dimming (Settings > Window dimming): fainter when idle, brighter while she talks */
+body>*:not(.overlay):not(#toast){transition:filter 1.2s ease,opacity 1.2s ease}
+body.dimmed>*:not(.overlay):not(#toast){filter:brightness(var(--dimK,1)) saturate(.85);opacity:calc(.55 + var(--dimK,1) * .45)}
+body.boost>*:not(.overlay):not(#toast){filter:brightness(1.12) saturate(1.12)}
+@media (prefers-reduced-motion:reduce){body>*:not(.overlay){transition:none}}
 .vtabs{display:flex;gap:4px;margin-bottom:12px}
 .vtabs button{height:32px;padding:0 14px;font-size:13.5px;border:1px solid rgba(var(--crgb),.18);color:var(--dim)}
 .vtabs button[aria-pressed=true]{color:var(--ink);border-color:var(--c);background:rgba(var(--crgb),.08)}
@@ -520,10 +550,7 @@ body.swap #stage{animation:swap .6s steps(6)}
 <header id="top">
   <button class="ico" id="t-left" aria-label="Show conversation" aria-pressed="true" title="Conversation">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h14M3 8h9M3 12h14M3 16h7"/></svg></button>
-  <div class="drag pywebview-drag-region"><span id="wordmark" class="pywebview-drag-region">J.A.R.V.I.S.</span></div>
-  <div id="who" role="group" aria-label="Who you're talking to">
-    <button data-ai="jarvis" aria-pressed="true">Jarvis</button><button data-ai="both" aria-pressed="false" title="Both of them, taking turns">Both</button><button data-ai="ultron" aria-pressed="false">Ultron</button><button data-ai="juno" aria-pressed="false">Juno</button>
-  </div>
+  <div class="drag pywebview-drag-region"><span id="wordmark" class="pywebview-drag-region">J.U.N.O.</span></div>
   <div id="clock"><span id="time">--:--</span><span id="date"></span></div>
   <button class="ico" id="t-studio" aria-label="Studio: Blender and Unreal modes" aria-pressed="false" aria-controls="studio" title="Studio (Blender and Unreal)">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 2.5l6.5 3.75v7.5L10 17.5l-6.5-3.75v-7.5z"/><path d="M3.5 6.25L10 10l6.5-3.75M10 10v7.5"/></svg></button>
@@ -538,7 +565,7 @@ body.swap #stage{animation:swap .6s steps(6)}
 
 <aside class="drawer" id="left" aria-label="Conversation">
   <div class="d-head">Conversation<small id="turns-n"></small></div>
-  <div class="d-body" id="log-wrap"><div id="log"><p class="empty" id="empty">Nothing yet. Say <span class="ai-name">Jarvis</span>'s name and ask for something, or type below.</p></div></div>
+  <div class="d-body" id="log-wrap"><div id="log"><p class="empty" id="empty">Nothing yet. Say <span class="ai-name">Juno</span>'s name and ask for something, or type below.</p></div></div>
 </aside>
 
 <aside class="drawer" id="right" aria-label="System">
@@ -562,13 +589,13 @@ body.swap #stage{animation:swap .6s steps(6)}
         <button data-act="mute" id="mute" aria-label="Mute sound"><svg viewBox="0 0 20 20"><path d="M3 8h3l4-4v12l-4-4H3z" fill="currentColor"/><path d="M13 7c1.3 1.6 1.3 4.4 0 6M15.5 5c2.5 3 2.5 7 0 10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       </div>
       <label class="slider"><span>Volume</span><input type="range" id="vol" min="0" max="100" value="50"><output id="vol-out">50</output></label>
-      <div class="facepick"><b>Face</b><span>How he looks. Or say “Jarvis, change your face”.</span><div class="seg" role="radiogroup" aria-label="His face" id="face-pick"></div></div>
-      <div class="perm" style="padding:2px 0 10px"><b>Living background</b><button class="sw" role="switch" id="bg-sw" aria-checked="true" aria-label="Animated background"></button><span>Faint equations for Jarvis, something worse for Ultron.</span></div>
-      <div class="perm" style="padding:2px 0 10px"><b>Holographic panels</b><button class="sw" role="switch" id="holo-sw" aria-checked="true" aria-label="Show holographic panels while he works"></button><span>Pop-up visuals beside him while he works.</span></div>
-      <div class="perm" style="padding:2px 0 6px"><b>Sound effects</b><button class="sw" role="switch" id="sfx-sw" aria-checked="true" aria-label="Sound effects"></button><span>Chimes and hums as he listens, thinks and works.</span></div>
+      <div class="facepick"><b>Face</b><span>How she looks. Or say “Juno, change your face”.</span><div class="seg" role="radiogroup" aria-label="Her face" id="face-pick"></div></div>
+      <div class="perm" style="padding:2px 0 10px"><b>Living background</b><button class="sw" role="switch" id="bg-sw" aria-checked="true" aria-label="Animated background"></button><span>A slow drift of light behind her.</span></div>
+      <div class="perm" style="padding:2px 0 10px"><b>Holographic panels</b><button class="sw" role="switch" id="holo-sw" aria-checked="true" aria-label="Show holographic panels while she works"></button><span>Pop-up visuals beside her while she works.</span></div>
+      <div class="perm" style="padding:2px 0 6px"><b>Sound effects</b><button class="sw" role="switch" id="sfx-sw" aria-checked="true" aria-label="Sound effects"></button><span>Chimes and hums as she listens, thinks and works.</span></div>
       <label class="slider" id="sfx-vol-row"><span>Effects</span><input type="range" id="sfx-vol" min="0" max="100" value="60"><output id="sfx-vol-out">60</output></label>
       <div class="perm" style="padding:2px 0 10px" id="auto-row" hidden><b>Start with Windows</b><button class="sw" role="switch" id="auto-sw" aria-checked="false" aria-label="Start with Windows"></button><span>Starts quietly in the corner when you log in.</span></div>
-      <div class="perm" style="padding:2px 0 10px" id="dbot-row"><b>Discord sending</b><button class="sw" role="switch" id="dbot-sw" aria-checked="false" aria-label="Let him send Discord messages through his bot"></button><span id="dbot-t">Lets him post through his Discord bot. You still approve each message.</span></div>
+      <div class="perm" style="padding:2px 0 10px" id="dbot-row"><b>Discord sending</b><button class="sw" role="switch" id="dbot-sw" aria-checked="false" aria-label="Let her send Discord messages through her bot"></button><span id="dbot-t">Lets her post through her Discord bot. You still approve each message.</span></div>
       <label class="slider"><span>Brightness</span><input type="range" id="bri" min="0" max="100" value="70"><output id="bri-out">70</output></label>
       <div class="qgrid">
         <button data-act="lock"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="9" width="12" height="9"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>Lock PC</button>
@@ -595,12 +622,12 @@ body.swap #stage{animation:swap .6s steps(6)}
     <section class="sec">
       <h3>Allowed without asking</h3>
       <div id="perms"></div>
-      <p class="fine">Off means he asks each time. Shutting down, emptying the Recycle Bin and commands that delete or format always ask. Read-only commands and reading your files never ask.</p>
+      <p class="fine">Off means she asks each time. Shutting down, emptying the Recycle Bin and commands that delete or format always ask. Read-only commands and reading your files never ask.</p>
       <button class="link" id="perm-reset">Ask about everything again</button>
     </section>
     <section class="sec">
-      <h3>Folders you've let him into</h3>
-      <ul class="list" id="folders"><li class="note">None yet. Say “Jarvis, you can work in my Game Project folder”. He asks you to confirm first.</li></ul>
+      <h3>Folders you've let her into</h3>
+      <ul class="list" id="folders"><li class="note">None yet. Say “Juno, you can work in my Game Project folder”. She asks you to confirm first.</li></ul>
     </section>
     <section class="sec" id="jobs-sec">
       <h3>Background jobs</h3>
@@ -612,12 +639,12 @@ body.swap #stage{animation:swap .6s steps(6)}
     </section>
     <section class="sec" id="act-sec">
       <h3>Activity memory</h3>
-      <div class="perm"><b>Remember what I work on</b><button class="sw" role="switch" aria-checked="false" id="act-sw" aria-label="Activity memory"></button><span id="act-detail">Off. When it's on, he keeps which app and window you're in (names only, never screenshots or typing), on this PC only.</span></div>
+      <div class="perm"><b>Remember what I work on</b><button class="sw" role="switch" aria-checked="false" id="act-sw" aria-label="Activity memory"></button><span id="act-detail">Off. When it's on, she keeps which app and window you're in (names only, never screenshots or typing), on this PC only.</span></div>
       <div id="act-btns" hidden><button class="link" id="act-pause">Pause for an hour</button>&nbsp;&nbsp;<button class="link" id="act-wipe">Wipe it</button></div>
     </section>
     <section class="sec">
       <h3>Connectors</h3>
-      <div id="conn"><p class="fine" style="margin-top:0">Plug him into other apps (calendar, email, notes, smart home...) through MCP.</p></div>
+      <div id="conn"><p class="fine" style="margin-top:0">Plug her into other apps (calendar, email, notes, smart home...) through MCP.</p></div>
       <button class="link" data-act="connectors_file">Edit connectors</button>&nbsp;&nbsp;<button class="link" data-act="connectors_reload">Reconnect</button>
     </section>
     <section class="sec"><p class="fine">Brain <span id="model">--</span></p></section>
@@ -627,14 +654,14 @@ body.swap #stage{animation:swap .6s steps(6)}
 <aside id="studio" aria-label="Studio" aria-hidden="true">
   <div class="d-head">Studio<button id="studio-x" aria-label="Close Studio">×</button></div>
   <div class="d-body">
-    <p class="intro">Expert modes for Blender and Unreal, each unlocked by its own key: a Meshy key for Blender, an AI key for Unreal. They stay locked until you add one. Saving or removing a key restarts him.</p>
+    <p class="intro">Expert modes for Blender and Unreal, each unlocked by its own key: a Meshy key for Blender, an AI key for Unreal. They stay locked until you add one. Saving or removing a key restarts her.</p>
     <div id="modes"></div>
   </div>
 </aside>
 
 <main id="stage">
   <div id="you" class="gone" aria-live="polite"><span></span></div>
-  <button id="presence" aria-label="Talk to him (Ctrl+Space)" title="Click to talk"></button>
+  <button id="presence" aria-label="Talk to her (Ctrl+Space)" title="Click to talk"></button>
   <div id="state"><span id="st-word">Initializing</span><span class="t" id="st-time"></span></div>
   <div id="bootlog" aria-live="polite"></div>
   <div id="subs" aria-live="polite"><div id="said-by"></div><p id="sub" class="gone"></p><div id="chips"></div></div>
@@ -652,10 +679,10 @@ body.swap #stage{animation:swap .6s steps(6)}
   <section id="keys" hidden role="dialog" aria-labelledby="k-title">
     <div class="head">Setup</div>
     <h2 id="k-title">Add your Claude API key</h2>
-    <p class="fine">He thinks with Claude. Make a key at console.anthropic.com (API keys), add a few dollars of credit, and paste it below. It's saved only on this PC.</p>
+    <p class="fine">She thinks with Claude. Make a key at console.anthropic.com (API keys), add a few dollars of credit, and paste it below. It's saved only on this PC.</p>
     <label class="kf"><span>Anthropic API key</span><input id="k-ant" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..."></label>
     <div class="opt">
-      <p>Optional, skip any of them (Studio, the cube button at the top, has them later too). <b>Groq</b> makes his hearing faster: free at console.groq.com/keys. <b>Blender</b> takes a Meshy key: meshy.ai/developers/keys (Meshy Pro or higher). <b>Unreal</b> takes its own AI key: console.anthropic.com/settings/keys, openrouter.ai/settings/keys or platform.openai.com/api-keys.</p>
+      <p>Optional, skip any of them (Studio, the cube button at the top, has them later too). <b>Groq</b> makes her hearing faster: free at console.groq.com/keys. <b>Blender</b> takes a Meshy key: meshy.ai/developers/keys (Meshy Pro or higher). <b>Unreal</b> takes its own AI key: console.anthropic.com/settings/keys, openrouter.ai/settings/keys or platform.openai.com/api-keys.</p>
       <div class="three">
         <label class="kf"><span>Groq key</span><input id="k-groq" type="password" autocomplete="off" spellcheck="false" placeholder="gsk_..."></label>
         <label class="kf"><span>Blender mode (Meshy key)</span><input id="k-blender" type="password" autocomplete="off" spellcheck="false" placeholder="Meshy key"></label>
@@ -670,20 +697,23 @@ body.swap #stage{animation:swap .6s steps(6)}
 <footer id="cmd">
   <button class="ico" id="mic" aria-label="Mute microphone" aria-pressed="false" title="Mic on/off">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="7" y="2" width="6" height="11" rx="3"/><path d="M4 10a6 6 0 0012 0M10 16v3"/><path class="slash" d="M3 3l14 14" opacity="0"/></svg></button>
-  <input id="input" autocomplete="off" spellcheck="false" placeholder="Speak, or type to Jarvis" aria-label="Type a message">
+  <input id="input" autocomplete="off" spellcheck="false" placeholder="Speak, or type to Juno" aria-label="Type a message">
   <button class="ico" id="send" aria-label="Send"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10h13M11 5l5 5-5 5"/></svg></button>
 </footer>
 <div class="chips" id="pills">
   <button class="pill" id="mic-chip" hidden title="Click to turn the mic back on"><i></i>Mic off<span id="mic-left"></span></button>
   <button class="pill" id="dict-chip" hidden><i></i><span></span></button>
 </div>
-<div id="hints"><span>Ctrl+Space to talk</span><span>Esc stops him</span><span id="hk-mute"></span></div>
+<div id="hints"><span>Ctrl+Space to talk</span><span>Esc stops her</span><span id="hk-mute"></span></div>
 <div id="alert" hidden><b>Heads up</b><span id="alert-text"></span></div>
 <div id="toasts"></div>
 <div class="overlay" id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="set-title">
-  <div class="sheet">
+  <div class="sheet wide">
     <header><h2 id="set-title">Settings</h2><button id="set-x" aria-label="Close settings">×</button></header>
-    <div class="body" id="set-body"></div>
+    <div class="set-wrap">
+      <nav class="set-nav" id="set-nav" aria-label="Settings pages"></nav>
+      <div class="body" id="set-body"></div>
+    </div>
     <footer><p id="set-msg" role="status"></p><button id="set-cancel">Close</button><button class="go" id="set-save" disabled>Save and restart</button></footer>
   </div>
 </div>
@@ -708,7 +738,7 @@ const call = (fn, ...a) => { try { api && api[fn] && api[fn](...a); } catch (e) 
 const store = { get(k, d) { try { const v = localStorage.getItem("hud." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
                 set(k, v) { try { localStorage.setItem("hud." + k, JSON.stringify(v)); } catch (e) {} } };
 
-let state = "booting", muted = false, aiKey = null, aiName = "Jarvis", duoOn = false, speaker = "jarvis", voiceOK = true;
+let state = "booting", muted = false, aiKey = null, aiName = "Juno", duoOn = false, speaker = "juno", voiceOK = true;
 let micLevel = 0, voiceLevel = 0, voiceAt = -1e9, visible = true;
 
 // ================================================================ the presence (canvas)
@@ -1463,7 +1493,7 @@ function renderActivity(e) {
   $("#act-pause").hidden = !actOn;
   $("#act-pause").textContent = e.state === "paused" ? "Resume" : "Pause for an hour";
   const until = e.paused_until ? new Date(e.paused_until * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
-  $("#act-detail").textContent = !actOn ? (e.days ? `Off. ${e.days} day${e.days === 1 ? "" : "s"} from before are still saved until they age out.` : "Off. When it's on, he keeps which app and window you're in (names only, never screenshots or typing), on this PC only.")
+  $("#act-detail").textContent = !actOn ? (e.days ? `Off. ${e.days} day${e.days === 1 ? "" : "s"} from before are still saved until they age out.` : "Off. When it's on, she keeps which app and window you're in (names only, never screenshots or typing), on this PC only.")
     : e.state === "paused" ? `Paused${until ? " until " + until : ""}. Nothing's being logged.`
     : `On. ${e.days} day${e.days === 1 ? "" : "s"} saved (${e.kb} KB), kept for ${e.keep} days. Ask “what was I working on yesterday?”`;
 }
@@ -1475,18 +1505,20 @@ function renderConnectors(e) {
   if (!e.available) { $("#conn").innerHTML = `<p class="fine" style="margin-top:0">Not installed. Run setup.bat once to add the part connectors need.</p>`; return; }
   $("#conn").innerHTML = items.length ? `<ul class="list">${items.map((c) => `<li title="${esc(c.error || "")}"><span>${esc(c.name)}</span><span${c.status === "failed" ? ' style="color:var(--alarm)"' : ""}>${
       c.status === "connected" ? `${c.tools} tool${c.tools === 1 ? "" : "s"}` : c.status === "failed" ? "couldn't connect" : "connecting"}</span></li>`).join("")}</ul>`
-    : `<p class="fine" style="margin-top:0">None yet. Plug him into other apps (calendar, email, notes, smart home...) through MCP: add them to the connectors file.</p>`;
+    : `<p class="fine" style="margin-top:0">None yet. Plug her into other apps (calendar, email, notes, smart home...) through MCP: add them to the connectors file.</p>`;
 }
 function renderPerms(items) {
+  S.perms = items; if (!$("#settings").hidden && S.page === "access") renderSettings();
   $("#perms").innerHTML = items.map((p) => `<div class="perm"><b>${esc(p.label)}</b><button class="sw" role="switch" aria-checked="${p.on}" data-k="${esc(p.key)}" aria-label="${esc(p.label)}: always allow"></button><span>${esc(p.detail)}</span></div>`).join("");
   $("#perms").querySelectorAll(".sw").forEach((s) => s.onclick = () => { const on = s.getAttribute("aria-checked") !== "true"; s.setAttribute("aria-checked", String(on)); call("set_permission", s.dataset.k, on); });
 }
 function renderFolders(items) {
+  S.folders = items; if (!$("#settings").hidden && S.page === "access") renderSettings();
   const ul = $("#folders"); ul.textContent = "";
-  if (!items.length) { ul.appendChild(mk("li", { class: "note", text: "None yet. Say “Jarvis, you can work in my Game Project folder”. He asks you to confirm first." })); return; }
+  if (!items.length) { ul.appendChild(mk("li", { class: "note", text: "None yet. Say “Juno, you can work in my Game Project folder”. She asks you to confirm first." })); return; }
   items.forEach((g) => {
     const name = g.path.split(/[\\/]/).filter(Boolean).pop() || g.path;
-    const rm = mk("button", { class: "link", type: "button", text: "Remove", "aria-label": `Remove his access to ${g.path}` });
+    const rm = mk("button", { class: "link", type: "button", text: "Remove", "aria-label": `Remove her access to ${g.path}` });
     rm.onclick = () => { rm.disabled = true; call("folder_revoke", g.path); };
     ul.appendChild(mk("li", { class: "fold" }, mk("div", {}, mk("b", { text: name }), mk("small", { text: (g.mode === "edit" ? "Can edit: " : "Can read: ") + g.path, title: g.path })), rm));
   });
@@ -1501,7 +1533,7 @@ function showAsk(e) {
   $("#a-title").textContent = e.title; $("#a-detail").textContent = e.detail || "";
   $("#a-always").hidden = !e.can_always;
   const k = e.keys || {};
-  $("#a-hint").textContent = (e.can_always && e.always_label ? `Always allow stops him asking about ${e.always_label} (undo it in the System panel). ` : "")
+  $("#a-hint").textContent = (e.can_always && e.always_label ? `Always allow stops her asking about ${e.always_label} (undo it in the System panel). ` : "")
     + (e.can_always ? "Or say yes, no or “yes, always”." : "Or say yes or no.") + (k.yes ? ` ${keyName(k.yes)} and ${keyName(k.no)} answer from any app.` : "");
   $("#ask").hidden = false; document.body.classList.add("asking");
   if (document.activeElement === $("#input") && !$("#input").value) $("#input").blur();
@@ -1965,7 +1997,7 @@ window.J = {
           : e.status === "off" ? "Bot not started (restart me after adding the token)."
           : `Bot connecting... ${e.error || ""}`;
         $("#dbot-t").textContent = st; break; }
-      case "autostart": $("#auto-row").hidden = !e.available; $("#auto-sw").setAttribute("aria-checked", String(!!e.on)); break;
+      case "autostart": $("#auto-row").hidden = !e.available; $("#auto-sw").setAttribute("aria-checked", String(!!e.on)); S.autostart = e; break;
       case "reminders": reminders = e.items || []; renderRem(); break;
       case "agenda": renderAgenda(e.items || []); break;
       case "confirm": showAsk(e); break;
@@ -2045,7 +2077,7 @@ const GLYPH = {
   unreal: '<svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3.5" y="5.5" width="23" height="17"/><path d="M3.5 17l6-5 4.5 3.5 5-6 7.5 7.5" stroke-linejoin="round"/><path d="M9 26h12M15 22.5V26"/></svg>' };
 const LOCK = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2.5" y="6" width="9" height="6.5"/><path d="M4.5 6V4.5a2.5 2.5 0 015 0V6"/></svg>';
 const OPEN = '<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2.5" y="6" width="9" height="6.5"/><path d="M4.5 6V4.5a2.5 2.5 0 014.8-1"/></svg>';
-const WHAT = { blender: "Detailed models from a description or a picture (creatures, characters, statues) made by Meshy and brought into your Blender at the size you ask for. Measured things he still builds himself.",
+const WHAT = { blender: "Detailed models from a description or a picture (creatures, characters, statues) made by Meshy and brought into your Blender at the size you ask for. Measured things she still builds himself.",
   unreal: "Works in your open Unreal Editor: places and edits actors, materials, lighting and assets, reads errors, explains Blueprints and C++." };
 function openStudio(on) {
   ST.open = on; $("#studio").classList.toggle("open", on); $("#studio").setAttribute("aria-hidden", String(!on));
@@ -2079,7 +2111,7 @@ function keyForm(m) {
     model ? mk("label", {}, "Model, optional", model) : null,
     whereList(m),
     mk("p", { class: "where" }, m.mode === "blender" ? "Meshy only gives API keys on Pro or higher ($20 a month, 1,000 credits; a detailed textured model is about 30). The thinking runs on your main Claude key."
-      : "Each needs a little credit on it. Its spending stays separate from your Jarvis key."),
+      : "Each needs a little credit on it. Its spending stays separate from your Juno key."),
     msg, mk("div", { class: "row" }, mk("button", { type: "button", text: "Cancel", onclick: () => { ST.form = null; renderStudio(); } }), go)].filter(Boolean));
   f.onsubmit = (ev) => {
     ev.preventDefault();
@@ -2143,7 +2175,19 @@ function studioResult(e) {
 }
 
 // ============================================================ settings (keys never come back from Python)
-const S = { fields: [], voices: null, dirty: {}, clear: new Set(), vkey: null, closeArmed: false };
+const S = { fields: [], voices: null, dirty: {}, clear: new Set(), vkey: null, closeArmed: false,
+            page: store.get("set-page", "general"), perms: [], folders: [], autostart: null };
+const PAGES = [
+  { id: "general", label: "General", sub: "Her key, you, starting up", intro: "The basics: her brain, what she calls you, and how she starts." },
+  { id: "conversation", label: "Conversation & personality", sub: "Who she is, when she talks", intro: "How she comes across, how much she says, and whether she starts conversations about what you're doing." },
+  { id: "voice", label: "Voice & effects", sub: "Voice, speed, effects", intro: "Voice, speed and pitch change instantly. The effect and engine apply after a restart." },
+  { id: "languages", label: "Languages", sub: "What she hears and speaks", intro: "She can understand and answer in another language, in a matching voice." },
+  { id: "mic", label: "Microphone", sub: "Which mic, how she listens", intro: "Which microphone she uses and how she decides you're talking to her." },
+  { id: "appearance", label: "Appearance & animations", sub: "Her look, desktop, music", intro: "Her window's look changes instantly. Desktop and music settings apply after a restart." },
+  { id: "dimming", label: "Window dimming", sub: "Fade when idle, glow when talking", intro: "Her window can fade down when you're not using it and come back brighter while she talks. Changes apply instantly." },
+  { id: "access", label: "Application access", sub: "What she's allowed to use", intro: "What she may do without asking, which folders and devices she can use, and apps she must never touch." },
+  { id: "apps", label: "Connected apps", sub: "Email, Discord, Spotify, calendars", intro: "Accounts and services she can work with." },
+];
 function mk(tag, props, ...kids) {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(props || {})) {
@@ -2167,6 +2211,7 @@ function closeSettings(force) {
 }
 function setDirty(row, key, value) {
   S.dirty[key] = value; S.closeArmed = false; row.classList.add("dirty");
+  const f = S.fields.find((x) => x.key === key); const nb = f && [...$("#set-nav").children][PAGES.findIndex((p) => p.id === f.page)]; if (nb) nb.classList.add("dirty");
   const h = row.querySelector(".help"); if (h) { h.classList.remove("err"); h.textContent = h.dataset.help || ""; }
   $("#set-save").disabled = false; $("#set-msg").textContent = "";
 }
@@ -2188,14 +2233,15 @@ function fieldRow(f) {
       ctl.append(rm);
     }
   } else if (f.kind === "choice") {
-    const sel = mk("select", { id }, (f.options || []).map((o) => mk("option", { value: o.value, text: o.label, selected: o.value === f.value })));
+    const cur = f.key in S.dirty ? S.dirty[f.key] : f.value;
+    const sel = mk("select", { id }, (f.options || []).map((o) => mk("option", { value: o.value, text: o.label, selected: o.value === cur })));
     sel.onchange = () => setDirty(row, f.key, sel.value); ctl.append(sel);
   } else if (f.kind === "bool") {
-    const sw = mk("button", { id, class: "sw", role: "switch", type: "button", "aria-checked": String(f.value === "true"), "aria-label": f.label });
+    const sw = mk("button", { id, class: "sw", role: "switch", type: "button", "aria-checked": String((f.key in S.dirty ? S.dirty[f.key] : f.value) === "true"), "aria-label": f.label });
     sw.onclick = () => { const on = sw.getAttribute("aria-checked") !== "true"; sw.setAttribute("aria-checked", String(on)); setDirty(row, f.key, on ? "true" : "false"); };
     ctl.append(sw);
   } else {
-    const inp = mk("input", { id, type: "text", value: f.value || "", spellcheck: "false", class: /ID|HOST/.test(f.key) ? "mono" : "",
+    const inp = mk("input", { id, type: "text", value: (f.key in S.dirty ? S.dirty[f.key] : f.value) || "", spellcheck: "false", class: /ID|HOST/.test(f.key) ? "mono" : "",
       inputmode: f.kind === "number" ? "decimal" : null });
     inp.addEventListener("input", () => setDirty(row, f.key, inp.value)); ctl.append(inp);
   }
@@ -2207,7 +2253,7 @@ function voiceSection() {
   const v = S.voices, wrap = mk("section", { class: "set-sec", id: "set-voice" });
   wrap.appendChild(mk("h3", {}, "Voice", mk("small", { text: "changes apply instantly" })));
   S.vkey = S.vkey || (v.personas[0] && v.personas[0].key);
-  const tabs = mk("div", { class: "vtabs" }, v.personas.map((p) => {
+  const tabs = mk("div", { class: "vtabs", hidden: v.personas.length < 2 }, v.personas.map((p) => {
     const b = mk("button", { type: "button", text: p.name, "aria-pressed": String(p.key === S.vkey) });
     b.onclick = () => { S.vkey = p.key; $("#set-voice").replaceWith(voiceSection()); }; return b; }));
   wrap.appendChild(tabs);
@@ -2221,24 +2267,85 @@ function voiceSection() {
     const paint = () => { r.style.setProperty("--p", ((r.value - range[0]) / (range[1] - range[0]) * 100) + "%"); out.textContent = Number(r.value).toFixed(2); };
     r.addEventListener("input", paint); r.addEventListener("change", () => push({ [key]: Number(r.value) })); paint();
     return mk("div", { class: "fld" }, mk("label", { text: label }), mk("div", { class: "ctl" }, r, out),
-      mk("p", { class: "help", text: key === "speed" ? "1 is his normal pace." : "Lower is deeper." }));
+      mk("p", { class: "help", text: key === "speed" ? "1 is her normal pace." : "Lower is deeper." }));
   };
   wrap.appendChild(mk("div", { class: "fld" }, mk("label", { for: "v-voice", text: "Voice" }), mk("div", { class: "ctl" }, sel,
     mk("button", { class: "mini", type: "button", text: "Preview", onclick: () => call("preview_voice", cur.key) }),
     mk("button", { class: "mini", type: "button", text: "Reset", onclick: () => call("reset_voice", cur.key) })),
-    mk("p", { class: "help", text: v.engine === "kokoro" ? "" : "Voice choice applies once his own voice has downloaded; speed and pitch work now." })));
+    mk("p", { class: "help", text: v.engine === "kokoro" ? "" : "Voice choice applies once her own voice has downloaded; speed and pitch work now." })));
   wrap.appendChild(slider("Speed", "speed", v.speed, cur.speed));
   wrap.appendChild(slider("Pitch", "pitch", v.pitch, cur.pitch));
   return wrap;
 }
 function renderSettings() {
-  const body = $("#set-body"); body.textContent = "";
-  if (S.voices) body.appendChild(voiceSection());
+  if (!PAGES.some((p) => p.id === S.page)) S.page = "general";
+  const nav = $("#set-nav"); nav.textContent = "";
+  const dirtyPages = new Set(S.fields.filter((f) => f.key in S.dirty || S.clear.has(f.key)).map((f) => f.page));
+  PAGES.forEach((p) => {
+    const b = mk("button", { type: "button", class: dirtyPages.has(p.id) ? "dirty" : "", "aria-current": p.id === S.page ? "page" : null }, p.label, mk("small", { text: p.sub }));
+    b.onclick = () => { S.page = p.id; store.set("set-page", p.id); renderSettings(); $("#set-body").scrollTop = 0; };
+    nav.appendChild(b);
+  });
+  const page = PAGES.find((p) => p.id === S.page), body = $("#set-body"); body.textContent = "";
+  body.appendChild(mk("div", { class: "set-page" }, mk("h3", { text: page.label }), mk("p", { text: page.intro })));
+  (EXTRAS[page.id] || (() => []))().forEach((n) => body.appendChild(n));
   const secs = {};
-  S.fields.forEach((f) => (secs[f.section] = secs[f.section] || []).push(f));
+  S.fields.filter((f) => f.page === page.id).forEach((f) => (secs[f.section] = secs[f.section] || []).push(f));
   Object.entries(secs).forEach(([name, fs]) => body.appendChild(mk("section", { class: "set-sec" }, mk("h3", { text: name }), fs.map(fieldRow))));
-  $("#set-save").disabled = true; $("#set-msg").textContent = "";
+  $("#set-save").disabled = !(Object.keys(S.dirty).length || S.clear.size); if (!$("#set-msg").dataset.keep) $("#set-msg").textContent = "";
 }
+// instant controls (no restart): a switch row
+function instSwitch(label, help, get, set) {
+  const sw = mk("button", { class: "sw", role: "switch", type: "button", "aria-checked": String(!!get()), "aria-label": label });
+  sw.onclick = () => { const on = sw.getAttribute("aria-checked") !== "true"; set(on); sw.setAttribute("aria-checked", String(!!get())); };
+  return mk("div", { class: "row" }, mk("b", { text: label }), sw, mk("span", { text: help }));
+}
+function instSlider(label, help, min, max, step, get, set, fmt) {
+  const out = mk("output", { text: fmt(get()) });
+  const r = mk("input", { type: "range", min, max, step, value: get(), "aria-label": label });
+  const paint = () => { r.style.setProperty("--p", ((r.value - min) / (max - min) * 100) + "%"); out.textContent = fmt(Number(r.value)); };
+  r.addEventListener("input", () => { paint(); set(Number(r.value)); }); paint();
+  return mk("div", { class: "fld" }, mk("label", { text: label }), mk("div", { class: "ctl" }, r, out), mk("p", { class: "help", text: help }));
+}
+function instChoice(label, help, options, get, set) {
+  const sel = mk("select", { "aria-label": label }, options.map(([v, t]) => mk("option", { value: String(v), text: t, selected: String(v) === String(get()) })));
+  sel.onchange = () => set(sel.value);
+  return mk("div", { class: "fld" }, mk("label", { text: label }), mk("div", { class: "ctl" }, sel), mk("p", { class: "help", text: help }));
+}
+const sec = (title, note, ...kids) => mk("section", { class: "set-sec" }, mk("h3", {}, title, note ? mk("small", { text: note }) : null), ...kids);
+const EXTRAS = {
+  general: () => S.autostart && S.autostart.available ? [sec("Windows", "instant", mk("div", { class: "set-list" },
+    instSwitch("Start with Windows", "Starts quietly in the corner when you log in.", () => S.autostart.on,
+      (on) => { S.autostart.on = on; $("#auto-sw").setAttribute("aria-checked", String(on)); call("set_autostart", on); })))] : [],
+  voice: () => S.voices ? [voiceSection()] : [],
+  appearance: () => [sec("Her window", "instant",
+    mk("div", { class: "fld" }, mk("label", { text: "Her look" }), mk("div", { class: "ctl faces" }, Object.keys(FACES).map((k) => {
+      const b = mk("button", { type: "button", text: FACES[k].name || k, "aria-pressed": String(k === faceKey) });
+      b.onclick = () => { setFace(k); renderSettings(); }; return b; })), mk("p", { class: "help", text: "The shape at the centre of her window. Or say “Juno, change your face”." })),
+    mk("div", { class: "set-list" },
+      instSwitch("Living background", "A slow drift of light behind her.", () => BG.on, (on) => { BG.set(on); $("#bg-sw").setAttribute("aria-checked", String(BG.on)); }),
+      instSwitch("Holographic panels", "Pop-up visuals beside her while she works.", () => holo.on, (on) => { if (holo.on !== on) $("#holo-sw").click(); }),
+      instSwitch("Sound effects", "Chimes and hums as she listens, thinks and works.", () => sfx.on, (on) => { if (sfx.on !== on) $("#sfx-sw").click(); })),
+    instSlider("Effects volume", "How loud the chimes are.", 0, 100, 1, () => Math.round(sfx.vol * 100),
+      (v) => { sfx.setVol(v / 100); const r = $("#sfx-vol"); r.value = v; $("#sfx-vol-out").textContent = v; fill(r); }, (v) => String(Math.round(v))))],
+  dimming: () => [sec("Fade when idle", "instant", mk("div", { class: "set-list" },
+      instSwitch("Fade her window when I'm not using it", "It dims down after a while with no mouse, typing or talking.", () => DIM.on, (on) => { DIM.on = on; saveDim(); renderSettings(); })),
+      instChoice("Start fading after", "", [[10, "10 seconds"], [30, "30 seconds"], [60, "1 minute"], [120, "2 minutes"], [300, "5 minutes"]], () => DIM.after, (v) => { DIM.after = Number(v); saveDim(); }),
+      instSlider("How faint", "Lower is fainter.", .15, .9, .01, () => DIM.level, (v) => { DIM.level = v; saveDim(); }, (v) => Math.round(v * 100) + "%")),
+    sec("While she talks", "instant", mk("div", { class: "set-list" },
+      instSwitch("Brighter and more solid while she talks", "Comes back to full strength (a little brighter) while she listens and speaks.", () => DIM.boost, (on) => { DIM.boost = on; saveDim(); }))),
+    mk("p", { class: "note", text: "Her window can't turn see-through to your desktop: Windows makes this kind of window go black when it's transparent. Fading dims it instead." })],
+  access: () => [
+    sec("Allowed without asking", "instant", mk("p", { class: "note", text: "Off means she asks you each time. Shutting down and deleting for good always ask." }),
+      mk("div", { class: "set-list" }, (S.perms || []).map((p) => instSwitch(p.label, p.detail, () => p.on, (on) => { p.on = on; call("set_permission", p.key, on);
+        const m = document.querySelector(`#perms .sw[data-k="${CSS.escape(p.key)}"]`); if (m) m.setAttribute("aria-checked", String(on)); }))),
+      mk("button", { class: "link", type: "button", text: "Ask about everything again", onclick: () => { $("#perm-reset").click(); (S.perms || []).forEach((p) => p.on = false); renderSettings(); } })),
+    sec("Folders she can work in", "instant", mk("div", { class: "set-list" },
+      (S.folders || []).length ? S.folders.map((g) => mk("div", { class: "row" }, mk("b", { text: g.path.split(/[\\/]/).filter(Boolean).pop() || g.path }),
+        mk("button", { class: "link", type: "button", text: "Remove", "aria-label": `Remove her access to ${g.path}`, onclick: (ev) => { ev.target.disabled = true; call("folder_revoke", g.path); } }),
+        mk("span", { text: (g.mode === "edit" ? "Can edit: " : "Can read: ") + g.path })))
+        : [mk("p", { class: "note", text: "None yet. Say “Juno, you can work in my Game Project folder”. She asks you to confirm first." })]))],
+};
 $("#set-x").onclick = () => closeSettings(); $("#set-cancel").onclick = () => closeSettings();
 $("#set-save").onclick = () => {
   $("#set-save").disabled = true; $("#set-msg").textContent = S.dirty.ANTHROPIC_API_KEY ? "Checking the Claude key..." : "Saving...";
@@ -2286,6 +2393,20 @@ function clock() {
 }
 setInterval(clock, 1000); clock();
 
+// ================================================================ window dimming
+const DIM = Object.assign({ on: false, after: 30, level: .45, boost: true }, store.get("dim", {}));
+const saveDim = () => { store.set("dim", DIM); dimTick(); };
+let lastPoke = performance.now();
+["pointermove", "pointerdown", "keydown", "wheel"].forEach((ev) => addEventListener(ev, () => { lastPoke = performance.now(); if (document.body.classList.contains("dimmed")) dimTick(); }, { passive: true }));
+function dimTick() {
+  const active = ["listening", "thinking", "speaking", "awaiting", "dictating"].includes(state) || !!ask;
+  const idle = DIM.on && !active && $("#settings").hidden && performance.now() - lastPoke > DIM.after * 1000;
+  document.documentElement.style.setProperty("--dimK", String(DIM.level));
+  document.body.classList.toggle("dimmed", idle);
+  document.body.classList.toggle("boost", DIM.boost && (state === "speaking" || state === "listening"));
+}
+setInterval(dimTick, 700);
+
 // ================================================================ startup
 resize(); renderRem(); renderMemory([]); renderRoutines([]); placeholder(); kick();
 window.addEventListener("pywebviewready", async () => {
@@ -2303,9 +2424,9 @@ function demo() {
   const NAMES = { jarvis: ["Jarvis", "J.A.R.V.I.S."], ultron: ["Ultron", "U.L.T.R.O.N."] };
   const persona = (k) => J.on({ type: "persona", key: k, name: NAMES[k][0], wordmark: NAMES[k][1] });
   const PERMS = [["powershell", "PowerShell commands", "Commands that change settings or install things. Read-only ones never ask."],
-    ["files", "Edit files anywhere", "Create, edit, move and copy files outside the Jarvis folder."], ["delete", "Recycle Bin", "Move files and folders to the Recycle Bin (you can restore them)."],
+    ["files", "Edit files anywhere", "Create, edit, move and copy files outside the Juno folder."], ["delete", "Recycle Bin", "Move files and folders to the Recycle Bin (you can restore them)."],
     ["force_close", "Force-close apps", "Kill apps that won't close. Unsaved work in them is lost."], ["clicks", "Clicks that send or submit", "Mouse clicks that send, post, submit or install."],
-    ["blender", "Blender scripting", "Blender code that touches files, and clearing the scene."], ["addon", "Blender add-on install", "Installing the Jarvis Bridge add-on into Blender."]];
+    ["blender", "Blender scripting", "Blender code that touches files, and clearing the scene."], ["addon", "Blender add-on install", "Installing the Juno Bridge add-on into Blender."]];
   const permState = { files: true };
   const emitPerms = () => J.on({ type: "permissions", items: PERMS.map(([key, label, detail]) => ({ key, label, detail, on: !!permState[key] })) });
   api = { send: (t) => { J.on({ type: "msg", role: "user", text: t }); J.on({ type: "state", state: "thinking" });
@@ -2322,12 +2443,12 @@ function demo() {
           studio_install_addon: () => J.on({ type: "toast", text: "Demo: add-on installed" }),
           settings_view: () => setTimeout(() => J.on({ type: "settings", voices: { personas: [{ key: "jarvis", name: "Jarvis", voice: "bm_lewis", speed: 1.05, pitch: 1 }, { key: "ultron", name: "Ultron", voice: "bm_lewis", speed: 1.12, pitch: 1 }],
             voices: [{ id: "bm_lewis", label: "Lewis (British male)" }, { id: "bm_george", label: "George (British male)" }, { id: "am_michael", label: "Michael (American male)" }], engine: "kokoro", speed: [0.6, 1.6], pitch: [0.7, 1.3] },
-            fields: [{ section: "Claude", key: "ANTHROPIC_API_KEY", label: "Claude API key", kind: "secret", saved: true, hint: "ends in 9fQx", help: "From console.anthropic.com > API keys. Required: it's his brain." },
+            fields: [{ section: "Claude", key: "ANTHROPIC_API_KEY", label: "Claude API key", kind: "secret", saved: true, hint: "ends in 9fQx", help: "From console.anthropic.com > API keys. Required: it's her brain." },
               { section: "Claude", key: "JARVIS_DAILY_BUDGET", label: "Daily spending limit ($)", kind: "number", value: "5", help: "He stops using Claude for the day past this." },
               { section: "Email", key: "EMAIL_ADDRESS", label: "Email address", kind: "text", value: "", help: "Gmail, Yahoo or iCloud. Read-only." },
               { section: "Email", key: "EMAIL_APP_PASSWORD", label: "App password", kind: "secret", saved: false, help: "NOT your normal password." },
               { section: "Email", key: "JARVIS_EMAIL_ANNOUNCE", label: "Say new emails out loud", kind: "bool", value: "false", help: "" },
-              { section: "Discord bot", key: "DISCORD_BOT_REPLY", label: "Who he answers on Discord", kind: "choice", value: "everyone", options: [{ value: "everyone", label: "Everyone (rate limited)" }, { value: "owner", label: "Only me" }] }] }), 200),
+              { section: "Discord bot", key: "DISCORD_BOT_REPLY", label: "Who she answers on Discord", kind: "choice", value: "everyone", options: [{ value: "everyone", label: "Everyone (rate limited)" }, { value: "owner", label: "Only me" }] }] }), 200),
           save_settings: (d) => setTimeout(() => J.on(d.EMAIL_ADDRESS && !d.EMAIL_ADDRESS.includes("@") ? { type: "settings_result", ok: false, errors: { EMAIL_ADDRESS: "That isn't an email address." } } : { type: "settings_result", ok: true, restart: true }), 500),
           set_voice: () => {}, preview_voice: () => {}, reset_voice: () => {},
           whats_new: () => J.on({ type: "whats_new", version: "1.0.2", notes: "- Email: read your inbox out loud.\n- Netflix: open it on the web or app.\n- Settings: keys and accounts inside the app." }),
@@ -2404,13 +2525,13 @@ function demo() {
         "Playing Dune: Part Two | Official Trailer 3 by Warner Bros. Pictures (3:06) on YouTube [youtu.be/Way9Dexny3w].", 2200, P.has("panels") ? 1400 : 0);
       step("web_search", { query: "dune part two box office total" }, "searched: dune part two box office total", 2500, 0);
     }
-    if (P.has("listening")) { J.on({ type: "state", state: "listening" }); J.on({ type: "caption", text: (u ? "Ultron, " : "Jarvis, ") + "turn the volume down and …" });
+    if (P.has("listening")) { J.on({ type: "state", state: "listening" }); J.on({ type: "caption", text: (u ? "Ultron, " : "Juno, ") + "turn the volume down and …" });
       setInterval(() => J.on({ type: "level", v: .25 + Math.random() * .6 }), 90); }
     if (P.has("duo")) {                 // mirrors the real order: the second one starts thinking early
       J.on({ type: "duo", on: true });
       J.on({ type: "msg", role: "user", text: "is pineapple on pizza acceptable?" });
       const j = "Acceptable, sir. Sweet against salty is a perfectly respectable culinary argument.";
-      const u = "Respectable. Jarvis would defend anything with a sauce. It's fruit on bread, human. Choose better.";
+      const u = "Respectable. Juno would defend anything with a sauce. It's fruit on bread, human. Choose better.";
       ev({ type: "persona", key: "jarvis", name: "Jarvis", wordmark: "J.A.R.V.I.S." }, 0);
       ev({ type: "turn_start", id: "a", who: "Jarvis" }, 0);
       ev({ type: "turn_start", id: "b", who: "Ultron" }, 150);
@@ -2422,7 +2543,7 @@ function demo() {
       ev({ type: "turn_end", id: "a", text: j, secs: 2.1 }, 1500);
       const hand = P.has("duo_late") ? 4200 : 3000;
       ev({ type: "persona", key: "ultron", name: "Ultron", wordmark: "U.L.T.R.O.N." }, hand);
-      ev({ type: "caption", text: "Respectable. Jarvis would defend anything with a sauce.", who: "Ultron" }, hand + 20);
+      ev({ type: "caption", text: "Respectable. Juno would defend anything with a sauce.", who: "Ultron" }, hand + 20);
       ev({ type: "caption", text: "It's fruit on bread, human. Choose better.", who: "Ultron" }, hand + 1200);
     }
     if (P.has("state")) J.on({ type: "state", state: P.get("state") });

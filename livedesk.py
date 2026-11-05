@@ -22,6 +22,7 @@ import base64
 import io
 import json
 import sys
+import re
 import threading
 import time
 
@@ -345,9 +346,9 @@ class LiveDesk:
             print(f"[desktop] attaching failed: {e}")
             return
         merged = bool(_flags("merged"))
-        persona = getattr(self.core, "persona_key", "jarvis") if self.core else "jarvis"
+        persona = "juno"
         self.em({"type": "desk_init", "monitors": monitors(), "shot": shot, "intro": bool(config.DESK_INTRO),
-                 "persona": persona, "merged": merged})
+                 "persona": persona, "merged": merged, "quality": config.DESK_QUALITY, "viz": config.DESK_VIZ})
         for k in ("state",):
             if k in self.snap:
                 self.em(self.snap[k])
@@ -423,6 +424,16 @@ class DeskBridge:
 
     def __init__(self, desk):
         self._desk = desk
+
+    def picture(self, name):
+        """One of her pictures as a data: link. WebView2 won't let the graphics card read a picture loaded
+        straight from a file:// page (it counts as another site), but it will read one handed over like this."""
+        import base64
+        import config
+        if not re.fullmatch(r"[\w-]+\.png", name or ""):
+            return ""
+        p = config.RES_DIR / "ui" / name
+        return "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode("ascii") if p.exists() else ""
 
     def ready(self):
         self._desk.em.mark_ready()

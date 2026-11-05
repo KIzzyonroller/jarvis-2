@@ -214,7 +214,7 @@ input{flex:1;font:inherit;font-size:16px;background:rgba(var(--rgb),.06);border:
 input:focus{outline:none;border-color:var(--arc)}
 form button{flex:none;background:var(--arc);color:var(--bg);font-weight:700;border:0;padding:0 18px}
 </style></head><body class="st-idle">
-<header><i class="dot"></i><span class="wm" id="wm">J.A.R.V.I.S.</span><span class="st" id="st">Standby</span></header>
+<header><i class="dot"></i><span class="wm" id="wm">J.U.N.O.</span><span class="st" id="st">Standby</span></header>
 <div id="log"></div>
 <div class="card" id="card"><h4>Needs your OK</h4><div id="ct"></div><code id="cd"></code>
 <div class="row"><button id="no">Deny</button><button id="always">Always allow</button><button class="yes" id="yes">Allow</button></div></div>
@@ -224,7 +224,7 @@ form button{flex:none;background:var(--arc);color:var(--bg);font-weight:700;bord
 <script>
 const T="__TOKEN__", $=s=>document.querySelector(s), log=$("#log");
 const LABEL={idle:"Standby",listening:"Listening",thinking:"Thinking",speaking:"Speaking",awaiting:"Approval",dictating:"Dictating",booting:"Starting"};
-let next=0, cid=null, live={}, ai="jarvis";
+let next=0, cid=null, live={}, ai="juno";
 const api=(p,b)=>fetch(p,{method:b?"POST":"GET",headers:{"X-Token":T,"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined}).then(r=>r.json());
 function add(cls,text,who){const d=document.createElement("div");d.className="m "+cls;
   if(who){const b=document.createElement("b");b.textContent=who.toUpperCase();b.className=who.toLowerCase();d.appendChild(b)}

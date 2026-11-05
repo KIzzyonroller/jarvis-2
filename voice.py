@@ -120,7 +120,79 @@ def ultron_fx(x, sr, pitch=0.84):
     return (y * (0.9 / peak) if peak > 0 else y).astype(np.float32)
 
 
-EFFECTS = {"ultron": ultron_fx}
+def _norm(y):
+    peak = float(np.max(np.abs(y))) if len(y) else 0
+    return (y * (0.92 / peak) if peak > 0.92 else y).astype(np.float32)
+
+
+def _mix(dry, wet):
+    """Blend by the strength setting (Settings > Voice & effects). Same length in, same length out."""
+    k = max(0.0, min(1.0, config.VOICE_FX_STRENGTH))
+    return _norm((1 - k) * dry + k * wet)
+
+
+def _delays(x, sr, taps):
+    y = x.copy()
+    for ms, g in taps:
+        d = int(sr * ms / 1000)
+        if 0 < d < len(x):
+            y[d:] += g * x[:-d]
+    return y
+
+
+def echo_fx(x, sr):
+    """A big room: a couple of soft repeats."""
+    x = np.asarray(x, dtype=np.float32)
+    return _mix(x, _delays(x, sr, [(140, .38), (280, .2), (420, .1)]))
+
+
+def ethereal_fx(x, sr):
+    """Airy and dreamy: a short shimmering reverb."""
+    x = np.asarray(x, dtype=np.float32)
+    y = _delays(x, sr, [(23, .5), (37, .42), (53, .35), (71, .28), (97, .22), (131, .16)])
+    t = np.arange(len(y)) / sr
+    return _mix(x, y * (0.9 + 0.1 * np.sin(2 * np.pi * 5.5 * t)))
+
+
+def robot_fx(x, sr):
+    """Synthetic: ring modulation and a metallic comb."""
+    x = np.asarray(x, dtype=np.float32)
+    t = np.arange(len(x)) / sr
+    y = _delays(x * np.sin(2 * np.pi * 55 * t) * 1.6 + 0.4 * x, sr, [(5.0, .45), (9.0, .3)])
+    return _mix(x, np.tanh(1.6 * y))
+
+
+def glitch_fx(x, sr):
+    """Digital: now and then a tiny stutter, plus a little bit-crush. The same text always glitches the same way."""
+    x = np.asarray(x, dtype=np.float32)
+    y = np.round(x * 24) / 24                                   # bit-crush
+    rng = np.random.default_rng(len(x))
+    blk = int(sr * 0.045)
+    for start in range(blk * 4, len(y) - blk * 2, blk * 9):
+        if rng.random() < 0.35:
+            y[start + blk:start + 2 * blk] = y[start:start + blk]   # repeat the previous 45 ms
+    return _mix(x, y)
+
+
+def radio_fx(x, sr):
+    """Through a speaker or a radio: thin, band-limited, slightly crunchy."""
+    x = np.asarray(x, dtype=np.float32)
+    hp = x - np.convolve(x, np.ones(24) / 24, mode="same")      # cut the lows
+    lp = np.convolve(hp, np.ones(4) / 4, mode="same")           # and the very highs
+    return _mix(x, np.tanh(3.0 * lp) * 0.8)
+
+
+def synth_fx(x, sr):
+    """Deeper and metallic (what Ultron used to sound like), same length as the voice."""
+    x = np.asarray(x, dtype=np.float32)
+    t = np.arange(len(x)) / sr
+    y = _delays(x, sr, [(7.0, .42), (12.5, .28)])
+    y = 0.82 * y + 0.18 * y * np.sin(2 * np.pi * 42 * t)
+    return _mix(x, np.tanh(1.8 * y) / np.tanh(1.8))
+
+
+EFFECTS = {"ultron": ultron_fx, "echo": echo_fx, "ethereal": ethereal_fx, "robot": robot_fx, "glitch": glitch_fx,
+           "radio": radio_fx, "synth": synth_fx}
 
 
 def pitch_shift(x, pitch):
@@ -216,8 +288,17 @@ class KokoroEngine:
             voice = "bm_george"
         pitch = float(p.get("pitch") or 1.0)
         speed = min(max(float(p["speed"]) / pitch, 0.5), 2.0)
+        lang = None
+        if config.LANGUAGES:                          # a Spanish (French, ...) sentence gets a Spanish voice
+            try:
+                import langs
+                hit = langs.voice_for(text, voice)
+                if hit and (not self.available or hit[0] in self.available):
+                    voice, lang = hit
+            except Exception:
+                pass
         with _SYNTH_LOCK:
-            samples, sr = self.k.create(text, voice=voice, speed=speed, lang=_lang_for(voice, p["lang"]))
+            samples, sr = self.k.create(text, voice=voice, speed=speed, lang=lang or _lang_for(voice, p["lang"]))
         pcm = np.asarray(samples, dtype=np.float32)
         peak = float(np.max(np.abs(pcm))) if len(pcm) else 0.0
         if peak > 0.95:                      # some voices overshoot full scale and would crackle
