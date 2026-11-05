@@ -64,13 +64,14 @@
 
   const glc = document.getElementById("juno-gl"), fxc = document.getElementById("juno-fx");
   let JG = null;
-  try { JG = JunoGL.create(glc, fxc, "juno.png"); } catch (e) { console.error("Juno's renderer:", e); }
+  // She lives on the music player now; these only run if her desktop scripts are loaded again.
+  if (window.JunoGL) try { JG = JunoGL.create(glc, fxc, "juno.png"); } catch (e) { console.error("Juno's renderer:", e); }
   // Most of the time she's her standing picture, and now and then she walks somewhere else on the screen (both from
   // juno_rig.js), pointing when she opens something, pointing up while she thinks. The leaping picture
   // (juno_gl.js) is her entrance.
   const rigc = document.getElementById("juno-rig");
   let RIG = null;
-  try {
+  if (window.JunoRig) try {
     RIG = JunoRig.create(rigc, async (name) => { const x = window.pywebview && window.pywebview.api; return x && x.picture ? await x.picture(name) : ""; });
   } catch (e) { console.error("Juno's rig:", e); }
   const ME = { x: 0, ground: 0, scale: 1, wscale: 1, minX: 0, maxX: 1, facing: 1, walkTo: null, ph: 0, glitch: 0,
@@ -92,6 +93,7 @@
   }
   function stepHer(now, dt, lvl) {
     if (!RIG || !S.rigRect) return;
+    if (S.music && rigc.style.opacity === "0") return;      // away on the music player: nothing to draw
     const t = now / 1000;
     const leap = S.oneShot && LEAP_ONLY.has(S.oneShot) && now < S.oneShotUntil;
     if (leap !== ME.leaping) {                 // swap pictures behind a glitch
@@ -158,13 +160,20 @@
     // the voice visualizer: small in the main monitor's bottom-left corner, big in the middle of the second one
     const o = others()[0], vr = p.wh * .075;
     const vizzes = [];
-    if (S.viz === "both" || S.viz === "corner" || (S.viz === "second" && !o)) vizzes.push({ x: p.wx + vr * 1.7, y: p.wy + p.wh - vr * 1.7, r: vr, a: 1, n: 40 });
-    if (o && (S.viz === "both" || S.viz === "second")) vizzes.push({ x: o.x + o.w / 2, y: o.wy + o.wh * .45, r: Math.min(o.w, o.wh) * .2, a: 1, n: 72 });
+    // She isn't standing on the desktop any more, so the visualizers take centre stage: big in the middle of each monitor.
+    const mid = (m) => ({ x: m.wx + m.ww / 2, y: m.wy + m.wh * .45, r: Math.min(m.ww, m.wh) * .2, a: 1, n: 72 });
+    if (S.viz === "both" || S.viz === "main") vizzes.push(mid(p));
+    if (S.viz === "corner" || (S.viz === "second" && !o)) vizzes.push({ x: p.wx + vr * 1.7, y: p.wy + p.wh - vr * 1.7, r: vr, a: 1, n: 40 });
+    if (S.viz === "both" || S.viz === "second") for (const m of others()) vizzes.push(mid(m));
     VIZ = vizzes;
+    // where the pop-up panels go: either side of the middle of the main monitor
+    const gm = mid(p);
+    window.deskGeom = () => ({ cx: gm.x, cy: gm.y, R: gm.r, left: p.wx, right: p.wx + p.ww });
+    if (window.DeskHolo) setTimeout(DeskHolo.layout, 0);
     // drifting shards over every monitor
     let ms = '<g id="motes">';
     const nM = (QUALITY[S.quality] || QUALITY.medium)[2] * mons.length;
-    for (let i = 0; i < nM; i++) ms += el("g", {}, path(P([[0, -9], [3.5, 0], [0, 9], [-3.5, 0]]), { fill: ["#46f0ff", "#ff5ae0", "#c13dff"][i % 3] }));
+    for (let i = 0; i < nM; i++) ms += el("g", {}, path(P([[0, -9], [3.5, 0], [0, 9], [-3.5, 0]]), { fill: ["#2ee59d", "#ff5ae0", "#c13dff"][i % 3] }));
     ms += "</g>";
     s += ms;
     // Juno herself: her artwork on the graphics card (juno_gl.js), standing on the main monitor's floor
@@ -213,11 +222,17 @@
     desk_init(e) {
       S.monitors = e.monitors && e.monitors.length ? e.monitors : S.monitors;
       S.persona = "juno"; S.merged = !!e.merged;
-      if (e.quality) S.quality = e.quality; if (e.viz) S.viz = e.viz;
+      if (e.quality) S.quality = e.quality; if (e.viz) S.viz = e.viz; if (e.fps) S.fps = +e.fps;
       build();
       if (e.intro && !still) playIntro(e.shot); else reveal(0);
     },
     desk_layout(e) { if (JSON.stringify(e.monitors) !== JSON.stringify(S.monitors)) { S.monitors = e.monitors; build(); } },
+    music(e) {                                  // her music player is up: she's sitting on it, so she leaves the desktop
+      S.music = !!e.on; ME.glitch = .8; if (JG) JG.glitch(.8);
+      for (const c of [rigc, fxc]) { c.style.transition = "opacity 450ms"; c.style.opacity = S.music ? 0 : (S.shown ? 1 : 0); }
+      if (S.music) ME.walkTo = null;
+    },
+    fps(e) { S.fps = Math.max(5, Math.min(60, +e.fps || 30)); },
     desk_pause(e) { S.paused = !!e.on; if (!S.paused) kick(); },
     persona() { refresh(); },
     merged(e) { S.merged = !!e.on; if (S.merged) oneShot("happy", "juno", 3); refresh(); },
@@ -231,7 +246,10 @@
     confirm_done() { S.confirm = false; refresh(); },
   };
   window.J = {
-    on(e) { const h = handlers[e && e.type]; if (h) try { h(e); } catch (err) { console.error(err); } },
+    on(e) {
+      const h = handlers[e && e.type]; if (h) try { h(e); } catch (err) { console.error(err); }
+      if (window.DeskHolo && !S.paused) try { DeskHolo.on(e); } catch (err) { console.error(err); }      // pop-up panels
+    },
     batch(list) { list.forEach((e) => window.J.on(e)); },
   };
 
@@ -243,7 +261,7 @@
     requestAnimationFrame(frame);
     const busy = S.state !== "idle" && S.state !== "booting" || (S.oneShot && now < S.oneShotUntil) || S.confirm || ME.walkTo != null;
     const q = QUALITY[S.quality] || QUALITY.medium;
-    if (now - last < 1000 / (busy ? q[0] : q[1])) return;
+    if (now - last < 1000 / (S.fps || (busy ? q[0] : q[1])) - 2) return;      // her frame rate (Settings, or ask her)
     const dt = Math.min(.1, (now - last) / 1000); last = now;
     if (!S.built) return;
     const fresh = now - S.levelT < 400 ? S.level : 0;
@@ -262,7 +280,7 @@
   }
   function reveal(ms) {
     S.shown = true;
-    for (const c of [glc, fxc, rigc]) { c.style.transition = `opacity ${ms}ms, transform ${ms}ms cubic-bezier(.2,1.4,.4,1)`; c.style.opacity = 1; c.style.transform = "none"; }
+    for (const c of [glc, fxc, rigc]) { c.style.transition = `opacity ${ms}ms, transform ${ms}ms cubic-bezier(.2,1.4,.4,1)`; c.style.opacity = S.music && c !== glc ? 0 : 1; c.style.transform = "none"; }
     if (JG && ms) { JG.glitch(1); oneShot("leap", "juno", 1.8); }      // she leaps in, then lands standing
   }
 

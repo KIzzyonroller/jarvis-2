@@ -215,6 +215,11 @@ DESK_QUALITY = os.environ.get("JUNO_DESK_QUALITY", "medium").lower()   # low / m
 DESK_VIZ = os.environ.get("JUNO_DESK_VIZ", "both").lower()             # both / corner / second / off
 # Her music player (music.py): pops up while music plays, with her sitting on it. Spotify stays in the background.
 MUSIC_PLAYER = os.environ.get("JUNO_MUSIC_PLAYER", "true").lower() != "false"
+# Frame rate for her animations (desktop and music player), all the time. Say "set your animations to 60 fps" to change it.
+try:
+    ANIM_FPS = max(5, min(60, int(os.environ.get("JUNO_FPS", "30"))))
+except ValueError:
+    ANIM_FPS = 30
 # Screen watching (screenwatch.py): a live view of the screen in memory while you talk to him, so he sees what you mean.
 SCREEN_WATCH = os.environ.get("JARVIS_SCREEN_WATCH", "true").lower() != "false"
 # Start with his window minimized (the corner widget shows him), so he never covers the desktop intro or your work.

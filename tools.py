@@ -2618,6 +2618,32 @@ def set_mailbox(m):
 _VOICE_CORE = None
 
 
+FPS_STEPS = (10, 15, 20, 24, 30, 45, 60)
+
+
+def frame_rate_tool(action="get", fps=None):
+    """Her animation frame rate (desktop and music player), live, and remembered for next time."""
+    cur = config.ANIM_FPS
+    if action == "get" or fps is None:
+        return f"Her animations run at {cur} fps (desktop and music player). Options: {', '.join(map(str, FPS_STEPS))}."
+    try:
+        want = float(fps)
+    except (TypeError, ValueError):
+        return "fps has to be a number, like 30 or 60."
+    new = min(FPS_STEPS, key=lambda v: abs(v - want))
+    config.ANIM_FPS = new
+    try:
+        import settings
+        settings.save({"JUNO_FPS": str(new)})
+    except Exception as e:
+        print(f"[fps] couldn't save it: {e}")
+    if _VOICE_CORE is not None:
+        _VOICE_CORE.emit({"type": "fps", "fps": new})
+    note = "" if new == round(want) else f" ({int(want)} isn't an option, so I picked the closest)"
+    heavy = " 60 is the smoothest but costs the most; drop it if your games feel it." if new >= 45 else ""
+    return f"Done: {new} fps now, from {cur}{note}. It's saved for next time.{heavy}"
+
+
 def set_voice_core(c):
     global _VOICE_CORE
     _VOICE_CORE = c
@@ -2877,6 +2903,10 @@ TOOL_SPECS = [
                      "where possible; don't add your persona's flourishes unless they asked you to speak as yourself.",
           {"action": {"type": "string", "enum": ["recent", "unread", "servers", "read_channel", "send", "send_as_me"]}, "who": S,
            "hours": {"type": "number"}, "channel": S, "text": S, "limit": {"type": "number"}}, ["action"]),
+    _spec("frame_rate", "Her animation frame rate on the desktop and the music player (default 30). get, or set with "
+                        "fps (10, 15, 20, 24, 30, 45 or 60; other numbers snap to the closest). 'smoother' = higher, "
+                        "'lighter on my PC' / 'it's lagging' = lower.",
+          {"action": {"type": "string", "enum": ["get", "set"]}, "fps": {"type": "number"}}, ["action"]),
     _spec("voice_settings", "Change how you (or the other AI) sound, live, no restart. list: current voice and the "
                             "options. set: who (jarvis or ultron; default you), voice (an id from list), speed (0.6 to "
                             "1.6, 1 = normal pace), pitch (0.7 to 1.3, lower = deeper). For relative requests, start from "
@@ -3015,7 +3045,7 @@ FUNCS = {
     "look_at_camera": look_at_camera, "display": display, "media_control": media_control, "set_volume": set_volume,
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
-    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "history": history_tool, "background": background_tool,
+    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "history": history_tool, "background": background_tool,
     "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
 

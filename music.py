@@ -26,7 +26,8 @@ from datetime import datetime, timezone
 import config
 
 TITLE = "Juno Music"
-W, H = 400, 360                 # logical pixels; the page lays out the panel at the bottom and her above it
+W, H = 400, 360                 # the page's layout size; the panel at the bottom and her above it
+SIZE = 1.25                     # drawn this much bigger than the layout (the page zooms to match)
 MARGIN = 16
 PARK = -30000
 PAUSE_HIDE = 15                 # seconds paused before it goes away
@@ -36,7 +37,7 @@ IS_WINDOWS = sys.platform == "win32"
 MUSIC_APPS = ("spotify", "applemusic", "apple music", "zunemusic", "itunes", "tidal", "deezer", "amazon music",
               "amazonmusic", "musicbee", "foobar", "winamp", "aimp", "soundcloud", "pandora", "ytmdesktop",
               "youtube music", "cider", "qobuz", "audirvana", "dopamine", "plexamp")
-PASS = {"voice", "state"}       # from her core: so she grins along when she talks
+PASS = {"voice", "state", "fps"}   # from her core: her voice (she glows when she talks) and frame rate changes
 
 
 def _is_music(aumid):
@@ -73,6 +74,7 @@ class MusicPlayer:
         self._stop = threading.Event()
         self._drag0 = None
         self._region_runs = None
+        self.dpr = 0.0                 # the page's real scale (Windows display scaling), once it reports it
 
     # ------------------------------------------------------------------ window
     def create(self, webview):
@@ -113,11 +115,28 @@ class MusicPlayer:
             print(f"[music] style failed: {e}")
 
     def _scale(self):
+        """Screen pixels per layout pixel. The page reports its own scale; asking Windows alone isn't enough, because
+        when the app isn't DPI-aware Windows says 100% while WebView2 still draws at 125% or 150%, and the bottom of
+        the player (the play buttons) got cut off."""
         from mini import _u
+        s = self.dpr
+        if not s:
+            try:
+                s = (_u().GetDpiForWindow(self.hwnd) or 96) / 96
+            except Exception:
+                s = 1.0
+        return s * SIZE
+
+    def layout(self, dpr):
         try:
-            return (_u().GetDpiForWindow(self.hwnd) or 96) / 96
-        except Exception:
-            return 1.0
+            self.dpr = max(.5, min(4.0, float(dpr)))
+        except (TypeError, ValueError):
+            return
+        if self.visible and self.hwnd:
+            try:
+                self._place()
+            except Exception:
+                pass
 
     def _rect(self):
         """Bottom-right of the main screen, just above the taskbar (or wherever you dragged it)."""
@@ -174,10 +193,20 @@ class MusicPlayer:
             g.DeleteObject(rgn)
         self._region_runs = runs
 
+    def _tell_desktop(self, on):
+        """The big Juno on the desktop steps away while her music player is up (she's sitting on it instead)."""
+        emit = getattr(self.core, "emit", None)
+        if emit:
+            try:
+                emit({"type": "music", "on": bool(on)})
+            except Exception:
+                pass
+
     def show(self):
         if self.visible or not self.window or not self._handle():
             return
         self.visible = True
+        self._tell_desktop(True)
         self.em({"type": "window", "visible": True})
         try:
             self._place()
@@ -188,6 +217,7 @@ class MusicPlayer:
         if not self.visible:
             return
         self.visible = False
+        self._tell_desktop(False)
         self.em({"type": "window", "visible": False})
         try:
             self._remember_pos()
@@ -206,7 +236,8 @@ class MusicPlayer:
 
     # ------------------------------------------------------------------ core events (her voice, for the grin)
     def feed(self, ev):
-        if self.visible and ev.get("type") in PASS:
+        t = ev.get("type")
+        if t in PASS and (self.visible or t == "fps"):
             self.em(ev)
 
     # ------------------------------------------------------------------ start
@@ -440,6 +471,9 @@ class MusicBridge:
         print("[music] player loaded")
         return True
 
+    def fps(self):
+        return config.ANIM_FPS
+
     def toggle(self):
         self._p.cmds.put(("toggle",))
 
@@ -457,8 +491,13 @@ class MusicBridge:
         p.closed_for = (p.track.get("title"), p.track.get("artist"))
         p.hide()
 
-    def shape(self, runs):
+    def shape(self, runs, dpr=None):
+        if dpr:
+            self._p.layout(dpr)
         threading.Thread(target=self._p.shape, args=(runs,), daemon=True).start()
+
+    def size(self):
+        return SIZE
 
     def drag_start(self):
         self._p._remember_pos()

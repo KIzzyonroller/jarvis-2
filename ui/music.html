@@ -245,8 +245,11 @@ void main() {
   c.rgb += uFx.y * .18 * vec3(.55, .3, 1.0);           // she glows while she talks
   gl_FragColor = vec4(c.rgb * c.a, c.a);
 }`;
+// The whole player is drawn bigger than its 400 x 360 layout (music.py SIZE); the window is sized to match.
+const ZOOM = 1.25;
+document.documentElement.style.zoom = ZOOM;
 const her = (() => {
-  const cv = $("#juno"), Wc = 400, Hc = 360, dpr = Math.min(2, devicePixelRatio || 1);
+  const cv = $("#juno"), Wc = 400, Hc = 360, dpr = Math.min(3, (devicePixelRatio || 1) * ZOOM);
   cv.width = Wc * dpr; cv.height = Hc * dpr; cv.style.width = Wc + "px"; cv.style.height = Hc + "px";
   const gl = cv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: true });
   if (!gl) return null;
@@ -303,10 +306,10 @@ function pose(t, o) {
 }
 
 // ---------------------------------------------------------------- loop (about 30 fps, stops while parked)
-let raf = 0, prev = 0, side = 1, lastHalf = 0;
+let raf = 0, prev = 0, side = 1, lastHalf = 0, FPS = 30;
 function frame(ms) {
   raf = requestAnimationFrame(frame);
-  if (ms - prev < 32) return;
+  if (ms - prev < 1000 / FPS - 2) return;
   const dt = Math.min(.1, (ms - (prev || ms)) / 1000); prev = ms;
   const t = ms / 1000;
   env += (level - env) * 0.3; kick *= 0.86; voice *= 0.9;
@@ -340,7 +343,7 @@ async function outline() {
   const W = 400, H = 360, c = document.createElement("canvas"); c.width = W; c.height = H;
   const g = c.getContext("2d");
   g.fillStyle = "#000";
-  const p = $("#panel").getBoundingClientRect(), k = 16;
+  const p = { left: 6, top: 158, right: 394, bottom: 354 }, k = 16;     // the panel (fixed layout, so zoom can't skew it)
   g.beginPath(); g.moveTo(p.left + k, p.top - 2); g.lineTo(p.right, p.top - 2); g.lineTo(p.right, p.bottom - k);
   g.lineTo(p.right - k, p.bottom); g.lineTo(p.left, p.bottom); g.lineTo(p.left, p.top + k - 2); g.closePath(); g.fill();
   if (!her) return null;
@@ -389,6 +392,7 @@ window.J = {
       case "level": onLevel(+e.v || 0); break;
       case "voice": voice = Math.max(voice, +e.level || +e.v || 0); break;
       case "window": run(!!e.visible); break;
+      case "fps": FPS = Math.max(5, Math.min(60, +e.fps || 30)); break;
     }
   },
   batch(list) { list.forEach((e) => this.on(e)); },
@@ -437,7 +441,8 @@ async function boot() {
   booted = true;
   try { await document.fonts.ready; } catch (e) {}
   const runs = await outline().catch(() => null);
-  if (runs && runs.length) call("shape", runs);
+  if (runs && runs.length) call("shape", runs, devicePixelRatio || 1);
+  try { const f = await api().fps(); if (f) FPS = +f; } catch (e) {}
   call("ready");
 }
 window.addEventListener("pywebviewready", boot);

@@ -31,7 +31,8 @@ import config
 TITLE = "Jarvis Desktop"
 PARK = -30000
 IS_WINDOWS = sys.platform == "win32"
-PASS = {"state", "voice", "persona", "turn_start", "turn_end", "merged", "confirm", "confirm_done"}
+PASS = {"state", "voice", "persona", "turn_start", "turn_end", "merged", "confirm", "confirm_done", "fps", "music",
+        "telemetry", "instant", "briefing", "discord"}      # the last four feed the pop-up panels
 FLAG = "desk_icons_hidden"
 
 _U = None
@@ -237,6 +238,30 @@ def _fullscreen_in_front():
     return r.left <= m.left and r.top <= m.top and r.right >= m.right and r.bottom >= m.bottom
 
 
+def _short(v, n):
+    if isinstance(v, str):
+        return v if len(v) <= n else v[:n] + "..."
+    if isinstance(v, (int, float, bool)) or v is None:
+        return v
+    return None                                  # lists, dicts: the panels don't need them
+
+
+def _panel_activity(ev):
+    """What the desktop's pop-up panels need from a step she takes, kept small (no screenshots, short results)."""
+    kind, d = ev.get("kind"), ev.get("data")
+    if kind == "thinking":
+        return {"type": "activity", "kind": "thinking", "data": str(d or "")[:400]}
+    if kind not in ("tool_pending", "tool_start", "tool_done"):
+        return None
+    d = d or {}
+    args = {k: _short(v, 300) for k, v in (d.get("args") or {}).items() if _short(v, 300) is not None} if isinstance(d.get("args"), dict) else {}
+    out = {"name": d.get("name", ""), "args": args}
+    if kind == "tool_done":
+        out["ok"] = d.get("ok", True)
+        out["result"] = str(d.get("result") or "")[:800]
+    return {"type": "activity", "kind": kind, "data": out}
+
+
 class LiveDesk:
     def __init__(self, emitter_cls, core=None):
         self.em = emitter_cls()
@@ -255,16 +280,16 @@ class LiveDesk:
     def feed(self, ev):
         t = ev.get("type")
         if t == "activity":
-            if ev.get("kind") != "tool_start":
+            ev = _panel_activity(ev)
+            if ev is None:
                 return
-            ev = {"type": "activity", "kind": "tool_start", "data": {"name": (ev.get("data") or {}).get("name", "")}}
         elif t == "msg":
             if ev.get("role") != "user":
                 return
             ev = {"type": "msg", "role": "user", "text": str(ev.get("text", ""))[:200]}
         elif t not in PASS:
             return
-        if t in ("persona", "state", "merged"):
+        if t in ("persona", "state", "merged", "music", "fps"):
             self.snap[t] = ev
         if self.attached:
             self.em(ev)
@@ -348,8 +373,9 @@ class LiveDesk:
         merged = bool(_flags("merged"))
         persona = "juno"
         self.em({"type": "desk_init", "monitors": monitors(), "shot": shot, "intro": bool(config.DESK_INTRO),
-                 "persona": persona, "merged": merged, "quality": config.DESK_QUALITY, "viz": config.DESK_VIZ})
-        for k in ("state",):
+                 "persona": persona, "merged": merged, "quality": config.DESK_QUALITY, "viz": config.DESK_VIZ,
+                 "fps": config.ANIM_FPS})
+        for k in ("state", "music", "fps"):
             if k in self.snap:
                 self.em(self.snap[k])
         print(f"[desktop] living desktop on ({len(monitors())} monitor(s))")
