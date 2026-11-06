@@ -2820,6 +2820,22 @@ def birthdays_tool(action="upcoming", name=None, month=None, day=None, year=None
     return birthdays.upcoming()
 
 
+def desktop_card(title, items=None, text=None, minutes=None):
+    """A card on her desktop wallpaper (not glass mode): a list or a short note that stays up for a while."""
+    if _VOICE_CORE is None:
+        return "Not available."
+    if getattr(_VOICE_CORE, "desk", None) is None:
+        return "Her desktop isn't on ('Her world as your desktop' in Settings), so there's nowhere to put it."
+    mins = max(1, min(float(minutes or 10), 120))
+    card = {"title": str(title or "")[:60], "max": 12}
+    if items:
+        card["list"] = [{"time": "", "text": str(i)[:120]} for i in items][:12]
+    else:
+        card["text"] = str(text or "")[:400]
+    _VOICE_CORE.emit({"type": "cards", "cards": [card], "linger": int(mins * 60000)})
+    return f"On your desktop for {mins:g} minutes."
+
+
 def changelog_tool(action="read", version=None, channel=None, full=False):
     """Her own release notes: read them, copy them ready for Discord, or post them through her bot."""
     import changelog
@@ -3344,6 +3360,10 @@ TOOL_SPECS = [
                        "someone's birthday; remove (name); upcoming. She reminds them 3 days before and on the day.",
           {"action": {"type": "string", "enum": ["add", "remove", "upcoming"]}, "name": S, "month": S, "day": N,
            "year": N, "note": S}, ["action"]),
+    _spec("desktop_card", "Put a card on their desktop wallpaper (her world behind their windows), NOT glass mode: use "
+                          "this when they say 'on my desktop' / 'not the glass'. A list (items) or short text; stays up "
+                          "for minutes (default 10, max 120). Say they can see it with Win+D.",
+          {"title": S, "items": {"type": "array", "items": S}, "text": S, "minutes": N}, ["title"]),
     _spec("changelog", "Her own release notes (what's new in each version of this app). read (version, default the "
                        "newest): summarize it out loud in a few highlights. copy: puts it on the clipboard formatted "
                        "for Discord. post: whenever they say 'post the changelog / update notes / what's new' (to "
@@ -3527,8 +3547,9 @@ TOOL_SPECS = [
                    "a sticky's body. pin/unpin (id): keep a card for next time. restore: bring back the last card "
                    "they threw away. list: what's up, which card they're holding, pointing at or made bigger (look "
                    "before talking about 'this one'). remove (id or title), clear, open (just the window), close. "
-                   "desktop / window: from now on show glass mode on their desktop (over her world, hands only) or "
-                   "in its own window with the camera (Settings has the same choice). calibrate: start 'line up my "
+                   "desktop / window: from now on show glass mode itself on their desktop (over her world, hands only) "
+                   "or in its own window with the camera (Settings has the same choice); to just put a list or note "
+                   "on their desktop instead of the glass, use desktop_card, not this. calibrate: start 'line up my "
                    "hand' when the dots sit off their hand. "
                    "Keep plain cards short (under about 60 words, or up to 8 items); say only a few words out loud, "
                    "like 'Up on the glass.' If the window wasn't open, showing a card opens it. Their hands can also: "
@@ -3569,7 +3590,7 @@ FUNCS = {
     "look_at_camera": look_at_camera, "display": display, "media_control": media_control, "set_volume": set_volume,
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
-    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "pc_doctor": pc_doctor, "steam": steam_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
+    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
     "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
 

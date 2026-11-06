@@ -527,10 +527,15 @@ class GlassHub:
         threading.Timer(0.8, self.open_window).start()
 
     def desk_fallback(self, why=""):
-        """The desktop copy couldn't get the camera: use the normal window instead."""
-        self.log(f"[glass] no camera on the desktop ({why or 'refused'}); opening its own window")
-        self._off_desktop()
-        return self._browser()
+        """The desktop copy couldn't get the camera: the cards stay on the desktop (to look at), and she says how to
+        get hands back, instead of a window jumping up you didn't ask for."""
+        self.log(f"[glass] no camera on the desktop ({why or 'refused'}); cards stay on the desktop, look-only")
+        try:
+            self.core.emit({"type": "toast", "text": "The camera didn't start on the desktop, so the cards are look-only "
+                                                    "there. Say \"glass mode in its own window\" to use your hands."})
+        except Exception:
+            pass
+        return True
 
     def _browser(self):
         """An app-style window (no tabs or address bar) in Edge or Chrome; the default browser if neither."""

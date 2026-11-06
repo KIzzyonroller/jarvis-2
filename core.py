@@ -2237,6 +2237,8 @@ class Core:
             self.on_mini(config.MINI_HUD)
         if "JUNO_FPS" in keys:
             self.emit({"type": "fps", "fps": config.ANIM_FPS})
+        if "JUNO_DESK_VIZ" in keys:                        # where the desktop visualizers go, no restart
+            self.emit({"type": "desk_viz", "viz": config.DESK_VIZ})
         if "JUNO_PHONE_NOTIFS" in keys and config.PHONE_NOTIFS and getattr(self, "phonelink", None) is None:
             self._start_phonelink()
         if config.WIDGET_KEYS & set(keys):

@@ -1227,7 +1227,10 @@ async function startCamera() {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60, min: 24 } }, audio: false });
     const v = $("#cam"); v.srcObject = stream; await v.play(); camOK = true;
   } catch (e) {
-    if (DESK) { fetch("/action", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": TOKEN }, body: JSON.stringify({ do: "desk_fallback", why: e && e.name }) }).catch(() => {}); return; }
+    if (DESK) {                                    // cards still show on the desktop, just no hands
+      fetch("/action", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": TOKEN }, body: JSON.stringify({ do: "desk_fallback", why: e && e.name }) }).catch(() => {});
+      document.body.classList.add("nocam"); status("Camera blocked here: these cards are look-only."); return;
+    }
     document.body.classList.add("nocam", "mouse");
     status([b("Mouse mode."), e && e.name === "NotAllowedError" ? " Allow the camera (the icon in the address bar, or Settings) to use your hands." : " No camera found."]);
     return;

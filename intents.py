@@ -91,7 +91,7 @@ def _open(m):
     target = m.group(1).strip()
     if COMPOUND.search(target) or len(target.split()) > 4 or target in ("it", "that", "this", "something", "the app"):
         return None
-    if re.search(r"\b(play|playing|song|music by|video|search|for me|i|that|which|where|from|with|about|last|latest|recent|new)\b", target):
+    if re.search(r"\b(play|playing|song|music by|video|search|for me|i|that|which|where|from|with|about|last|latest|recent|new|glass|mode|tutorial|card|list)\b", target):
         return None
     if _DRY.on:
         return HIT
@@ -328,6 +328,15 @@ def _lights(action, target_group=None, value_group=None, color_group=None):
     return go
 
 
+def _glass_open(m):
+    core = getattr(tools, "_VOICE_CORE", None)
+    if core is None:
+        return None
+    if _DRY.on:
+        return HIT
+    return core.glass_open(), "Glass mode"
+
+
 def _goodnight(m):
     core = getattr(tools, "_VOICE_CORE", None)
     if core is None:
@@ -359,6 +368,7 @@ RULES = [
     (r"^(?:next|skip)(?: (?:this |that |the )?(?:song|track|one|video))?$|^skip it$|^next song please$", _media("next", "Next")),
     (r"^(?:previous|last|go back(?: a)?|back)(?: (?:song|track|one))$|^previous$|^play the last song$|^go back a song$",
      _media("previous", "Previous")),
+    (r"^(?:open|launch|start|run|pull up|bring up|show)(?: up)? (?:the |my )?glass(?: mode)?(?: tutorial| help)?$", _glass_open),
     (r"^(?:open|launch|start|run|fire up|load up|boot up|pull up|bring up)(?: up)? (?:the |my )?(.+?)(?: app| application)?$", _open),
     (r"^(?:close|quit|exit|kill) (?:the |my )?(.+?)(?: app| application)?$", _close),
     (r"^(?:what(?:'s| is) the time|what time is it|time|what time is it right now|got the time)$", _time),

@@ -218,7 +218,7 @@ function cardPanels(e) {
     P.el.querySelector(".hh").childNodes[1].textContent = c.title || "";
     let html = "";
     if (c.weather) html = wxHtml(c.weather);
-    else if (c.list) html = c.list.length ? `<ul class="hl">${c.list.slice(0, 6).map((r, i) => `<li style="animation-delay:${i * .08}s"><b>${esc(r.time || "")}</b>${esc(r.text)}</li>`).join("")}</ul>`
+    else if (c.list) html = c.list.length ? `<ul class="hl">${c.list.slice(0, c.max || 6).map((r, i) => `<li style="animation-delay:${i * .08}s"><b>${esc(r.time || "")}</b>${esc(r.text)}</li>`).join("")}</ul>`
                                           : `<div class="sub" style="white-space:normal">${esc(c.empty || "Nothing.")}</div>`;
     else html = `${c.big ? `<div class="big">${esc(c.big)}</div>` : ""}${c.text ? `<div class="sub" style="white-space:normal">${esc(c.text)}</div>` : ""}`;
     P.el.querySelector(".bd").innerHTML = html;

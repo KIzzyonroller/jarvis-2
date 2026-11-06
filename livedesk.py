@@ -32,7 +32,7 @@ TITLE = "Jarvis Desktop"
 PARK = -30000
 IS_WINDOWS = sys.platform == "win32"
 PASS = {"state", "voice", "persona", "turn_start", "turn_end", "merged", "confirm", "confirm_done", "fps", "music",
-        "telemetry", "instant", "briefing", "discord", "cards", "phone_note", "game",
+        "telemetry", "instant", "briefing", "discord", "cards", "phone_note", "game", "desk_viz",
         "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes"}           # the w_ ones feed the desktop widgets      # the last four feed the pop-up panels
 FLAG = "desk_icons_hidden"
 
@@ -428,11 +428,13 @@ class LiveDesk:
                 from Microsoft.Web.WebView2.Core import CoreWebView2PermissionKind as K, CoreWebView2PermissionState as St
                 def on_perm(sender, args):
                     try:
-                        ok = re.match(r"^http://127\.0\.0\.1:%d(/|$)" % _glass_port(), str(args.Uri))
-                        if args.PermissionKind == K.Camera and ok:
-                            args.State = St.Allow
-                        else:
-                            args.State = St.Deny
+                        uri = str(args.Uri or "")
+                        ours = re.match(r"^https?://(127\.0\.0\.1|localhost)(:\d+)?(/|$)", uri, re.I)
+                        # an iframe's request can be reported with the wallpaper page's own address (file:///...)
+                        host_page = uri.lower().startswith("file:") and bool(self.glass_url)
+                        allow = args.PermissionKind == K.Camera and (ours or host_page)
+                        args.State = St.Allow if allow else St.Deny
+                        print(f"[desktop] {args.PermissionKind} requested by {uri[:80]}: {'allowed' if allow else 'denied'}")
                     except Exception as e:
                         print(f"[desktop] camera permission: {e}")
                 wv.CoreWebView2.PermissionRequested += on_perm

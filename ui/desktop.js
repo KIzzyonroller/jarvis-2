@@ -277,7 +277,7 @@
     if (!glassFrame) {
       glassFrame = document.createElement("iframe");
       glassFrame.id = "glassfr"; glassFrame.title = "Glass mode";
-      glassFrame.setAttribute("allow", "camera; autoplay");
+      glassFrame.setAttribute("allow", "camera *; autoplay *");
       glassFrame.setAttribute("allowtransparency", "true");
       glassFrame.style.cssText = "position:fixed;border:0;z-index:50;background:transparent;color-scheme:normal";
       document.body.appendChild(glassFrame);
@@ -302,6 +302,7 @@
       if (S.music) ME.walkTo = null;
     },
     fps(e) { S.fps = Math.max(5, Math.min(60, +e.fps || 30)); },
+    desk_viz(e) { if (e.viz) { S.viz = e.viz; build(); } },
     desk_pause(e) { S.paused = !!e.on; if (!S.paused) kick(); },
     persona(e) {                                 // switching AI swaps the whole desktop to theirs
       const k = THEMES[e.key] ? e.key : "juno";
