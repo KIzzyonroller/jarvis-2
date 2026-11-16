@@ -320,13 +320,18 @@ def run_gui(voice, start_hidden=False, show_hook=None):
 
     def on_closing():
         emitter.close()     # stop talking to the window before it's torn down
-        if desk:
-            desk.close()    # icons back, normal wallpaper back
-        if mini:
-            mini.close()    # otherwise the hidden widget keeps the app alive
-        if music:
-            music.close()
-        core.shutdown()
+        _exit_soon(6)       # whatever happens below, this process is gone in a few seconds (no Task Manager)
+        for part in (desk, mini, music):
+            if part:
+                try:
+                    part.close()    # desk: icons and the normal wallpaper back; mini/music: hidden windows that keep the app alive
+                except Exception as e:
+                    print(f"[close] {e}")
+        try:
+            core.shutdown()
+        except Exception as e:
+            print(f"[close] {e}")
+        _close_other_windows(window)
 
     window.events.closing += on_closing
 
@@ -370,6 +375,7 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         if music:
             music.hide()
         threading.Timer(2.0, window.destroy).start()
+        _exit_soon(8)
 
     core.on_quit = quit_app
 
@@ -429,6 +435,41 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     if music:
         music.close()
     core.shutdown()
+
+
+def _exit_soon(secs):
+    """Closing used to leave him running in the background: a hidden helper window (the queue-times reader, glass,
+    the music player) or a thread that never finishes (the Discord bot, the price stream) kept the process alive
+    after his window was gone, and only Task Manager could end it. Now, once you close him, the process ends after
+    a short grace period whatever is still hanging on. (A restart for an update keeps its exit code.)"""
+    def bye():
+        time.sleep(secs)
+        import updater
+        code = updater.RESTART_CODE if getattr(updater, "RESTARTING", False) else 0
+        print(f"[close] done; ending the process ({code})")
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass
+        os._exit(code)
+    if not getattr(_exit_soon, "armed", False):
+        _exit_soon.armed = True
+        threading.Thread(target=bye, daemon=True, name="exit-watchdog").start()
+
+
+def _close_other_windows(main):
+    """Every other pywebview window (hidden ones too): webview.start() only returns when ALL of them are gone."""
+    try:
+        import webview
+        for w in list(getattr(webview, "windows", []) or []):
+            if w is main:
+                continue
+            try:
+                w.destroy()
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[close] {e}")
 
 
 def _start_phone(core, holder, emit):
@@ -578,9 +619,10 @@ def main():
         try:
             run_gui(not args.no_voice, start_hidden=args.startup, show_hook=show_hook)
             import updater
-            if getattr(updater, "RESTARTING", False):
-                sys.stdout.flush()
-                os._exit(updater.RESTART_CODE)        # don't wait on leftover threads; run_jarvis.bat reads the code
+            sys.stdout.flush()
+            # don't wait on leftover threads (Discord bot, mic, price stream): they kept the process alive after
+            # the window closed. run_jarvis.bat and the updater read the exit code.
+            os._exit(updater.RESTART_CODE if getattr(updater, "RESTARTING", False) else 0)
         except ImportError:
             print("pywebview isn't installed (run setup.bat). Falling back to console mode.")
             run_console(not args.no_voice)
