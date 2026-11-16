@@ -2311,6 +2311,68 @@ class Core:
         config.reload_live()
         self.apply_live(list(changes))
 
+    # ---------------------------------------------------------------- Settings > Appearance > Arrange the desktop
+    W_KEYS = {"stats": "JUNO_W_STATS", "music": "JUNO_W_MUSIC", "weather": "JUNO_W_WEATHER", "calendar": "JUNO_W_CALENDAR",
+              "notes": "JUNO_W_NOTES", "discord": "JUNO_W_DISCORD", "stocks": "JUNO_W_STOCKS"}
+
+    def emit_arrange(self):
+        import deskwidgets
+        import pulls
+        mons, virt = [], [1920, 1080]
+        try:
+            import livedesk
+            mons = livedesk.monitors()
+            virt = list(livedesk.virtual_rect()[2:])
+        except Exception:
+            pass
+        self.emit({"type": "desk_arrange", "monitors": mons, "virtual": virt, "desk_on": getattr(self, "desk", None) is not None,
+                   "widgets_on": bool(config.DESK_WIDGETS), "where": config.DESK_WIDGETS_WHERE,
+                   "kinds": [{"k": k, "name": deskwidgets.NAMES[k], "on": bool(config.DESK_WIDGET_ON.get(k, True))}
+                             for k in deskwidgets.KINDS],
+                   "pos": deskwidgets.positions(), "panels": pulls.layout()})
+
+    def _widgets_changed(self):
+        import deskwidgets
+        if deskwidgets.WIDGETS is not None:
+            deskwidgets.WIDGETS.refresh()
+        self.emit_arrange()
+
+    def widget_move(self, kind, mon, x, y):
+        import deskwidgets
+        if kind in deskwidgets.KINDS:
+            deskwidgets.set_position(kind, mon, x, y)
+        self._widgets_changed()
+
+    def widget_column(self, kind):
+        import deskwidgets
+        deskwidgets.set_position(kind)
+        self._widgets_changed()
+
+    def widget_toggle(self, kind, on):
+        if kind == "all":
+            self.set_widgets({"JUNO_DESK_WIDGETS": "true" if on else "false"})
+        elif kind in self.W_KEYS:
+            ch = {self.W_KEYS[kind]: "true" if on else "false"}
+            if on:
+                ch["JUNO_DESK_WIDGETS"] = "true"
+            self.set_widgets(ch)
+        self.emit_arrange()
+
+    def widget_reset(self):
+        import deskwidgets
+        deskwidgets.reset_positions()
+        self._widgets_changed()
+
+    def widget_column_side(self, where):
+        if where in ("right", "left", "second"):
+            self.set_widgets({"JUNO_DESK_WIDGETS_WHERE": where})
+        self.emit_arrange()
+
+    def panel_where(self, kind, where):
+        import pulls
+        pulls.move(kind, where)
+        self.emit_arrange()
+
     def set_glass_where(self, where):
         """Voice or Settings: glass mode in its own window, or on the desktop."""
         where = "desktop" if str(where).lower().startswith("desk") else "window"

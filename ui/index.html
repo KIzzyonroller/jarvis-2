@@ -367,6 +367,24 @@ body.booting #subs,body.booting #chips{display:none}
 .sheet>footer .go{background:var(--c);border-color:var(--c);color:#02121a;font-weight:600}
 .sheet>footer .go:disabled{opacity:.4;cursor:default}
 .set-sec{padding:14px 0 6px;border-bottom:1px solid rgba(var(--crgb),.08)}
+.arr-wrap{overflow:auto;padding:6px 0 10px}
+.arr-stage{position:relative;margin:0 auto;background:rgba(var(--vrgb),.6);border-radius:6px}
+.arr-mon{position:absolute;box-sizing:border-box;border:1px solid rgba(var(--crgb),.35);background:rgba(var(--crgb),.04);border-radius:4px}
+.arr-mon span{position:absolute;left:8px;bottom:6px;font-size:11px;color:rgba(var(--crgb),.6);letter-spacing:.08em;text-transform:uppercase}
+.arr-w{position:absolute;box-sizing:border-box;border:1px solid rgba(var(--crgb),.55);background:rgba(var(--crgb),.14);border-radius:3px;
+  cursor:grab;touch-action:none;display:flex;align-items:flex-start;justify-content:space-between;padding:3px 4px;overflow:hidden}
+.arr-w.placed{border-color:var(--c);background:rgba(var(--crgb),.22)}
+.arr-w.drag{cursor:grabbing;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:2}
+.arr-w:focus-visible{outline:2px solid var(--c);outline-offset:2px}
+.arr-w b{font-size:10px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.arr-x{flex:none;min-width:22px;min-height:22px;margin:-3px -4px 0 0;border:0;background:transparent;color:var(--ink);font-size:15px;line-height:1;cursor:pointer}
+.arr-x:hover,.arr-x:focus-visible{color:var(--c)}
+.arr-back{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;font-size:13px;color:rgba(var(--crgb),.75)}
+.arr-back .chip{min-height:32px;padding:4px 12px;border:1px solid rgba(var(--crgb),.4);border-radius:16px;background:transparent;color:var(--ink);cursor:pointer}
+.arr-back .chip:hover,.arr-back .chip:focus-visible{border-color:var(--c);color:var(--c)}
+.arr-tools .row{display:flex;gap:18px;flex-wrap:wrap;padding:6px 0}
+.arr-panels{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+
 .set-sec:last-child{border-bottom:0}
 .set-sec h3{font:500 15px var(--text);color:var(--ink);margin-bottom:8px}
 .set-sec h3 small{font-size:12.5px;color:var(--dim);font-weight:400;margin-left:8px}
@@ -2036,6 +2054,7 @@ window.J = {
       }
       case "setup": showKeys(e); break;
       case "settings": S.fields = e.fields || []; S.voices = e.voices || null; if (!$("#settings").hidden) renderSettings(); break;
+      case "desk_arrange": S.arrange = e; if (!$("#settings").hidden && S.page === "arrange" && !S.dragging) renderSettings(); break;
       case "voices": S.voices = { personas: e.personas, voices: e.voices, engine: e.engine, speed: e.speed, pitch: e.pitch };
         if (!$("#settings").hidden && $("#set-voice")) $("#set-voice").replaceWith(voiceSection());
         if (e.msg && !$("#settings").hidden) $("#set-msg").textContent = e.msg; break;
@@ -2249,6 +2268,7 @@ const PAGES = [
   { id: "voice", label: "Voice & effects", sub: "Voice, speed, effects", intro: "Voice, speed and pitch change instantly. The effect and engine apply after a restart." },
   { id: "languages", label: "Languages", sub: "What he hears and speaks", intro: "He can understand and answer in another language, in a matching voice." },
   { id: "mic", label: "Microphone", sub: "Which mic, how he listens", intro: "Which microphone he uses and how he decides you're talking to him." },
+  { id: "arrange", label: "Arrange the desktop", sub: "Move, hide or bring back widgets", intro: "Drag the widgets to where you want them on your monitors. × hides one, the buttons underneath bring it back, double-click puts it back in the column. Changes show on your desktop straight away." },
   { id: "appearance", label: "Appearance & animations", sub: "His look, desktop, music", intro: "His window's look changes instantly. Desktop and music settings apply after a restart." },
   { id: "dimming", label: "Window dimming", sub: "Fade when idle, glow when talking", intro: "His window can fade down when you're not using it and come back brighter while he talks. Changes apply instantly." },
   { id: "access", label: "Application access", sub: "What he's allowed to use", intro: "What he may do without asking, which folders and devices he can use, and apps he must never touch." },
@@ -2349,7 +2369,7 @@ function renderSettings() {
   const dirtyPages = new Set(S.fields.filter((f) => f.key in S.dirty || S.clear.has(f.key)).map((f) => f.page));
   PAGES.forEach((p) => {
     const b = mk("button", { type: "button", class: dirtyPages.has(p.id) ? "dirty" : "", "aria-current": p.id === S.page ? "page" : null }, p.label, mk("small", { text: p.sub }));
-    b.onclick = () => { S.page = p.id; store.set("set-page", p.id); renderSettings(); $("#set-body").scrollTop = 0; };
+    b.onclick = () => { S.page = p.id; store.set("set-page", p.id); if (p.id === "arrange") call("arrange_view"); renderSettings(); $("#set-body").scrollTop = 0; };
     nav.appendChild(b);
   });
   const page = PAGES.find((p) => p.id === S.page), body = $("#set-body"); body.textContent = "";
@@ -2379,7 +2399,81 @@ function instChoice(label, help, options, get, set) {
   return mk("div", { class: "fld" }, mk("label", { text: label }), mk("div", { class: "ctl" }, sel), mk("p", { class: "help", text: help }));
 }
 const sec = (title, note, ...kids) => mk("section", { class: "set-sec" }, mk("h3", {}, title, note ? mk("small", { text: note }) : null), ...kids);
+// ------------------------------------------------------------ Settings > Arrange the desktop
+const W_HEIGHT = { stats: 200, stocks: 150, music: 110, weather: 160, calendar: 170, notes: 160, discord: 170 };
+const PANEL_KINDS = [["stock", "Stocks"], ["weather", "Weather"], ["calendar", "Your day"], ["sources", "Sources"], ["pc", "Your PC"],
+  ["file", "Files he makes"], ["network", "Network"], ["briefing", "Game briefing"], ["tracker", "Trackers"]];
+const PANEL_DEFAULT = { pc: "right", network: "right", briefing: "right", weather: "right" };
+function arrangeSection() {
+  const A = S.arrange;
+  if (!A) { call("arrange_view"); return [mk("p", { class: "note", text: "Loading your monitors..." })]; }
+  if (!A.desk_on) return [mk("p", { class: "note", text: "Turn on “His world as your desktop” (Appearance & animations) to place widgets on it." })];
+  const mons = (A.monitors || []).slice().sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0));
+  if (!mons.length) return [mk("p", { class: "note", text: "Couldn't read your monitors." })];
+  const main = mons[0], second = mons[1] || null;
+  const [VW, VH] = A.virtual || [1920, 1080];
+  const stage = mk("div", { class: "arr-stage", role: "group", "aria-label": "Your monitors" });
+  const SW = 720, SH = Math.round(SW * VH / VW);
+  stage.style.width = SW + "px"; stage.style.height = SH + "px";
+  const px = (m) => ({ x: m.x * SW, y: m.y * SH, w: m.w * SW, h: m.h * SH, wx: m.wx * SW, wy: m.wy * SH, ww: m.ww * SW, wh: m.wh * SH });
+  const P = px(main), O = second ? px(second) : null;
+  for (const [m, name] of [[P, "Main monitor"], [O, "Second monitor"]]) {
+    if (!m) continue;
+    const r = mk("div", { class: "arr-mon" }, mk("span", { text: name }));
+    Object.assign(r.style, { left: m.x + "px", top: m.y + "px", width: m.w + "px", height: m.h + "px" }); stage.appendChild(r);
+  }
+  const realH = main.wh * VH, scale = P.wh / realH;                    // stage px per real px on the main monitor
+  const bw = Math.max(76, Math.min(380, Math.max(270, realH * .27)) * scale);
+  const col = A.where === "second" && O ? O : P, right = A.where !== "left";
+  let cy = col.wy + 22 * scale;
+  const on = (A.kinds || []).filter((k) => k.on && A.widgets_on);
+  for (const k of on) {
+    const p = (A.pos || {})[k.k], bh = Math.max(26, (W_HEIGHT[k.k] || 150) * scale);
+    let x, y, mon = main;
+    if (p) { const m = p.mon === "second" && O ? O : P; x = m.wx + p.x * m.ww; y = m.wy + p.y * m.wh; }
+    else { x = right ? col.wx + col.ww - bw - 22 * scale : col.wx + 22 * scale; y = cy; cy += bh + 14 * scale; }
+    const box = mk("div", { class: "arr-w" + (p ? " placed" : ""), tabindex: "0", role: "button", title: k.name,
+      "aria-label": `${k.name}: drag to move, arrow keys nudge, Delete hides, Enter puts it back in the column` },
+      mk("b", { text: k.name }),
+      mk("button", { type: "button", class: "arr-x", text: "×", "aria-label": `Hide ${k.name}`, onclick: (ev) => { ev.stopPropagation(); call("widget_toggle", k.k, false); } }));
+    Object.assign(box.style, { left: x + "px", top: y + "px", width: bw + "px", height: bh + "px" });
+    const drop = (bx, by) => {                                            // where did it land? fractions of that monitor
+      const cx = bx + bw / 2, cyy = by + bh / 2;
+      const m = O && cx >= O.x && cx <= O.x + O.w && cyy >= O.y && cyy <= O.y + O.h ? O : P;
+      call("widget_move", k.k, m === O ? "second" : "main", Math.max(0, (bx - m.wx) / m.ww), Math.max(0, (by - m.wy) / m.wh));
+    };
+    box.addEventListener("pointerdown", (ev) => {
+      if (ev.target.closest(".arr-x")) return;
+      ev.preventDefault(); box.setPointerCapture(ev.pointerId); S.dragging = true; box.classList.add("drag");
+      const sx = ev.clientX, sy = ev.clientY, ox = parseFloat(box.style.left), oy = parseFloat(box.style.top);
+      const move = (e) => { box.style.left = Math.max(0, Math.min(SW - bw, ox + e.clientX - sx)) + "px"; box.style.top = Math.max(0, Math.min(SH - bh, oy + e.clientY - sy)) + "px"; };
+      const up = () => { box.removeEventListener("pointermove", move); box.removeEventListener("pointerup", up); box.classList.remove("drag"); S.dragging = false;
+        if (Math.abs(parseFloat(box.style.left) - ox) + Math.abs(parseFloat(box.style.top) - oy) > 3) drop(parseFloat(box.style.left), parseFloat(box.style.top)); };
+      box.addEventListener("pointermove", move); box.addEventListener("pointerup", up);
+    });
+    box.addEventListener("dblclick", () => call("widget_column", k.k));
+    box.addEventListener("keydown", (e) => {
+      const step = e.shiftKey ? 20 : 5, d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+      if (d) { e.preventDefault(); drop(Math.max(0, Math.min(SW - bw, parseFloat(box.style.left) + d[0])), Math.max(0, Math.min(SH - bh, parseFloat(box.style.top) + d[1]))); }
+      else if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); call("widget_toggle", k.k, false); }
+      else if (e.key === "Enter") { e.preventDefault(); call("widget_column", k.k); }
+    });
+    stage.appendChild(box);
+  }
+  const hidden = (A.kinds || []).filter((k) => !k.on || !A.widgets_on);
+  const back = mk("div", { class: "arr-back" }, hidden.length ? [mk("span", { text: "Bring back:" }), ...hidden.map((k) =>
+    mk("button", { type: "button", class: "chip", text: "+ " + k.name, onclick: () => call("widget_toggle", k.k, true) }))] : [mk("span", { text: "Every widget is showing." })]);
+  const tools = mk("div", { class: "arr-tools" },
+    instChoice("The column", "Widgets you haven't placed yourself stack here.", [["right", "Right side"], ["left", "Left side"], ["second", "Other monitor"]], () => A.where, (v) => call("widget_side", v)),
+    mk("div", { class: "row" }, mk("button", { type: "button", class: "link", text: "Put every widget back in the column", onclick: () => call("widget_reset") }),
+      mk("button", { type: "button", class: "link", text: A.widgets_on ? "Hide all widgets" : "Show widgets", onclick: () => call("widget_toggle", "all", !A.widgets_on) })));
+  const panels = sec("Where he pulls things up", "instant", mk("div", { class: "arr-panels" }, PANEL_KINDS.map(([k, name]) =>
+    instChoice(name, "", [["left", "Left of him"], ["right", "Right of him"], ["center", "The middle"], ["second", "Other monitor"]],
+      () => (A.panels || {})[k] || PANEL_DEFAULT[k] || "left", (v) => call("panel_where", k, v)))));
+  return [sec("Widgets", "instant", mk("div", { class: "arr-wrap" }, stage), back, tools), panels];
+}
 const EXTRAS = {
+  arrange: () => arrangeSection(),
   general: () => S.autostart && S.autostart.available ? [sec("Windows", "instant", mk("div", { class: "set-list" },
     instSwitch("Start with Windows", "Starts quietly in the corner when you log in.", () => S.autostart.on,
       (on) => { S.autostart.on = on; $("#auto-sw").setAttribute("aria-checked", String(on)); call("set_autostart", on); })))] : [],

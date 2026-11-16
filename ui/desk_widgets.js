@@ -5,7 +5,10 @@ window.DeskWidgets = (() => {
   const root = document.createElement("div");
   root.id = "widgets"; root.setAttribute("aria-hidden", "true");
   document.body.appendChild(root);
-  const W = { on: [], where: "right", paused: false, el: {}, data: {}, hist: [], tel: null, gpu: null, discord: [] };
+  const free = document.createElement("div");                       // widgets you've placed somewhere yourself
+  free.id = "widgets-free"; free.setAttribute("aria-hidden", "true");
+  document.body.appendChild(free);
+  const W = { on: [], where: "right", pos: {}, paused: false, el: {}, data: {}, hist: [], tel: null, gpu: null, discord: [] };
   const ORDER = ["stats", "stocks", "music", "weather", "calendar", "notes", "discord"];
   const TITLE = { stats: "System", stocks: "Watchlist", music: "Now playing", weather: "Weather", calendar: "Today", notes: "Notes", discord: "Messages" };
   const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -180,8 +183,23 @@ window.DeskWidgets = (() => {
     root.style.left = right ? "auto" : mon.wx + 22 + "px";
     root.style.right = right ? innerWidth - (mon.wx + mon.ww) + 22 + "px" : "auto";
     root.style.top = mon.wy + 22 + "px"; root.style.height = mon.wh - 44 + "px";
-    ORDER.forEach((k) => { if (W.el[k]) root.appendChild(W.el[k]); });
+    free.style.setProperty("--ww", w + "px");
+    ORDER.forEach((k) => {
+      const c = W.el[k]; if (!c) return;
+      const p = W.pos[k];
+      if (p) {                                     // its own spot: fractions of that monitor's work area
+        const m = p.mon === "second" && M.o ? M.o : M.p;
+        if (c.parentNode !== free) free.appendChild(c);
+        const ch = c.offsetHeight || 160;
+        c.style.left = clamp(m.wx + p.x * m.ww, m.wx + 8, m.wx + m.ww - w - 8) + "px";
+        c.style.top = clamp(m.wy + p.y * m.wh, m.wy + 8, m.wy + m.wh - ch - 8) + "px";
+      } else {
+        c.style.left = c.style.top = "";
+        root.appendChild(c);
+      }
+    });
     root.classList.toggle("off", !W.on.length);
+    free.classList.toggle("off", !W.on.length);
   }
 
   // ------------------------------------------------------------------ stocks: the watchlist (stocks.py, every 5 minutes)
@@ -207,10 +225,10 @@ window.DeskWidgets = (() => {
   return {
     layout,
     has: (k) => W.on.includes(k),
-    side: () => (W.on.length ? W.where : "none"),
+    side: () => (W.on.some((k) => !W.pos[k]) ? W.where : "none"),
     on(e) {
       switch (e.type) {
-        case "widgets": W.on = e.on || []; W.where = e.where || "right"; redrawAll(); break;
+        case "widgets": W.on = e.on || []; W.where = e.where || "right"; W.pos = e.pos || {}; redrawAll(); break;
         case "desk_pause": W.paused = !!e.on; break;
         case "telemetry": W.tel = e; W.hist.push({ cpu: e.cpu, gpu: W.gpu ? W.gpu.gpu : 0 }); if (W.hist.length > 60) W.hist.shift(); if (!W.paused) drawStats(); break;
         case "w_gpu": W.gpu = e; if (!W.paused) drawStats(); break;

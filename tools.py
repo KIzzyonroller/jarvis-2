@@ -3013,6 +3013,51 @@ def stocks_tool(action="quote", symbols=None, range=None, add=None, remove=None,
     return out
 
 
+SEARCH_URLS = {
+    "web": "https://www.google.com/search?q={}", "images": "https://www.google.com/search?tbm=isch&q={}",
+    "news": "https://www.google.com/search?tbm=nws&q={}", "videos": "https://www.google.com/search?tbm=vid&q={}",
+    "shopping": "https://www.google.com/search?tbm=shop&q={}", "maps": "https://www.google.com/maps/search/{}",
+    "youtube": "https://www.youtube.com/results?search_query={}", "reddit": "https://www.google.com/search?q={}+site%3Areddit.com",
+    "wikipedia": "https://en.wikipedia.org/w/index.php?search={}", "amazon": "https://www.amazon.com/s?k={}",
+}
+
+
+def browse_tool(searches=None, urls=None, kind="web", new_window=False):
+    """Google things (or open pages) in their own browser, one tab each: 'look up X', 'open a bunch of tabs on Y'."""
+    from urllib.parse import quote_plus
+    searches = [s for s in (searches if isinstance(searches, list) else [searches] if searches else []) if str(s).strip()]
+    urls = [u for u in (urls if isinstance(urls, list) else [urls] if urls else []) if str(u).strip()]
+    links = []
+    tpl = SEARCH_URLS.get((kind or "web").lower(), SEARCH_URLS["web"])
+    for q in searches[:12]:
+        links.append(tpl.format(quote_plus(str(q).strip())))
+    for u in urls[:12]:
+        u = str(u).strip()
+        if not re.match(r"^https?://", u, re.I):
+            if re.match(r"^[\w.-]+\.[a-z]{2,}(/.*)?$", u, re.I):
+                u = "https://" + u
+            else:
+                links.append(SEARCH_URLS["web"].format(quote_plus(u)))
+                continue
+        links.append(u)
+    links = links[:15]
+    if not links:
+        return "What should I look up or open?"
+    opened = 0
+    for i, u in enumerate(links):
+        try:
+            if i == 0 and new_window:
+                webbrowser.open_new(u)
+            else:
+                webbrowser.open_new_tab(u)
+            opened += 1
+            time.sleep(0.35 if i == 0 else 0.15)      # the first one wakes the browser; the rest line up as tabs
+        except Exception as e:
+            print(f"[browse] {u}: {e}")
+    return f"Opened {opened} tab{'s' if opened != 1 else ''} in their browser." + (
+        "" if opened == len(links) else f" ({len(links) - opened} didn't open.)")
+
+
 def pull_up_tool(what, target=None, focus=False):
     """Put something up on the desktop beside him (and get the facts back to talk about)."""
     import pulls
@@ -3338,7 +3383,7 @@ def game_mode_tool(action="status", name=None, person=None, text=None, label=Non
     return "action must be status, start, stop, allow, disallow, detect_on or detect_off."
 
 
-def desk_widgets_tool(action="status", widget=None, where=None):
+def desk_widgets_tool(action="status", widget=None, where=None, spot=None):
     """The live widgets on his desktop (PC stats, now playing, weather, today, notes, Discord)."""
     if _VOICE_CORE is None:
         return "Not available."
@@ -3347,6 +3392,32 @@ def desk_widgets_tool(action="status", widget=None, where=None):
     names = {"stats": "PC stats", "music": "now playing", "weather": "weather", "calendar": "today",
              "notes": "notes, lists and timers", "discord": "Discord"}
     a = (action or "status").lower()
+    import deskwidgets
+    if a == "move" and (widget or spot):
+        if widget not in keys:
+            return "Which widget? " + ", ".join(names) + "."
+        s = (spot or where or "").lower().replace("-", " ").replace("center", "middle").replace("centre", "middle")
+        mon = "second" if "second" in s or "other" in s else "main"
+        s = s.replace("on my second monitor", "").replace("second monitor", "").replace("other monitor", "").strip() or "top right"
+        if s in ("column", "back", "default"):
+            deskwidgets.set_position(widget)
+        else:
+            xy = deskwidgets.SPOTS.get(s)
+            if not xy:
+                return "Where? top/middle/bottom + left/right/middle, optionally on the second monitor, or 'column' to put it back."
+            deskwidgets.set_position(widget, mon, *xy)
+        ch = {keys[widget]: "true", "JUNO_DESK_WIDGETS": "true"}
+        _VOICE_CORE.set_widgets(ch)
+        return f"{names[widget]} moved" + ("" if s in ("column", "back", "default") else f" to the {s}" + (" of your second monitor" if mon == "second" else "")) + "."
+    if a == "reset":
+        deskwidgets.reset_positions()
+        _VOICE_CORE.set_widgets({"JUNO_DESK_WIDGETS": "true"})
+        return "Widgets are back in their column."
+    if a == "all_on":
+        ch = {k: "true" for k in keys.values()}
+        ch["JUNO_DESK_WIDGETS"] = "true"
+        _VOICE_CORE.set_widgets(ch)
+        return "All the widgets are back."
     if a == "status":
         if not config.DESK_WIDGETS:
             return "Desktop widgets are off."
@@ -3711,6 +3782,14 @@ TOOL_SPECS = [
            "side": {"type": "string", "enum": ["long", "short"]}, "take": S,
            "symbols": {"type": "array", "items": S}, "range": S, "add": {"type": "array", "items": S},
            "remove": {"type": "array", "items": S}}, ["action"]),
+    _spec("browse", "Look things up in THEIR browser, one tab each ('google X', 'pull up X on Google', 'open a bunch of "
+                    "tabs on Y', 'show me pictures of Z'). searches = search terms (each its own tab), urls = pages to "
+                    "open (domains are fine), kind = web / images / news / videos / shopping / maps / youtube / reddit / "
+                    "wikipedia / amazon for the searches. For 'a bunch of tabs on a topic', pick 4-8 good, different "
+                    "searches or well-known sites yourself. new_window = start a fresh window. Up to 15 tabs. This is for "
+                    "them to read; use your own web search when YOU need the answer.",
+          {"searches": {"type": "array", "items": S}, "urls": {"type": "array", "items": S},
+           "kind": {"type": "string", "enum": list(SEARCH_URLS)}, "new_window": {"type": "boolean"}}, []),
     _spec("pull_up", "Put something up on their desktop beside you, live, and get its facts back to talk about. stock "
                      "(target = name or ticker; live chart), weather (target = place or empty; radar + next hours), "
                      "calendar (today as a timeline), pc (this PC opened up: parts, live load and temperatures), network "
@@ -3798,11 +3877,14 @@ TOOL_SPECS = [
            "name": S, "person": S, "text": S, "label": S, "seconds": N}, ["action"]),
     _spec("desk_widgets", "The live widgets on his desktop wallpaper: PC stats (CPU, memory, GPU load/temp, VRAM, "
                            "disk, network), now playing, weather, today's calendar, notes/lists/timers, Discord, stocks watchlist. on/off "
-                           "(all, or one widget), where (right or left side of the main monitor, or second = the other "
-                           "monitor), or status.",
-          {"action": {"type": "string", "enum": ["on", "off", "move", "status"]},
+                           "(all, or one widget: off removes it, on brings it back), all_on (bring every widget back), "
+                           "where (the column: right or left side of the main monitor, or second = the other monitor), "
+                           "move (one widget to a spot: 'top left', 'middle right', 'bottom middle'..., add 'second monitor' "
+                           "for the other screen, or 'column' to put it back in the column), reset (all back in the column), "
+                           "status. They can also drag them in Settings > Appearance > Arrange the desktop.",
+          {"action": {"type": "string", "enum": ["on", "off", "all_on", "move", "reset", "status"]},
            "widget": {"type": "string", "enum": ["stats", "music", "weather", "calendar", "notes", "discord", "stocks"]},
-           "where": {"type": "string", "enum": ["right", "left", "second"]}}, ["action"]),
+           "where": {"type": "string", "enum": ["right", "left", "second"]}, "spot": S}, ["action"]),
     _spec("frame_rate", "His animation frame rate on the desktop and the music player (default 30). get, or set with "
                         "fps (10, 15, 20, 24, 30, 45 or 60; other numbers snap to the closest). 'smoother' = higher, "
                         "'lighter on my PC' / 'it's lagging' = lower.",
@@ -3969,7 +4051,7 @@ FUNCS = {
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "stocks": stocks_tool, "desktop_scene": desktop_scene_tool,
-    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
+    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
     "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
 

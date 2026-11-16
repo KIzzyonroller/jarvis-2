@@ -26,8 +26,53 @@ def enabled():
     return [k for k in KINDS if config.DESK_WIDGET_ON.get(k, True) and (k != "stocks" or stocks.watchlist())]
 
 
+NAMES = {"stats": "PC stats", "stocks": "Watchlist", "music": "Now playing", "weather": "Weather", "calendar": "Today",
+         "notes": "Notes & timers", "discord": "Messages"}
+SPOTS = {"top left": (.02, .03), "top right": (.78, .03), "bottom left": (.02, .62), "bottom right": (.78, .62),
+         "middle left": (.02, .34), "middle right": (.78, .34), "top middle": (.4, .03), "bottom middle": (.4, .66)}
+
+
+# ------------------------------------------------------------------ where each one sits (desk_layout.json, "widgets")
+# A widget with a position sits exactly there (fractions of that monitor's work area: x, y of its top-left corner);
+# the rest stack in the column (right, left or the other monitor). Settings > Appearance > Arrange the desktop drags
+# them; "move the weather to the top left" does it by voice.
+def _layout_file():
+    return config.JARVIS_DIR / "desk_layout.json"
+
+
+def _load():
+    import json
+    try:
+        return json.loads(_layout_file().read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def positions():
+    return _load().get("widgets", {})
+
+
+def set_position(kind, mon="main", x=None, y=None):
+    import json
+    lay = _load()
+    w = lay.setdefault("widgets", {})
+    if x is None:
+        w.pop(kind, None)
+    else:
+        w[kind] = {"mon": "second" if mon == "second" else "main", "x": round(min(.97, max(0, float(x))), 4),
+                   "y": round(min(.97, max(0, float(y))), 4)}
+    _layout_file().write_text(json.dumps(lay), encoding="utf-8")
+
+
+def reset_positions():
+    import json
+    lay = _load()
+    lay.pop("widgets", None)
+    _layout_file().write_text(json.dumps(lay), encoding="utf-8")
+
+
 def config_event():
-    return {"type": "widgets", "on": enabled(), "where": config.DESK_WIDGETS_WHERE}
+    return {"type": "widgets", "on": enabled(), "where": config.DESK_WIDGETS_WHERE, "pos": positions()}
 
 
 class DeskWidgets:

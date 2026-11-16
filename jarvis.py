@@ -157,6 +157,27 @@ class Bridge:
     def toggle_mute(self):
         threading.Thread(target=self._core.toggle_mute, daemon=True).start()
 
+    def arrange_view(self):
+        threading.Thread(target=self._core.emit_arrange, daemon=True).start()
+
+    def widget_move(self, kind, mon, x, y):
+        threading.Thread(target=self._core.widget_move, args=(str(kind), str(mon), float(x), float(y)), daemon=True).start()
+
+    def widget_column(self, kind):
+        threading.Thread(target=self._core.widget_column, args=(str(kind),), daemon=True).start()
+
+    def widget_toggle(self, kind, on):
+        threading.Thread(target=self._core.widget_toggle, args=(str(kind), bool(on)), daemon=True).start()
+
+    def widget_reset(self):
+        threading.Thread(target=self._core.widget_reset, daemon=True).start()
+
+    def widget_side(self, where):
+        threading.Thread(target=self._core.widget_column_side, args=(str(where),), daemon=True).start()
+
+    def panel_where(self, kind, where):
+        threading.Thread(target=self._core.panel_where, args=(str(kind), str(where)), daemon=True).start()
+
     def set_autostart(self, on):
         threading.Thread(target=self._core.set_autostart, args=(bool(on),), daemon=True).start()
 

@@ -33,6 +33,10 @@ body.glass-up #holo{opacity:0;transition:opacity .3s}
 #widgets{position:fixed;z-index:3;display:flex;flex-direction:column;flex-wrap:wrap;align-content:flex-start;gap:14px;overflow:hidden;pointer-events:none;transition:opacity .4s}
 #widgets.rt{flex-wrap:wrap-reverse}
 #widgets > .wd{width:var(--ww,300px);box-sizing:border-box}
+#widgets-free{position:fixed;inset:0;z-index:3;pointer-events:none;transition:opacity .4s}
+#widgets-free > .wd{position:absolute;width:var(--ww,300px);box-sizing:border-box}
+#widgets-free.off,body.glass-up #widgets-free{opacity:0}
+body.focusing #widgets-free{opacity:.15}
 #widgets.off,body.glass-up #widgets{opacity:0}
 .wd{position:relative;color:var(--ink);background:linear-gradient(180deg,rgba(var(--crgb),.10),rgba(var(--vrgb),.78) 40%);
   border:1px solid rgba(var(--crgb),.30);box-shadow:0 0 30px rgba(var(--crgb),.10),inset 0 0 20px rgba(var(--crgb),.05);animation:hpIn .5s cubic-bezier(.2,.8,.2,1) both}

@@ -6,6 +6,8 @@ Each release starts with a "## version" line: the same number you type when you 
 ## 1.0.30
 
 - **Picking a microphone works again.** Choosing a mic in Settings > Microphone crashed the save, so it quietly stayed on Windows' default. Fixed.
+- **He pulls things up on Google for you.** "Google the best budget gaming mouse", "pull up pictures of Lake Atitlán", "open a bunch of tabs on building a PC": he opens them in your own browser, one tab each (up to 15). Works for Google web, images, news, videos, shopping and Maps, plus YouTube, Reddit, Wikipedia and Amazon, or any sites you name.
+- **Arrange your widgets however you want.** Settings > Arrange the desktop shows your monitors with the widgets on them: drag any widget anywhere (either monitor), × hides it, the buttons underneath bring it back, double-click puts it back in the column. Arrow keys nudge the selected one. It changes on your desktop as you go. The same page sets where each kind of pulled-up panel appears. By voice: "move the weather to the top left", "put the stocks on my second monitor", "hide the messages", "bring all the widgets back", "put the widgets back in a column".
 - **Closing him actually closes him.** A hidden helper window or a background task (the Discord bot, the live price stream) could keep him running after his window was gone, so you had to end him in Task Manager. Now he puts everything away and the whole app ends within a few seconds of closing, whatever is still hanging on.
 - **He tells you when he can't hear you.** The log and his window now say which microphone he's listening on at startup, and if it sends nothing but silence for 20 seconds he says so ("MIC IS SILENT") instead of just ignoring you.
 
