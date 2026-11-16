@@ -3,6 +3,15 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.30
+
+- **Picking a microphone works again.** Choosing a mic in Settings > Microphone crashed the save, so it quietly stayed on Windows' default. Fixed.
+- **He tells you when he can't hear you.** The log and his window now say which microphone he's listening on at startup, and if it sends nothing but silence for 20 seconds he says so ("MIC IS SILENT") instead of just ignoring you.
+
+## 1.0.29
+
+(1.0.28's changes, released as 1.0.29.)
+
 ## 1.0.28
 
 - **It's just Jarvis now.** Juno and Ultron are retired: no switcher, no "both of you", one voice, one name to say. He keeps the moods, his opinions and starting conversations. "Switch to Juno" gets a polite no.

@@ -515,7 +515,15 @@ def save(changes, clear=()):
         if kind == "bool":
             value = "true" if value.lower() in ("true", "1", "on", "yes") else "false"
         elif kind == "choice":
-            allowed = [o[0] for o in known[key][5]]
+            opts = known[key][5]
+            if opts is None and key == "JUNO_MIC":         # filled in from the mics plugged in right now
+                try:
+                    import speech
+                    opts = speech.mic_devices()
+                except Exception:
+                    opts = []
+                opts = list(opts) + [("default", "")]
+            allowed = [o[0] for o in (opts or [])]
             if value not in allowed:
                 errors[key] = "Pick one of the options."
                 continue

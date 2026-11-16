@@ -336,6 +336,31 @@ class Listener:
         self._log = log
         threading.Thread(target=self._load_accurate, daemon=True, name="whisper-load").start()
         self.stream = _open_mic(sd, self._callback)
+        self._peak, self._heard_any = 0, False
+        try:
+            dev = self.stream.device if not isinstance(self.stream.device, (list, tuple)) else self.stream.device[0]
+            name = sd.query_devices(dev)["name"] if dev is not None and dev >= 0 else sd.query_devices(kind="input")["name"]
+            log(f"MICROPHONE  [{name}]")
+            self.mic_name = name
+        except Exception:
+            self.mic_name = "?"
+        threading.Thread(target=self._mic_check, daemon=True, name="mic-check").start()
+
+    def _mic_check(self):
+        """If the mic sends nothing but silence, say so (in the log and on screen) instead of just ignoring you."""
+        import time
+        warned = False
+        while True:
+            time.sleep(20)
+            peak, self._peak = self._peak, 0
+            if peak < 20 and not warned:
+                warned = True
+                msg = (f"MIC IS SILENT  [{self.mic_name}]: Windows may be muting it, another app may have it, or it's the "
+                       f"wrong mic. Pick yours in Settings > Microphone.")
+                self._log(msg)
+            elif peak >= 20 and warned:
+                warned = False
+                self._log(f"MIC IS BACK  [{self.mic_name}]")
 
     def _watch_speed(self, model, secs, audio_secs):
         """Measure how fast the local careful model really is on this PC. Too slow: swap to a lighter
@@ -535,7 +560,12 @@ class Listener:
 
     def _callback(self, indata, frames, t, status):
         adc = t.inputBufferAdcTime or (t.currentTime - self.stream.latency - frames / config.SAMPLE_RATE)
-        self.audio_q.put((indata[:, 0].copy(), adc))
+        chunk = indata[:, 0].copy()
+        try:
+            self._peak = max(self._peak, int(np.abs(chunk).max()))
+        except Exception:
+            pass
+        self.audio_q.put((chunk, adc))
 
     # ---- cut the mic stream into utterances
     def _clean(self, chunk, adc):
