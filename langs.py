@@ -73,7 +73,7 @@ NAMES = {"es": "Spanish", "fr": "French", "it": "Italian", "pt": "Brazilian Port
 
 
 def reply_rule():
-    """The line added to her instructions so replies follow the language setting."""
+    """The line added to his instructions so replies follow the language setting."""
     import config
     if not config.LANGUAGES:
         return ""

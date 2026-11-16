@@ -1,5 +1,5 @@
 """
-Changing their voices live: which voice, how fast, how deep. Per persona (Jarvis and Ultron separately), applied
+Changing their voices live: which voice, how fast, how deep. Per persona (just Jarvis now), applied
 the moment you change it (no restart), and remembered in Documents\\Jarvis\\voices.json.
 
 From the Settings panel (Voice section, with a Preview button) or by asking: "Jarvis, talk a bit faster",

@@ -337,6 +337,22 @@ def _glass_open(m):
     return core.glass_open(), "Glass mode"
 
 
+def _panels(action):
+    """'clear that' / 'back': only when he's actually got something up, so 'back' means nothing otherwise."""
+    def handler(m):
+        import pulls
+        if not pulls.recent() or (action == "back" and not pulls.LAST["focus"]):
+            return None
+        if _DRY.on:
+            return HIT
+        if action == "back":
+            pulls.focus(off=True)
+        else:
+            pulls.clear()
+        return None, f"Panels: {action}"
+    return handler
+
+
 def _goodnight(m):
     core = getattr(tools, "_VOICE_CORE", None)
     if core is None:
@@ -347,7 +363,7 @@ def _goodnight(m):
     return line, "Goodnight"
 
 
-COLORS = r"(red|orange|yellow|green|teal|cyan|blue|purple|violet|pink|magenta|white|warm white|cool white|warm|cool|juno|jarvis|ultron)"
+COLORS = r"(red|orange|yellow|green|teal|cyan|blue|purple|violet|pink|magenta|white|warm white|cool white|warm|cool|jarvis)"
 
 NUMWORD = r"(\d+(?:\.\d+)?|" + "|".join(sorted(WORDNUM, key=len, reverse=True)) + r")"
 RULES = [
@@ -392,7 +408,10 @@ RULES = [
     (r"^(?:turn |switch )?(?:the )?([a-z ]{3,24}?) lights? (on|off)$", _lights("onoff", 1, 2)),
     (rf"^(?:set |dim |turn |put )?(?:the )?lights? (?:to |at |down to |up to )?{NUM}(?: ?%| percent)?$", _lights("brightness", None, 1)),
     (rf"^(?:make|turn|set|change) (?:the )?lights? (?:to )?{COLORS}$", _lights("color", None, None, 1)),
-    (r"^(?:good ?night|night night|goodnight juno|i'?m going to (?:bed|sleep)|going to bed)$", _goodnight),
+    (r"^(?:good ?night|night night|goodnight jarvis|i'?m going to (?:bed|sleep)|going to bed)$", _goodnight),
+    (r"^(?:clear (?:that|it|this|those|them|the (?:screen|panels?|desktop))|close (?:that|those|the panels?)|"
+     r"put (?:that|those|it) away|get rid of (?:that|those))$", _panels("clear")),
+    (r"^(?:back|go back|that'?s enough|ok(?:ay)? back|exit focus|close focus)$", _panels("back")),
 ]
 RULES = [(re.compile(p), f) for p, f in RULES]
 

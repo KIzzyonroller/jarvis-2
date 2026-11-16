@@ -172,14 +172,23 @@ def _readable(p):
     return _inside(p, config.READ_ROOTS + config.WRITE_ROOTS) or folder_access.can_read(p)
 
 
-def _gate_write(paths, action, detail):
+def _personal_roots():
+    f = _known_folders()
+    return [f[k] for k in ("desktop", "documents", "downloads", "pictures", "music", "videos")]
+
+
+def _gate_write(paths, action, detail, new=False):
     """None if allowed, otherwise an error string. Free inside the Jarvis folder; elsewhere asks
-    (with 'always allow'), and Windows' own folders always ask."""
+    (with 'always allow'), and Windows' own folders always ask. new=True (nothing there yet): creating in your
+    personal folders is free too, when Settings > Application access says so."""
     if any(permissions.is_secret(p) for p in paths):
         return "That's a password, key or login store. I don't touch those."
     import folder_access
     if all(_inside(p, config.WRITE_ROOTS) or folder_access.can_edit(p) for p in paths):
         return None                                # the Jarvis folder, or folders the user let him edit
+    if (new and getattr(config, "FREE_CREATE", "jarvis") == "personal" and all(not Path(p).exists() for p in paths)
+            and all(_inside(p, _personal_roots()) for p in paths) and not any(permissions.is_system(p) for p in paths)):
+        return None                                # something new on the desktop, in Documents...
     if not all(_readable(p) for p in paths):
         return ("That's outside the folders I'm allowed to touch. If the user wants me in there, they can say so "
                 "(files grant_access).")
@@ -1538,6 +1547,12 @@ def read_file(path):
         return f"{p} is outside the folders I'm allowed to read."
     if not p.is_file():
         return f"{p} doesn't exist or isn't a file."
+    if p.suffix.lower() in (".docx", ".xlsx", ".xlsm", ".pptx", ".pdf"):
+        import documents
+        try:
+            return documents.read(p, TEXT_LIMIT)
+        except Exception as e:
+            return f"Couldn't read {p.name}: {type(e).__name__}: {e}"
     raw = p.read_bytes()[: TEXT_LIMIT * 4]
     if b"\x00" in raw[:2048]:
         return f"{p.name} isn't a plain text file. I can only read text (txt, md, csv, code, etc.), but I can open it in its app."
@@ -1572,7 +1587,8 @@ def write_file(path, content, mode="create"):
     p = _resolve(path, config.JARVIS_DIR)
     if mode == "create" and p.exists():
         return f"{p} already exists. Use mode 'append' or 'overwrite'."
-    err = _gate_write([p], f"{'Overwrite' if mode == 'overwrite' else 'Write'} a file outside the Jarvis folder", str(p))
+    err = _gate_write([p], f"{'Overwrite' if mode == 'overwrite' else 'Write'} a file outside the Jarvis folder", str(p),
+                      new=not p.exists())
     if err:
         return err
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -1581,14 +1597,179 @@ def write_file(path, content, mode="create"):
             content = "\n" + content
     with open(p, "a" if mode == "append" else "w", encoding="utf-8") as f:
         f.write(content)
+    if len(content) > 200 and p.parent != config.JARVIS_DIR:
+        try:
+            import pulls
+            pulls.file(p, "text", text=content)
+        except Exception as e:
+            print(f"[pulls] {e}")
     return f"Saved to {p}."
+
+
+def make_document(path, kind=None, spec=None, overwrite=False):
+    """Word / Excel / PowerPoint / PDF from an outline (documents.py)."""
+    import documents
+    if isinstance(spec, str):
+        try:
+            spec = json.loads(spec)
+        except ValueError:
+            spec = {"blocks": [{"p": x} for x in spec.split("\n\n") if x.strip()]}
+    kind = (kind or Path(str(path)).suffix.lstrip(".") or "docx").lower()
+    p = _resolve(path, config.MAKE_DIR)
+    if p.suffix.lower() != "." + kind:
+        p = p.with_suffix("." + kind)
+    if p.exists() and not overwrite:
+        return f"{p} already exists. Pick another name, or overwrite it (that asks the user)."
+    err = _gate_write([p], f"{'Replace' if p.exists() else 'Create'} {p.name}", str(p), new=not p.exists())
+    if err:
+        return err
+    try:
+        out = documents.make(kind, p, spec or {})
+    except Exception as e:
+        return f"Couldn't make it: {type(e).__name__}: {e}"
+    try:
+        import pulls
+        pulls.file(out, kind, spec=spec or {})
+    except Exception as e:
+        print(f"[pulls] {e}")
+    return f"Made {out}. (Offer to open it; the open tool takes that path.)"
+
+
+def edit_file(path, find, replace, count=0):
+    """Change part of a text file without rewriting the whole thing."""
+    p = _resolve(path, config.HOME)
+    if not p.is_file():
+        return f"{p} doesn't exist."
+    if not find:
+        return "What text should I replace?"
+    text = p.read_text(encoding="utf-8", errors="replace")
+    n = text.count(find)
+    if not n:
+        return f"Couldn't find that text in {p.name}. Read it first and copy the exact words."
+    err = _gate_write([p], f"Edit {p.name}", f"{p}\nReplace: {find[:200]}\nWith: {str(replace)[:200]}")
+    if err:
+        return err
+    shutil.copy2(p, p.with_name(p.name + ".bak"))          # one undo step, next to it
+    p.write_text(text.replace(find, replace or "", int(count) if count else -1), encoding="utf-8")
+    return f"Edited {p.name}: {n if not count else min(n, int(count))} change(s). The old version is {p.name}.bak."
+
+
+def search_text(query, folder="documents", max_results=20):
+    """Which files mention this? Text, code, Markdown, CSV and Word files."""
+    root = _resolve(folder or "documents", config.HOME)
+    if not _readable(root):
+        return f"{root} is outside the folders I'm allowed to search."
+    q = (query or "").lower()
+    if not q:
+        return "Search for what?"
+    exts = {".txt", ".md", ".csv", ".json", ".py", ".js", ".ts", ".html", ".css", ".ini", ".cfg", ".log", ".xml",
+            ".yaml", ".yml", ".cs", ".cpp", ".h", ".java", ".lua", ".gd", ".docx"}
+    hits, deadline = [], time.time() + 10
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d.lower() not in SKIP_DIRS and not d.startswith(".")]
+        for f in filenames:
+            fp = Path(dirpath) / f
+            if fp.suffix.lower() not in exts or permissions.is_secret(fp):
+                continue
+            try:
+                if fp.stat().st_size > 3_000_000:
+                    continue
+                if fp.suffix.lower() == ".docx":
+                    import documents
+                    body = documents.read(fp, 200000) or ""
+                else:
+                    body = fp.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+            i = body.lower().find(q)
+            if i >= 0:
+                snip = " ".join(body[max(0, i - 60): i + 80].split())
+                hits.append(f"{fp}: ...{snip}...")
+                if len(hits) >= int(max_results or 20):
+                    return "\n".join(hits) + "\n[stopped at max results]"
+        if time.time() > deadline:
+            return ("\n".join(hits) + "\n" if hits else "") + "[search timed out, try a narrower folder]"
+    return "\n".join(hits) if hits else f"Nothing in {root} mentions '{query}'."
+
+
+def zip_files(path, destination=None):
+    src = _resolve(path, config.HOME)
+    if not src.exists() or not _readable(src):
+        return f"{src} doesn't exist or I can't read it."
+    dst = _resolve(destination, config.HOME) if destination else src.with_suffix(".zip") if src.is_file() else src.parent / (src.name + ".zip")
+    if dst.suffix.lower() != ".zip":
+        dst = dst / (src.name + ".zip") if dst.is_dir() else dst.with_suffix(".zip")
+    if dst.exists():
+        return f"{dst} already exists."
+    err = _gate_write([dst], "Create a zip", f"{src}\n→ {dst}", new=True)
+    if err:
+        return err
+    import zipfile
+    with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as z:
+        if src.is_file():
+            z.write(src, src.name)
+        else:
+            for fp in src.rglob("*"):
+                if fp.is_file() and not permissions.is_secret(fp):
+                    z.write(fp, fp.relative_to(src.parent))
+    return f"Zipped to {dst} ({dst.stat().st_size // 1024} KB)."
+
+
+def unzip_file(path, destination=None):
+    src = _resolve(path, config.HOME)
+    if not src.is_file() or not _readable(src):
+        return f"{src} doesn't exist or I can't read it."
+    dst = _resolve(destination, config.HOME) if destination else src.with_suffix("")
+    if dst.exists() and any(dst.iterdir()):
+        return f"{dst} already has things in it. Give me an empty or new folder."
+    err = _gate_write([dst], "Unzip", f"{src}\n→ {dst}", new=not dst.exists())
+    if err:
+        return err
+    import zipfile
+    with zipfile.ZipFile(src) as z:
+        root = dst.resolve()
+        for m in z.infolist():                               # no "../" tricks out of the folder
+            target = (dst / m.filename).resolve()
+            if root not in target.parents and target != root:
+                return f"{src.name} tries to put files outside the folder. Not unzipping it."
+        z.extractall(dst)
+    return f"Unzipped to {dst}."
+
+
+def scaffold(folder, items):
+    """Several files at once (a project, a set of notes): items = [{path, content}], paths inside folder."""
+    root = _resolve(folder, config.MAKE_DIR)
+    if isinstance(items, str):
+        try:
+            items = json.loads(items)
+        except ValueError:
+            return "items must be a list of {path, content}."
+    items = [i for i in (items or []) if isinstance(i, dict) and i.get("path")][:60]
+    if not items:
+        return "Nothing to create."
+    targets = []
+    for it in items:
+        t = (root / str(it["path"]).lstrip("/\\")).resolve()
+        if root.resolve() not in t.parents:
+            return f"{it['path']} would land outside {root}."
+        if t.exists():
+            return f"{t} already exists. Pick a new folder, or change files one at a time."
+        targets.append((t, it))
+    err = _gate_write([t for t, _ in targets] + ([root] if not root.exists() else []), f"Create {len(targets)} files",
+                      f"In {root}:\n" + "\n".join(str(t.relative_to(root.resolve())) for t, _ in targets[:25]), new=True)
+    if err:
+        return err
+    for t, it in targets:
+        t.parent.mkdir(parents=True, exist_ok=True)
+        t.write_text(str(it.get("content") or ""), encoding="utf-8")
+    return f"Created {len(targets)} files in {root}."
 
 
 def create_folder(path):
     p = _resolve(path, config.JARVIS_DIR)
     if p.exists():
         return f"{p} already exists."
-    err = _gate_write([p], "Create a folder", str(p))
+    err = _gate_write([p], "Create a folder", str(p), new=True)
     if err:
         return err
     p.mkdir(parents=True)
@@ -1610,7 +1791,7 @@ def _move_or_copy(src, dst, copy):
         return f"{d} already exists. Not overwriting it."
     paths = [d] if copy else [s, d]
     verb = "Copy" if copy else "Move"
-    err = _gate_write(paths, f"{verb} {'folder' if s.is_dir() else 'file'}", f"{s}\n→ {d}")
+    err = _gate_write(paths, f"{verb} {'folder' if s.is_dir() else 'file'}", f"{s}\n→ {d}", new=copy)
     if err:
         return err
     d.parent.mkdir(parents=True, exist_ok=True)
@@ -1793,7 +1974,7 @@ def forget(query):
 
 
 def edit_memory(mid, text):
-    """Her window's memory page: change what one remembered thing says."""
+    """His window's memory page: change what one remembered thing says."""
     text = " ".join(str(text or "").split())
     if not text:
         return forget(mid)
@@ -1838,20 +2019,25 @@ def delete_routine(name):
     return f"Deleted routine '{hit}'."
 
 
-def context_note():
-    """Facts + routines appended to each user message (NOT the system prompt, which must stay fixed)."""
+def context_note(volatile=False):
+    """volatile=False: memory + routines, which only change when you add one (they sit at the end of the system
+    prompt, so the conversation after them stays cached). volatile=True: what changes every turn (the app in front),
+    which goes into the user's message instead: anything that changes in the system prompt throws away the cache for
+    the whole conversation, which was most of every request."""
     parts = []
+    if volatile:
+        cur = _ACTIVITY.now() if _ACTIVITY is not None and _ACTIVITY.running and not _ACTIVITY.paused else None
+        if cur:                   # activity memory is on: he knows what's in front ("save this", "what's this?")
+            import activity
+            t = activity.short_title(cur["title"], cur["app"])
+            return f"In front right now: {cur['app']}" + (f" ({t[:80]})" if t else "")
+        return ""
     mem = memories()
     if mem:
         parts.append("What you remember about the user: " + "; ".join(m["text"] for m in mem[-config.MEMORY_IN_CONTEXT:]))
     r = routines()
     if r:
         parts.append("Saved routines: " + "; ".join(f'"{k}" = {v["steps"]}' for k, v in list(r.items())[:30]))
-    cur = _ACTIVITY.now() if _ACTIVITY is not None and _ACTIVITY.running and not _ACTIVITY.paused else None
-    if cur:                       # activity memory is on: he knows what's in front ("save this", "what's this?")
-        import activity
-        t = activity.short_title(cur["title"], cur["app"])
-        parts.append(f"In front right now: {cur['app']}" + (f" ({t[:80]})" if t else ""))
     return " | ".join(parts)
 
 
@@ -2183,6 +2369,12 @@ def calendar_tool(action, when=None, title=None, start=None, end=None, duration_
     a = (action or "").lower()
     try:
         if a == "agenda":
+            if (when or "today").lower() in ("today", "now", "tonight"):
+                try:
+                    import pulls
+                    pulls.calendar()
+                except Exception as e:
+                    print(f"[pulls] {e}")
             return _CALENDAR.agenda(when or "today")
         if a == "add":
             if not title or not start:
@@ -2394,7 +2586,7 @@ def glass_tool(action="show", title=None, body=None, items=None, image=None, id=
         if where == "desktop":
             return ("Glass mode will show on the desktop from now on (hands only there; their windows get minimized "
                     "while it's up and come back when it closes)." +
-                    ("" if getattr(_VOICE_CORE, "desk", None) else " But 'Her world as your desktop' is off in "
+                    ("" if getattr(_VOICE_CORE, "desk", None) else " But 'His world as your desktop' is off in "
                      "Settings, so until that's on it still uses its own window."))
         return "Glass mode will use its own window (with the camera behind the cards) from now on."
     if a == "calibrate":
@@ -2614,8 +2806,20 @@ _FOLDERS_CHANGED = []          # the app sets this to refresh the System panel's
 
 
 def files(action, path=None, query=None, folder=None, content=None, mode="create", destination=None, new_name=None,
-          max_results=20):
+          max_results=20, kind=None, spec=None, find=None, replace=None, items=None):
     a = (action or "").lower()
+    if a == "make":
+        return make_document(path or "document", kind, spec, overwrite=(mode == "overwrite")) if (path or kind) else "What should I make, and called what?"
+    if a == "edit":
+        return edit_file(path, find, replace) if path else "Which file?"
+    if a == "search_text":
+        return search_text(query or "", folder or path or "documents", max_results)
+    if a == "zip":
+        return zip_files(path, destination) if path else "Zip what?"
+    if a == "unzip":
+        return unzip_file(path, destination) if path else "Unzip what?"
+    if a == "scaffold":
+        return scaffold(folder or path or "project", items)
     if a == "list":
         return list_folder(path or "home")
     if a == "read":
@@ -2709,7 +2913,7 @@ def background_tool(action="start", goal=None, id=None):
     if _JOBS is None:
         return "Background jobs aren't available."
     if action == "start":
-        job, msg = _JOBS.start(goal or "", getattr(_CTX, "persona", "juno"))
+        job, msg = _JOBS.start(goal or "", getattr(_CTX, "persona", "jarvis"))
         return msg + (". Tell the user in a few words that you're on it and they'll hear when it's done." if job else "")
     if action == "cancel":
         hit = _JOBS.cancel(int(id) if id else None)
@@ -2748,7 +2952,7 @@ _VOICE_CORE = None
 
 
 def corner_widget_tool(action="toggle"):
-    """The small always-on-top widget that shows while her window is minimized."""
+    """The small always-on-top widget that shows while his window is minimized."""
     if _VOICE_CORE is None:
         return "Not available."
     on = {"on": True, "off": False}.get(action, not config.MINI_HUD)
@@ -2756,8 +2960,8 @@ def corner_widget_tool(action="toggle"):
         return f"The corner widget is {'on' if config.MINI_HUD else 'off'}."
     _VOICE_CORE.set_corner_widget(on)
     return (f"Corner widget {'on' if on else 'off'}. " +
-            ("It shows in the top-right whenever her window is minimized." if on else
-             "Her window just minimizes to the taskbar now; the desktop and music player still show what she's doing."))
+            ("It shows in the top-right whenever his window is minimized." if on else
+             "His window just minimizes to the taskbar now; the desktop and music player still show what he's doing."))
 
 
 FPS_STEPS = (10, 15, 20, 24, 30, 45, 60)
@@ -2768,6 +2972,12 @@ def pc_doctor(action="slow", name=None, hours=None, speedtest=False):
     import pcdoctor
     a = (action or "slow").lower()
     if a == "slow":
+        try:
+            import pulls
+            if pulls.on():
+                pulls.pc()
+        except Exception as e:
+            print(f"[pulls] {e}")
         return pcdoctor.slow()
     if a == "updates":
         return pcdoctor.updates()
@@ -2782,6 +2992,124 @@ def pc_doctor(action="slow", name=None, hours=None, speedtest=False):
     if a == "network":
         return pcdoctor.network(bool(speedtest))
     return "action must be slow, updates, disk, crashes, startup, startup_off, startup_on or network."
+
+
+def stocks_tool(action="quote", symbols=None, range=None, add=None, remove=None, side=None, take=None):
+    import stocks
+    if isinstance(symbols, str):
+        symbols = [s for s in re.split(r"[,;]+", symbols) if s.strip()]
+    out = stocks.tool(action, symbols=symbols, range=range, add=add, remove=remove, side=side, take=take)
+    a = (action or "quote").lower()
+    if a in ("quote", "history", "news", "analysis", "fundamentals", "opinion", "compare", "earnings") and symbols:
+        def show():
+            import pulls
+            rng = {"history": (range or "1mo"), "compare": (range or "1y")}.get(a, "1d")
+            rng = {"week": "5d", "1w": "5d", "month": "1mo", "1m": "1mo", "year": "1y", "6m": "6mo", "3m": "3mo"}.get(rng, rng)
+            for s in symbols[:2]:
+                sym, _ = stocks.resolve(s)
+                if sym:
+                    pulls.stock(sym, rng)
+        threading.Thread(target=show, daemon=True).start()
+    return out
+
+
+def pull_up_tool(what, target=None, focus=False):
+    """Put something up on the desktop beside him (and get the facts back to talk about)."""
+    import pulls
+    w = (what or "").lower()
+    try:
+        if w == "stock":
+            import stocks
+            sym, why = stocks.resolve(target or "")
+            if not sym:
+                return why
+            d = pulls.stock(sym, "1d", focus_it=focus, auto=False)
+            return (f"{d['name']} {d['price']:,.2f}, {d['pct']:+.2f}% today. Up on their desktop, live." if d else "Couldn't get that stock.")
+        if w == "weather":
+            return pulls.weather(target, focus_it=focus, auto=False)
+        if w == "calendar":
+            evs = pulls.calendar(focus_it=focus, auto=False)
+            return ("Today: " + "; ".join(f"{e['start']} {e['title']}" for e in evs) if evs else "Nothing on today.") + " (Timeline is up.)"
+        if w == "pc":
+            return pulls.pc(focus_it=focus)
+        if w == "network":
+            import netsweep
+            return netsweep.report(focus_it=focus)
+        if w == "briefing":
+            import gamemode
+            name = target or gamemode.playing()
+            if not name:
+                return "Which game?"
+            pulls.game_briefing(name)
+            return f"Pulling up the {name} briefing."
+        if w == "file":
+            p = _resolve(target or "", config.HOME)
+            if not p.is_file() or not _readable(p):
+                return "Which file? Give me its name or path."
+            ext = p.suffix.lower().lstrip(".")
+            if ext in ("docx", "xlsx", "pptx", "pdf"):
+                pulls.file(p, "text", text=read_file(str(p)))
+            else:
+                pulls.file(p, "text", text=p.read_text(encoding="utf-8", errors="replace")[:3000])
+            if focus:
+                pulls.focus("file")
+            return f"{p.name} is up on the desktop."
+    except Exception as e:
+        return f"Couldn't pull that up ({type(e).__name__}: {e})."
+    return "I can pull up: stock, weather, calendar, pc, network, briefing, file."
+
+
+def panels_tool(action, what=None, where=None):
+    """Tidy the desktop: clear panels, focus one, back out of focus, or move a kind of panel somewhere else."""
+    import pulls
+    a = (action or "").lower()
+    if a == "clear":
+        pulls.clear(pulls._WORDS.get((what or "").lower(), None) if what else None)
+        return "Cleared."
+    if a == "focus":
+        pulls.focus(pulls._WORDS.get((what or "").lower(), what))
+        return "Focused."
+    if a == "back":
+        pulls.focus(off=True)
+        return "Back."
+    if a == "move":
+        return pulls.move(what or "", where or "")
+    return "clear, focus, back or move."
+
+
+def track_tool(kind, query=None, league=None, path=None, stop=False):
+    import trackers
+    try:
+        return trackers.track(kind, query, league, path, bool(stop))
+    except Exception as e:
+        return f"Couldn't track that ({type(e).__name__}: {e})."
+
+
+def desktop_scene_tool(scene=None, calm=None):
+    """Which scene his desktop shows, and calm panels on or off."""
+    import config
+    names = {"bench": "the drafting bench", "station": "the orbital station", "archive": "the archive",
+             "signal": "the listening post", "chart": "the cartographer's map"}
+    if scene is None and calm is None:
+        return f"The desktop shows {names.get(config.DESK_SCENE, config.DESK_SCENE)}. Options: " + ", ".join(
+            f"{k} ({v})" for k, v in names.items()) + "."
+    if _VOICE_CORE is None:
+        return "Settings aren't available."
+    ch = {}
+    if scene:
+        key = next((k for k, v in names.items() if scene.lower() in (k, v) or scene.lower() in v), None)
+        if not key:
+            return f"No scene called {scene}. Options: " + ", ".join(names) + "."
+        ch["JUNO_DESK_SCENE"] = key
+    if calm is not None:
+        ch["JUNO_DESK_CALM"] = "true" if calm else "false"
+    _VOICE_CORE.set_widgets(ch)
+    out = f"Desktop switched to {names[ch['JUNO_DESK_SCENE']]}." if "JUNO_DESK_SCENE" in ch else ""
+    if "JUNO_DESK_CALM" in ch:
+        out += (" Panels just appear now." if calm else " Panels animate again.")
+    if not getattr(_VOICE_CORE, "desk", None):
+        out += " (His world as your desktop is off in Settings, so you won't see it until that's on.)"
+    return out.strip()
 
 
 def steam_tool(action="friends", game=None, region=None, role=None):
@@ -2821,11 +3149,11 @@ def birthdays_tool(action="upcoming", name=None, month=None, day=None, year=None
 
 
 def desktop_card(title, items=None, text=None, minutes=None):
-    """A card on her desktop wallpaper (not glass mode): a list or a short note that stays up for a while."""
+    """A card on his desktop wallpaper (not glass mode): a list or a short note that stays up for a while."""
     if _VOICE_CORE is None:
         return "Not available."
     if getattr(_VOICE_CORE, "desk", None) is None:
-        return "Her desktop isn't on ('Her world as your desktop' in Settings), so there's nowhere to put it."
+        return "His desktop isn't on ('His world as your desktop' in Settings), so there's nowhere to put it."
     mins = max(1, min(float(minutes or 10), 120))
     card = {"title": str(title or "")[:60], "max": 12}
     if items:
@@ -2837,7 +3165,7 @@ def desktop_card(title, items=None, text=None, minutes=None):
 
 
 def changelog_tool(action="read", version=None, channel=None, full=False):
-    """Her own release notes: read them, copy them ready for Discord, or post them through her bot."""
+    """His own release notes: read them, copy them ready for Discord, or post them through his bot."""
     import changelog
     a = (action or "read").lower()
     if a == "read":
@@ -2857,7 +3185,7 @@ def changelog_tool(action="read", version=None, channel=None, full=False):
                 f"2000 characters per message, so it's also split up in {p})" if len(msgs) > 1 and p else "") + ".")
     if a == "post":
         if _DISCORD_BOT is None:
-            return "Her Discord bot isn't running on this PC (not set up, or it runs on your server)."
+            return "His Discord bot isn't running on this PC (not set up, or it runs on your server)."
         return _DISCORD_BOT.post_changelog(channel, version, lambda t, d: _confirm(t, d), full=bool(full))
     return "action must be read, copy or post."
 
@@ -3011,11 +3339,11 @@ def game_mode_tool(action="status", name=None, person=None, text=None, label=Non
 
 
 def desk_widgets_tool(action="status", widget=None, where=None):
-    """The live widgets on her desktop (PC stats, now playing, weather, today, notes, Discord)."""
+    """The live widgets on his desktop (PC stats, now playing, weather, today, notes, Discord)."""
     if _VOICE_CORE is None:
         return "Not available."
     keys = {"stats": "JUNO_W_STATS", "music": "JUNO_W_MUSIC", "weather": "JUNO_W_WEATHER", "calendar": "JUNO_W_CALENDAR",
-            "notes": "JUNO_W_NOTES", "discord": "JUNO_W_DISCORD"}
+            "notes": "JUNO_W_NOTES", "discord": "JUNO_W_DISCORD", "stocks": "JUNO_W_STOCKS"}
     names = {"stats": "PC stats", "music": "now playing", "weather": "weather", "calendar": "today",
              "notes": "notes, lists and timers", "discord": "Discord"}
     a = (action or "status").lower()
@@ -3038,7 +3366,7 @@ def desk_widgets_tool(action="status", widget=None, where=None):
     if not ch:
         return "Say on/off (optionally which widget) or where (right, left, second)."
     if getattr(_VOICE_CORE, "desk", None) is None:
-        note = " They show once 'Her world as your desktop' is on in Settings."
+        note = " They show once 'His world as your desktop' is on in Settings."
     else:
         note = ""
     _VOICE_CORE.set_widgets(ch)
@@ -3049,10 +3377,10 @@ def desk_widgets_tool(action="status", widget=None, where=None):
 
 
 def frame_rate_tool(action="get", fps=None):
-    """Her animation frame rate (desktop and music player), live, and remembered for next time."""
+    """His animation frame rate (desktop and music player), live, and remembered for next time."""
     cur = config.ANIM_FPS
     if action == "get" or fps is None:
-        return f"Her animations run at {cur} fps (desktop and music player). Options: {', '.join(map(str, FPS_STEPS))}."
+        return f"His animations run at {cur} fps (desktop and music player). Options: {', '.join(map(str, FPS_STEPS))}."
     try:
         want = float(fps)
     except (TypeError, ValueError):
@@ -3082,7 +3410,7 @@ def voice_settings_tool(action="list", who=None, voice=None, speed=None, pitch=N
     if _VOICE_CORE is None:
         return "Voice settings aren't available."
     key = (who or getattr(_CTX, "persona", None) or _VOICE_CORE.persona_key).lower()
-    key = "ultron" if "ultron" in key else "jarvis" if "jarvis" in key else "juno" if "juno" in key else personas.DEFAULT
+    key = personas.DEFAULT                     # just Jarvis now
     if key not in personas.PERSONAS:
         return f"No one called {who}."
     if action == "reset":
@@ -3263,18 +3591,31 @@ TOOL_SPECS = [
     _spec("run_command", "Run a PowerShell command and get its output. Read-only commands (Get-*, ipconfig, winget list/search...) run straight away; anything that changes things shows the user an approval prompt. Use for anything the other tools can't do (installing with winget, system info, scripts). Prefer specific tools when they exist. Keep commands non-interactive.",
           {"command": S}, ["command"]),
     _spec("files", "Files and notes. list (path: folder or shortcut home, desktop, documents, downloads, pictures, music, "
-                   "videos, jarvis), read (text files), find (query = name or wildcard like '*.pdf', folder), write (path, "
-                   "content, mode create/append/overwrite; relative paths go in the Jarvis folder; outside it asks the "
-                   "user), create_folder, move / copy (path, destination), rename (path, new_name), delete (to the Recycle "
-                   "Bin, asks the user), empty_recycle_bin (asks), add_note (content), read_notes. "
+                   "videos, jarvis), read (text, code, and Word/Excel/PowerPoint/PDF), find (query = name or wildcard like "
+                   "'*.pdf', folder), search_text (query = words inside files, folder), write (path, content, mode "
+                   "create/append/overwrite: any text file, md, csv, html, code...; 'desktop/x.txt' style paths work), "
+                   "edit (path, find = exact existing text, replace: change part of a text file; keeps a .bak), "
+                   "make (a real document: kind docx/xlsx/pptx/pdf, path like 'desktop/Budget', spec = outline: "
+                   "docx/pdf {title, blocks:[{h}|{h2}|{p}|{bullets:[]}|{numbers:[]}|{table:[[..],[..]]}|{quote}|{pagebreak:true}]}; "
+                   "xlsx {sheets:[{name, rows:[[header..],[..]], widths}]}, formulas as '=SUM(B2:B9)'; pptx {title, subtitle, "
+                   "slides:[{title, bullets, notes}]}; no path folder = Documents/Jarvis/Made), scaffold (folder + items "
+                   "[{path, content}]: many files at once, e.g. a project), zip / unzip (path, destination), "
+                   "create_folder, move / copy (path, destination), rename (path, new_name), delete (to the Recycle "
+                   "Bin, asks the user), empty_recycle_bin (asks), add_note (content), read_notes. New files and folders "
+                   "in their personal folders don't ask; changing or moving existing ones does. Write real, complete "
+                   "content (not placeholders), then offer to open what you made. "
                    "grant_access (path, mode read or edit): ONLY when the user asks you to have access to a specific folder "
                    "or file (find it first if they give just a name; approval card). edit = work there without asking each "
                    "time; read = just look (also reaches USB and network drives). revoke_access (path or folder name), "
                    "list_access.",
-          {"action": {"type": "string", "enum": ["list", "read", "find", "write", "create_folder", "move", "copy", "rename",
+          {"action": {"type": "string", "enum": ["list", "read", "find", "search_text", "write", "edit", "make", "scaffold",
+                                                 "zip", "unzip", "create_folder", "move", "copy", "rename",
                                                  "delete", "empty_recycle_bin", "add_note", "read_notes", "grant_access",
                                                  "revoke_access", "list_access"]},
            "path": S, "query": S, "folder": S, "content": S,
+           "kind": {"type": "string", "enum": ["docx", "xlsx", "pptx", "pdf"]}, "spec": {"type": "object"},
+           "find": S, "replace": S,
+           "items": {"type": "array", "items": {"type": "object", "properties": {"path": S, "content": S}}},
            "mode": {"type": "string", "enum": ["create", "append", "overwrite", "read", "edit"],
                     "description": "write: create/append/overwrite. grant_access: read or edit."},
            "destination": S, "new_name": S, "max_results": {"type": "integer"}}, ["action"]),
@@ -3322,7 +3663,7 @@ TOOL_SPECS = [
     _spec("history", "Search everything you and the user said in past conversations (all the way back, not just this "
                      "chat), plus Discord messages you saw. Use when they refer to something from before that isn't in "
                      "the current conversation ('what was that game Alex recommended', 'what did we decide about X'). "
-                     "query = keywords; days = only the last N days; who = 'You', 'Jarvis', 'Ultron' or a Discord name.",
+                     "query = keywords; days = only the last N days; who = 'You', 'Jarvis' or a Discord name.",
           {"query": S, "days": {"type": "number"}, "who": S}, ["query"]),
     _spec("discord", "Discord. Reading the user's own messages (from Windows notifications: DMs, group chats, pings): "
                      "recent (who = a name or channel to filter by, optional; hours, default 24), unread (since they last "
@@ -3337,7 +3678,7 @@ TOOL_SPECS = [
                      "where possible; don't add your persona's flourishes unless they asked you to speak as yourself.",
           {"action": {"type": "string", "enum": ["recent", "unread", "servers", "read_channel", "send", "send_as_me"]}, "who": S,
            "hours": {"type": "number"}, "channel": S, "text": S, "limit": {"type": "number"}}, ["action"]),
-    _spec("corner_widget", "The small always-on-top window in the top-right that shows while her main window is "
+    _spec("corner_widget", "The small always-on-top window in the top-right that shows while his main window is "
                            "minimized (the minimized window / mini HUD). on, off, toggle or status.",
           {"action": {"type": "string", "enum": ["on", "off", "toggle", "status"]}}, ["action"]),
     _spec("pc_doctor", "Diagnose the PC (read-only unless they approve a startup change). slow: what's using CPU/memory, "
@@ -3356,27 +3697,64 @@ TOOL_SPECS = [
                    "east', role killer/survivor). For other games' server status, search the web.",
           {"action": {"type": "string", "enum": ["friends", "suggest", "sales", "patch_notes", "installed", "dbd_queue"]},
            "game": S, "region": S, "role": {"type": "string", "enum": ["killer", "survivor"]}}, ["action"]),
+    _spec("stocks", "Stocks and markets (Yahoo Finance data, can be up to 15 min delayed). quote (symbols: names or "
+                    "tickers), history (symbols, range 1d/5d/1mo/3mo/6mo/ytd/1y/5y), compare (symbols, range), news (why it "
+                    "moved: headlines), earnings (next earnings date), analysis (fundamentals + headlines, then give your "
+                    "own read: bull case, bear case, what to watch), market (indexes + their watchlist), watchlist (list, or "
+                    "add/remove tickers). Paper portfolio (pretend, no money, to keep score on your takes): paper_open "
+                    "(symbols, side long/short, take = your one-line reason; do it whenever you give a clear directional take "
+                    "and they say to log it, or they ask you to), paper_close (symbols), paper (the record: how your calls "
+                    "have done). Use it for any stock, ETF, index or crypto price question. You may share opinions "
+                    "and analysis; never tell them to buy or sell or how much, and you can't trade.",
+          {"action": {"type": "string", "enum": ["quote", "history", "compare", "news", "earnings", "analysis", "market",
+                                                 "watchlist", "paper", "paper_open", "paper_close"]},
+           "side": {"type": "string", "enum": ["long", "short"]}, "take": S,
+           "symbols": {"type": "array", "items": S}, "range": S, "add": {"type": "array", "items": S},
+           "remove": {"type": "array", "items": S}}, ["action"]),
+    _spec("pull_up", "Put something up on their desktop beside you, live, and get its facts back to talk about. stock "
+                     "(target = name or ticker; live chart), weather (target = place or empty; radar + next hours), "
+                     "calendar (today as a timeline), pc (this PC opened up: parts, live load and temperatures), network "
+                     "(sweep their home network for devices; new ones flagged), briefing (pre-game board; target = game), "
+                     "file (target = path: preview). focus = true puts it in the middle and dims the rest (for 'show me', "
+                     "'pull up', 'let me see'). Many tools already pull up their own panel (stocks, calendar today, PC "
+                     "doctor, files you make, web search sources): don't repeat those.",
+          {"what": {"type": "string", "enum": ["stock", "weather", "calendar", "pc", "network", "briefing", "file"]},
+           "target": S, "focus": {"type": "boolean"}}, ["what"]),
+    _spec("panels", "The panels on their desktop: clear (all, or what = a kind), focus (what = a kind; middle of the "
+                    "screen), back (out of focus), move (what = stocks/weather/calendar/sources/pc/file/network/"
+                    "briefing/trackers/widgets, where = left/right/center/second: from now on that kind goes there).",
+          {"action": {"type": "string", "enum": ["clear", "focus", "back", "move"]}, "what": S,
+           "where": {"type": "string", "enum": ["left", "right", "center", "second"]}}, ["action"]),
+    _spec("track", "Keep something live on their desktop until it's done: score (query = team, league optional like nba, "
+                   "premier league, liga mx), download (what's downloading now, or path), flight (query = flight number "
+                   "like UA123), package (not possible: say so and offer a web lookup). stop = true stops (kind optional).",
+          {"kind": {"type": "string", "enum": ["score", "download", "flight", "package"]}, "query": S, "league": S, "path": S,
+           "stop": {"type": "boolean"}}, ["kind"]),
+    _spec("desktop_scene", "His desktop wallpaper scene: bench (drafting bench), station (orbital station), archive "
+                           "(his library), signal (listening post), chart (cartographer's map). calm = panels just appear "
+                           "(true) or animate (false). No arguments = which one is on.",
+          {"scene": {"type": "string", "enum": ["bench", "station", "archive", "signal", "chart"]}, "calm": {"type": "boolean"}}, []),
     _spec("birthdays", "Birthday radar: add (name, month, day, year if known, note like gift ideas) whenever they mention "
-                       "someone's birthday; remove (name); upcoming. She reminds them 3 days before and on the day.",
+                       "someone's birthday; remove (name); upcoming. He reminds them 3 days before and on the day.",
           {"action": {"type": "string", "enum": ["add", "remove", "upcoming"]}, "name": S, "month": S, "day": N,
            "year": N, "note": S}, ["action"]),
-    _spec("desktop_card", "Put a card on their desktop wallpaper (her world behind their windows), NOT glass mode: use "
+    _spec("desktop_card", "Put a card on their desktop wallpaper (his world behind their windows), NOT glass mode: use "
                           "this when they say 'on my desktop' / 'not the glass'. A list (items) or short text; stays up "
                           "for minutes (default 10, max 120). Say they can see it with Win+D.",
           {"title": S, "items": {"type": "array", "items": S}, "text": S, "minutes": N}, ["title"]),
-    _spec("changelog", "Her own release notes (what's new in each version of this app). read (version, default the "
+    _spec("changelog", "His own release notes (what's new in each version of this app). read (version, default the "
                        "newest): summarize it out loud in a few highlights. copy: puts it on the clipboard formatted "
                        "for Discord. post: whenever they say 'post the changelog / update notes / what's new' (to "
-                       "Discord): her bot posts it to a channel (channel, default the updates channel in Settings); "
+                       "Discord): his bot posts it to a channel (channel, default the updates channel in Settings); "
                        "the approval card is the confirmation, so don't ask again first. full: every detail instead of the skim version (titles "
                        "and first sentences).",
           {"action": {"type": "string", "enum": ["read", "copy", "post"]}, "version": S, "channel": S, "full": B}, ["action"]),
-    _spec("speed_report", "How fast she's been answering: where the time goes between them stopping talking and her "
+    _spec("speed_report", "How fast he's been answering: where the time goes between them stopping talking and his "
                            "first sound (hearing, Claude, tools, voice), split by model, tools, cold vs warm. hours "
-                           "limits it to recent answers. Also saved as speed_report.txt in her data folder. Read out "
+                           "limits it to recent answers. Also saved as speed_report.txt in his data folder. Read out "
                            "only the headline numbers unless they ask for detail.",
           {"hours": N}),
-    _spec("journal", "Their journal: a text file on their desktop (Juno Journal.txt). add (text = their words, first "
+    _spec("journal", "Their journal: a text file on their desktop (Jarvis Journal.txt). add (text = their words, first "
                       "person, lightly cleaned up, nothing invented; question = the question it answers, if any): when "
                       "they answer your journal question, or say 'journal: ...' / 'write in my journal'. read (days, or "
                       "search for a word) for 'what did I write...'. open: opens the file. ask: a question to ask them "
@@ -3391,7 +3769,7 @@ TOOL_SPECS = [
            "pc": {"type": "string", "enum": ["sleep", "lock", "nothing"]},
            "lights": {"type": "string", "enum": ["off", "dim", "leave"]}}, ["action"]),
     _spec("lights", "Smart lights (Philips Hue and/or Home Assistant). on, off, brightness (value 1-100), color (a name "
-                     "like purple / warm white, a hex code, or juno / jarvis / ultron for her colours), list, "
+                     "like purple / warm white, a hex code, or jarvis for his colour), list, "
                      "pair_hue (they press the bridge's button first). target: a room or light name, or all. Lights only.",
           {"action": {"type": "string", "enum": ["on", "off", "brightness", "color", "list", "pair_hue"]},
            "target": S, "value": N, "color": S}, ["action"]),
@@ -3403,9 +3781,9 @@ TOOL_SPECS = [
           {"action": {"type": "string", "enum": ["report", "tidy", "undo", "clean"]}, "folder": S}, ["action"]),
     _spec("phone", "The user's phone notifications (texts, WhatsApp, calls, apps), mirrored to the PC by Windows' Phone "
                     "Link. recent (hours, default 12) or unread (since they last asked); who filters by sender. "
-                    "Read-only: she can't reply from the phone.",
+                    "Read-only: he can't reply from the phone.",
           {"action": {"type": "string", "enum": ["recent", "unread"]}, "hours": N, "who": S}, ["action"]),
-    _spec("game_mode", "Game mode: she notices games (Steam, Epic, Riot, Xbox, GOG, EA, Ubisoft, Battle.net, or ones "
+    _spec("game_mode", "Game mode: he notices games (Steam, Epic, Riot, Xbox, GOG, EA, Ubisoft, Battle.net, or ones "
                         "they added) and stays quiet while they play (no conversation starters or check-ins; Discord only "
                         "from allowed people), then asks how it went. status; start (name: 'I'm playing X', for games it "
                         "didn't catch) / stop; allow / disallow (person: a Discord name that may interrupt a game); "
@@ -3418,19 +3796,19 @@ TOOL_SPECS = [
           {"action": {"type": "string", "enum": ["status", "start", "stop", "allow", "disallow", "detect_on", "detect_off",
                                                  "add_note", "add_timer", "remove", "notes", "show", "start_timer", "won", "lost"]},
            "name": S, "person": S, "text": S, "label": S, "seconds": N}, ["action"]),
-    _spec("desk_widgets", "The live widgets on her desktop wallpaper: PC stats (CPU, memory, GPU load/temp, VRAM, "
-                           "disk, network), now playing, weather, today's calendar, notes/lists/timers, Discord. on/off "
+    _spec("desk_widgets", "The live widgets on his desktop wallpaper: PC stats (CPU, memory, GPU load/temp, VRAM, "
+                           "disk, network), now playing, weather, today's calendar, notes/lists/timers, Discord, stocks watchlist. on/off "
                            "(all, or one widget), where (right or left side of the main monitor, or second = the other "
                            "monitor), or status.",
           {"action": {"type": "string", "enum": ["on", "off", "move", "status"]},
-           "widget": {"type": "string", "enum": ["stats", "music", "weather", "calendar", "notes", "discord"]},
+           "widget": {"type": "string", "enum": ["stats", "music", "weather", "calendar", "notes", "discord", "stocks"]},
            "where": {"type": "string", "enum": ["right", "left", "second"]}}, ["action"]),
-    _spec("frame_rate", "Her animation frame rate on the desktop and the music player (default 30). get, or set with "
+    _spec("frame_rate", "His animation frame rate on the desktop and the music player (default 30). get, or set with "
                         "fps (10, 15, 20, 24, 30, 45 or 60; other numbers snap to the closest). 'smoother' = higher, "
                         "'lighter on my PC' / 'it's lagging' = lower.",
           {"action": {"type": "string", "enum": ["get", "set"]}, "fps": {"type": "number"}}, ["action"]),
     _spec("voice_settings", "Change how you (or the other AI) sound, live, no restart. list: current voice and the "
-                            "options. set: who (jarvis or ultron; default you), voice (an id from list), speed (0.6 to "
+                            "options. set: who (jarvis), voice (an id from list), speed (0.6 to "
                             "1.6, 1 = normal pace), pitch (0.7 to 1.3, lower = deeper). For relative requests, start from "
                             "list's current values: 'a bit faster' = +0.1 speed, 'deeper' = -0.06 pitch, 'American' = "
                             "an a*_ voice, 'British' = a b*_ voice. reset: back to the original voice.",
@@ -3542,12 +3920,12 @@ TOOL_SPECS = [
                    "stays between sessions until they close it), chart (labels, values, chart_type bar/line, unit), "
                    "map (place, zoom 3-17), youtube (query, or video = a link/id; they pinch one to play it), photos "
                    "(folder of pictures), model (file = a .glb/.gltf to spin), windows (their open windows: focus, "
-                   "move to the other monitor, close), feed (Discord messages as they arrive). Her yes/no questions "
+                   "move to the other monitor, close), feed (Discord messages as they arrive). His yes/no questions "
                    "show up as cards on their own. update (id): change a progress value/max, a checklist's items or "
                    "a sticky's body. pin/unpin (id): keep a card for next time. restore: bring back the last card "
                    "they threw away. list: what's up, which card they're holding, pointing at or made bigger (look "
                    "before talking about 'this one'). remove (id or title), clear, open (just the window), close. "
-                   "desktop / window: from now on show glass mode itself on their desktop (over her world, hands only) "
+                   "desktop / window: from now on show glass mode itself on their desktop (over his world, hands only) "
                    "or in its own window with the camera (Settings has the same choice); to just put a list or note "
                    "on their desktop instead of the glass, use desktop_card, not this. calibrate: start 'line up my "
                    "hand' when the dots sit off their hand. "
@@ -3590,7 +3968,8 @@ FUNCS = {
     "look_at_camera": look_at_camera, "display": display, "media_control": media_control, "set_volume": set_volume,
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
-    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
+    "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "stocks": stocks_tool, "desktop_scene": desktop_scene_tool,
+    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
     "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
 
@@ -3605,6 +3984,86 @@ def set_connectors(c):
     _CONNECTORS = c
 
 
+# ------------------------------------------------------------------ tools on demand
+# Sending all ~55 tools with every request costs ~11k tokens each time. So he gets a small core set, plus groups the
+# request obviously needs (from its words), plus anything he asks for with more_tools. Groups stay loaded for the rest
+# of the conversation (until it's trimmed), so the tool list rarely changes and the prompt cache keeps working.
+# Anything not listed in a group is core. Settings > Answering > "Load tools as needed" turns this off.
+TOOL_GROUPS = {
+    "media": ["spotify", "youtube", "netflix", "apple_music"],
+    "computer": ["files", "run_command", "mouse", "display", "system_power", "pc_doctor", "file_butler", "screen_text",
+                 "look_at_camera", "watch", "activity", "close_app"],
+    "calendar_email": ["calendar", "email"],
+    "discord_phone": ["discord", "phone"],
+    "games": ["game_mode", "steam"],
+    "stocks": ["stocks"],
+    "desktop": ["glass", "desk_widgets", "desktop_scene", "frame_rate", "corner_widget", "rgb", "voice_settings",
+                "lights", "track"],
+    "life": ["journal", "birthdays", "goodnight", "changelog", "speed_report"],
+    "studio": ["blender", "blender_expert", "unreal_expert"],
+    "apps": [],              # the user's own connectors (MCP tools, names with "__")
+}
+GROUP_HINTS = {
+    "media": r"\b(play|song|music|spotify|youtube|video|netflix|apple music|playlist|album|artist|watch|episode|show|movie|queue|track)\b",
+    "computer": r"\b(file|folder|document|download|pdf|delete|move|copy|rename|powershell|command|terminal|install|uninstall|"
+                r"slow|lag|crash|driver|update|startup|disk|drive|storage|space|ping|internet|wifi|network|sleep|shut ?down|"
+                r"restart|lock|monitor|brightness|display|mouse|click|camera|webcam|look at me|text on|read (the|this|my) screen|"
+                r"what was i|earlier|yesterday|close|quit|kill|downloads|tidy|clean|doc|docs|document|word|excel|"
+                r"spreadsheet|sheet|powerpoint|slides|deck|presentation|pdf|zip|unzip|project|script|code|write|make|"
+                r"create|save|draft|letter|resume|essay|table|budget|txt|markdown|csv)\b",
+    "calendar_email": r"\b(calendar|event|meeting|appointment|schedule|tomorrow|next week|email|emails|inbox|mail)\b",
+    "discord_phone": r"\b(discord|message|messages|dm|server|channel|phone|text(ed)?|notification|notifications|post)\b",
+    "games": r"\b(game|games|gaming|steam|play next|what should i play|patch|dbd|dead by daylight|queue|ranked|lost|won|"
+             r"match|wishlist|sale|friends online)\b",
+    "stocks": r"\b(stock|stocks|share|shares|market|markets|ticker|nasdaq|s&p|dow|crypto|bitcoin|ethereum|earnings|"
+              r"watchlist|portfolio|invest|investing|nvidia|tesla|apple|amd|etf)\b",
+    "desktop": r"\b(track|tracking|score|scores|flight|download|downloading|glass|widget|widgets|desktop|wallpaper|scene|fps|frame rate|corner|rgb|keyboard lights|lights?|lamp|"
+               r"hue|voice|sound like|accent|speak (faster|slower))\b",
+    "life": r"\b(journal|diary|birthday|birthdays|goodnight|good night|bed|changelog|what'?s new|patch notes for you|"
+            r"speed report|how fast)\b",
+    "studio": r"\b(blender|unreal|3d|model|mesh|render|sculpt|ue5)\b",
+}
+
+
+def groups_for(text):
+    t = text or ""
+    return {g for g, rx in GROUP_HINTS.items() if re.search(rx, t, re.I)}
+
+
+def lean_specs(groups):
+    """The core tools plus the groups asked for, in a fixed order (so the same groups = the same list = cached)."""
+    grouped = {n for names in TOOL_GROUPS.values() for n in names}
+    want = {n for g in groups for n in TOOL_GROUPS.get(g, [])}
+    out = []
+    for s in all_specs():
+        n = s["name"]
+        if n.count("__"):
+            if "apps" in groups:
+                out.append(s)
+        elif n not in grouped or n in want:
+            out.append(s)
+    return out
+
+
+MORE_TOOLS_SPEC = None
+
+
+def more_tools_spec(loaded):
+    # always offered (with every group), so the list keeps its shape and older calls to it stay valid
+    rest = [g for g in TOOL_GROUPS if g not in loaded and (TOOL_GROUPS[g] or (g == "apps" and _CONNECTORS is not None))] \
+        or list(TOOL_GROUPS)
+    desc = {"media": "Spotify, YouTube, Netflix, Apple Music", "computer": "files, commands, PC doctor, power, displays, "
+            "mouse, camera, screen text, screen history", "calendar_email": "calendar and email", "discord_phone":
+            "Discord and phone notifications", "games": "game mode and Steam", "stocks": "stocks and markets",
+            "desktop": "glass mode, desktop widgets and scene, RGB and smart lights, his voice settings", "life":
+            "journal, birthdays, goodnight, his changelog, speed report", "studio": "Blender and Unreal",
+            "apps": "the user's connected apps"}
+    return {"name": "more_tools", "description": "Load more of your tools when the ones you have can't do the job. "
+            "Groups: " + "; ".join(f"{g} ({desc[g]})" for g in rest) + ". They're available from your next step on.",
+            "input_schema": {"type": "object", "properties": {"groups": {"type": "array", "items": {"type": "string",
+                             "enum": rest}}}, "required": ["groups"]}}
+
+
 def all_specs():
     """Built-in tools plus whatever the app connectors (MCP) provide right now.
     Blender and Unreal are expert modes on their own keys: the experts drive the editors (the raw blender tool is
@@ -3616,7 +4075,7 @@ def all_specs():
 
 
 
-# Tools that act inside other apps: the "apps she may never touch" list (Settings > Application access) applies.
+# Tools that act inside other apps: the "apps he may never touch" list (Settings > Application access) applies.
 _APP_TOOLS = {"open", "window_control", "keyboard_input", "mouse", "close_app", "screen", "media_control"}
 
 

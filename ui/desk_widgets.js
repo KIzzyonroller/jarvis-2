@@ -1,4 +1,4 @@
-// The live widgets on her desktop (deskwidgets.py feeds them): PC stats, now playing, weather, today, notes & timers,
+// The live widgets on his desktop (deskwidgets.py feeds them): PC stats, now playing, weather, today, notes & timers,
 // Discord. A column on the right or left of the main monitor, or on your other monitor. Look-only: the wallpaper
 // never gets clicks. Every widget hides itself when it has nothing to show.
 window.DeskWidgets = (() => {
@@ -6,8 +6,8 @@ window.DeskWidgets = (() => {
   root.id = "widgets"; root.setAttribute("aria-hidden", "true");
   document.body.appendChild(root);
   const W = { on: [], where: "right", paused: false, el: {}, data: {}, hist: [], tel: null, gpu: null, discord: [] };
-  const ORDER = ["stats", "music", "weather", "calendar", "notes", "discord"];
-  const TITLE = { stats: "System", music: "Now playing", weather: "Weather", calendar: "Today", notes: "Notes", discord: "Messages" };
+  const ORDER = ["stats", "stocks", "music", "weather", "calendar", "notes", "discord"];
+  const TITLE = { stats: "System", stocks: "Watchlist", music: "Now playing", weather: "Weather", calendar: "Today", notes: "Notes", discord: "Messages" };
   const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const pad = (n) => String(n).padStart(2, "0");
   const clock = (ms) => { ms = Math.max(0, ms); const s = Math.floor(ms / 1000), hh = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
@@ -184,7 +184,22 @@ window.DeskWidgets = (() => {
     root.classList.toggle("off", !W.on.length);
   }
 
-  function redrawAll() { drawStats(); drawMusic(); drawWeather(); drawCal(); drawNotes(); drawDiscord(); ORDER.forEach((k) => { if (!W.on.includes(k) && W.el[k]) show(k, false); }); layout(); }
+  // ------------------------------------------------------------------ stocks: the watchlist (stocks.py, every 5 minutes)
+  function drawStocks() {
+    const rows = W.data.stocks || [];
+    if (!W.on.includes("stocks") || !rows.length) { show("stocks", false); return; }
+    const b = body("stocks"); b.replaceChildren();
+    for (const r of rows) {
+      const row = h("div", "sk" + (r.pct == null ? "" : r.pct >= 0 ? " up" : " dn") + (r.flash ? (r.flash > 0 ? " flash-up" : " flash-dn") : ""));
+      r.flash = 0;
+      const p = r.price == null ? "--" : r.price >= 1000 ? Math.round(r.price).toLocaleString() : r.price.toFixed(2);
+      row.append(h("b", null, r.sym), h("span", null, p), h("em", null, r.pct == null ? "" : (r.pct >= 0 ? "▲ " : "▼ ") + Math.abs(r.pct).toFixed(2) + "%"));
+      b.append(row);
+    }
+    side("stocks", "live"); show("stocks", true);
+  }
+
+  function redrawAll() { drawStocks(); drawStats(); drawMusic(); drawWeather(); drawCal(); drawNotes(); drawDiscord(); ORDER.forEach((k) => { if (!W.on.includes(k) && W.el[k]) show(k, false); }); layout(); }
 
   setInterval(() => { if (W.paused) return; tickMusic(); tickTimers(); }, 1000);
   setInterval(() => { if (W.paused) return; tickCal(); if (W.discord.length) drawDiscord(); }, 30000);
@@ -192,6 +207,7 @@ window.DeskWidgets = (() => {
   return {
     layout,
     has: (k) => W.on.includes(k),
+    side: () => (W.on.length ? W.where : "none"),
     on(e) {
       switch (e.type) {
         case "widgets": W.on = e.on || []; W.where = e.where || "right"; redrawAll(); break;
@@ -202,6 +218,12 @@ window.DeskWidgets = (() => {
         case "w_weather": W.data.weather = e.data; drawWeather(); break;
         case "w_cal": W.data.cal = e.data; drawCal(); break;
         case "w_notes": W.data.notes = e.data; drawNotes(); break;
+        case "w_stocks": W.data.stocks = e.rows || []; drawStocks(); break;
+        case "tick": {                                       // livefeed.py: a price just changed
+          const r = (W.data.stocks || []).find((x) => x.sym === e.sym); if (!r) break;
+          r.price = e.price; if (e.pct != null) r.pct = e.pct; r.flash = e.dir || 0;
+          if (!W.paused) drawStocks(); break;
+        }
         case "discord": if (e.text) { W.discord.push({ who: e.from || e.who || "Someone", channel: e.channel || "", text: String(e.text).slice(0, 200), at: Date.now(), src: "Discord" }); if (W.discord.length > 12) W.discord.shift(); drawDiscord(); } break;
         case "phone_note": if (e.text || e.from) { W.discord.push({ who: e.from || "Phone", channel: "", text: String(e.text || "").slice(0, 200), at: Date.now(), src: "Phone" }); if (W.discord.length > 12) W.discord.shift(); drawDiscord(); } break;
         case "desk_init": case "desk_layout": setTimeout(layout, 0); break;

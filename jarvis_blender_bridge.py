@@ -3,7 +3,7 @@ Jarvis Bridge for Blender.
 
 One file, three jobs:
   * Blender add-on: install it in Blender (Edit > Preferences > Add-ons > Install
-    from Disk) and Jarvis / Ultron can build live inside your open Blender. It
+    from Disk) and Jarvis can build live inside your open Blender. It
     listens on 127.0.0.1 only, so nothing outside your PC can reach it.
   * Background runner: when Blender isn't open, Jarvis runs
         blender -b <file> --python jarvis_blender_bridge.py -- job.json result.json
@@ -18,7 +18,7 @@ bl_info = {
     "version": (1, 0, 0),
     "blender": (3, 3, 0),
     "location": "View3D > Sidebar > Jarvis",
-    "description": "Lets Jarvis and Ultron build models in this Blender session",
+    "description": "Lets Jarvis build models in this Blender session",
     "category": "System",
 }
 

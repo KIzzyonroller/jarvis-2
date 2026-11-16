@@ -3,7 +3,7 @@ Ears: always listening.
 
 The mic is cut into utterances (you talk, then pause). Each utterance is
 transcribed locally with Whisper, and the app decides what to do with it:
-commands that start or end with "Jarvis"/"Ultron" are acted on, everything
+commands that start or end with "Jarvis" are acted on, everything
 else is ignored unless Jarvis just asked you something.
 
 Nothing is sent anywhere until you address him by name.

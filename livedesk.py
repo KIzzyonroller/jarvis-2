@@ -1,5 +1,5 @@
 """
-The living desktop: Jarvis, Juno and Ultron become the wallpaper.
+The living desktop: his world becomes your wallpaper.
 
 How it works (the same trick Wallpaper Engine and Lively use on Windows 10):
   * Explorer draws the wallpaper in a window called WorkerW, underneath the window that holds the desktop icons
@@ -32,7 +32,8 @@ TITLE = "Jarvis Desktop"
 PARK = -30000
 IS_WINDOWS = sys.platform == "win32"
 PASS = {"state", "voice", "persona", "turn_start", "turn_end", "merged", "confirm", "confirm_done", "fps", "music",
-        "telemetry", "instant", "briefing", "discord", "cards", "phone_note", "game", "desk_viz",
+        "telemetry", "instant", "briefing", "discord", "cards", "phone_note", "game", "desk_viz", "desk_scene", "w_stocks", "desk_facts",
+        "pull", "pull_update", "pull_clear", "pull_focus", "pull_layout", "tick",
         "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes"}           # the w_ ones feed the desktop widgets      # the last four feed the pop-up panels
 FLAG = "desk_icons_hidden"
 
@@ -249,7 +250,7 @@ def _short(v, n):
 
 
 def _panel_activity(ev):
-    """What the desktop's pop-up panels need from a step she takes, kept small (no screenshots, short results)."""
+    """What the desktop's pop-up panels need from a step he takes, kept small (no screenshots, short results)."""
     kind, d = ev.get("kind"), ev.get("data")
     if kind == "thinking":
         return {"type": "activity", "kind": "thinking", "data": str(d or "")[:400]}
@@ -294,7 +295,8 @@ class LiveDesk:
             ev = {"type": "msg", "role": "user", "text": str(ev.get("text", ""))[:200]}
         elif t not in PASS:
             return
-        if t in ("persona", "state", "merged", "music", "fps", "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes"):
+        if t in ("persona", "state", "merged", "music", "fps", "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes",
+                 "desk_facts", "w_stocks", "pull_layout"):
             self.snap[t] = ev
         if self.attached:
             self.em(ev)
@@ -357,7 +359,7 @@ class LiveDesk:
         return True
 
     def start(self):
-        """Runs in its own thread once the windows exist: attach, play Juno's intro, then keep watch."""
+        """Runs in its own thread once the windows exist: attach, show his scene, then keep watch."""
         if not IS_WINDOWS:
             return
         self.hwnd = self._find_hwnd()
@@ -376,11 +378,12 @@ class LiveDesk:
             print(f"[desktop] attaching failed: {e}")
             return
         merged = bool(_flags("merged"))
-        persona = getattr(self.core, "persona_key", "juno") if self.core else "juno"
+        persona = getattr(self.core, "persona_key", "jarvis") if self.core else "jarvis"
         self.em({"type": "desk_init", "monitors": monitors(), "shot": shot, "intro": bool(config.DESK_INTRO),
                  "persona": persona, "merged": merged, "quality": config.DESK_QUALITY, "viz": config.DESK_VIZ,
+                 "scene": config.DESK_SCENE, "calm": config.DESK_CALM,
                  "fps": config.ANIM_FPS})
-        for k in ("state", "music", "fps", "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes"):
+        for k in ("desk_facts", "pull_layout", "state", "music", "fps", "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes"):
             if k in self.snap:
                 self.em(self.snap[k])
         self._allow_camera()
@@ -445,7 +448,7 @@ class LiveDesk:
             print(f"[desktop] couldn't let glass mode use the camera here: {e}")
 
     def _screenshot(self):
-        """The desktop as it is right now, for Juno to grab. Stays on this PC: it only goes into our own page."""
+        """The desktop as it is right now, for the old intro. Stays on this PC: it only goes into our own page."""
         try:
             from PIL import ImageGrab
             im = ImageGrab.grab(all_screens=True).convert("RGB")

@@ -102,9 +102,9 @@ class GameWatch:
     def name(self):
         return self.current["name"] if self.current else None
 
-    # -------------------------------------------------------------- wins and losses you tell her about
+    # -------------------------------------------------------------- wins and losses you tell him about
     def result(self, kind):
-        """'win' / 'loss', from what you say ("we lost again", "gg we won"). She can't see the game itself."""
+        """'win' / 'loss', from what you say ("we lost again", "gg we won"). He can't see the game itself."""
         rs = self.results = getattr(self, "results", [])
         rs.append((time.time(), kind, self.name()))
         del rs[:-50]
@@ -123,7 +123,7 @@ class GameWatch:
         w, l = sum(1 for r in rs if r[1] == "win"), sum(1 for r in rs if r[1] == "loss")
         return w, l
 
-    # -------------------------------------------------------------- you can tell her too
+    # -------------------------------------------------------------- you can tell him too
     def set_manual(self, name):
         """'I'm playing X' / 'game mode on': quiet until you say it's over (or 4 hours)."""
         if name:
@@ -167,6 +167,11 @@ class GameWatch:
                 self.core.history.add("Game", f"Started playing {info['name']}")
         except Exception:
             pass
+        try:
+            import pulls
+            pulls.game_briefing(info["name"])          # friends on, queues, latest patch: up while it loads
+        except Exception as e:
+            print(f"[game] briefing: {e}")
         hub = getattr(self.core, "glass", None)
         if hub is not None and hub.connected():
             try:

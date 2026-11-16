@@ -26,7 +26,7 @@ if not config.DISCORD_BOT_TOKEN or not config.ANTHROPIC_API_KEY:
 from brain import Brain  # noqa: E402
 import discord_bot  # noqa: E402
 
-PERSONA = os.environ.get("BOT_PERSONA", "juno").lower()
+PERSONA = "jarvis"
 stop = threading.Event()
 signal.signal(signal.SIGTERM, lambda *_: stop.set())
 signal.signal(signal.SIGINT, lambda *_: stop.set())

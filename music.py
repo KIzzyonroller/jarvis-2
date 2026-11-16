@@ -1,5 +1,5 @@
 """
-Juno's music player: a small pop-up that shows whatever music is playing, with her sitting on top of it, feet
+His music player: a small pop-up that shows whatever music is playing (it used to have Juno sitting on it), feet
 dangling over the edge, bobbing her head to it.
 
 Where the information comes from:
@@ -25,8 +25,8 @@ from datetime import datetime, timezone
 
 import config
 
-TITLE = "Juno Music"
-W, H = 400, 360                 # the page's layout size; the panel at the bottom and her above it
+TITLE = "Jarvis Music"
+W, H = 400, 360                 # the page's layout size; the panel at the bottom and his above it
 SIZE = 1.25                     # drawn this much bigger than the layout (the page zooms to match)
 MARGIN = 16
 PARK = -30000
@@ -37,7 +37,7 @@ IS_WINDOWS = sys.platform == "win32"
 MUSIC_APPS = ("spotify", "applemusic", "apple music", "zunemusic", "itunes", "tidal", "deezer", "amazon music",
               "amazonmusic", "musicbee", "foobar", "winamp", "aimp", "soundcloud", "pandora", "ytmdesktop",
               "youtube music", "cider", "qobuz", "audirvana", "dopamine", "plexamp")
-PASS = {"voice", "state", "fps", "react", "persona"}   # from her core: her voice (she glows when she talks) and frame rate changes
+PASS = {"voice", "state", "fps", "react", "persona"}   # from his core: his voice (he glows when he talks) and frame rate changes
 
 
 def _is_music(aumid):
@@ -174,7 +174,7 @@ class MusicPlayer:
             self.pos = (r.left, r.top)
 
     def shape(self, runs):
-        """Cut the window to the panel and her outline. runs: [[x, y, w, h], ...] in page pixels."""
+        """Cut the window to the panel and his outline. runs: [[x, y, w, h], ...] in page pixels."""
         if not (IS_WINDOWS and self._handle() and runs):
             return
         import ctypes
@@ -194,7 +194,7 @@ class MusicPlayer:
         self._region_runs = runs
 
     def _tell_desktop(self, on):
-        """The big Juno on the desktop steps away while her music player is up (she's sitting on it instead)."""
+        """The big Juno on the desktop steps away while his music player is up (he's sitting on it instead)."""
         emit = getattr(self.core, "emit", None)
         if emit:
             try:
@@ -234,7 +234,7 @@ class MusicPlayer:
         except Exception:
             pass
 
-    # ------------------------------------------------------------------ core events (her voice, for the grin)
+    # ------------------------------------------------------------------ core events (his voice, for the grin)
     def feed(self, ev):
         t = ev.get("type")
         if t in PASS and (self.visible or t in ("fps", "persona")):
@@ -397,7 +397,7 @@ class MusicPlayer:
         time.sleep(0.25)
         self._tick(loop, mgr)
 
-    # ------------------------------------------------------------------ loudness, for the waves and her head bob
+    # ------------------------------------------------------------------ loudness, for the waves and his head bob
     def _meter(self):
         try:
             import comtypes
@@ -426,7 +426,7 @@ class MusicPlayer:
             self._stop.wait(1 / 30)
 
     def _find_meter(self, AudioUtilities, IMeter, cast, POINTER, CLSCTX_ALL):
-        """That app's own sound (so her talking doesn't move the bars); the whole speaker output if it can't be found."""
+        """That app's own sound (so him talking doesn't move the bars); the whole speaker output if it can't be found."""
         app = (self.app or "").lower()
         stem = app.split("!")[0].split("_")[0].split(".")[-1] if "!" in app else app.replace(".exe", "")
         try:
@@ -475,8 +475,8 @@ class MusicBridge:
     def ready(self):
         self._p.em.mark_ready()
         core = getattr(self._p, "core", None)
-        if core is not None:                               # her colours match whoever you're talking to
-            self._p.em({"type": "persona", "key": getattr(core, "persona_key", "juno")})
+        if core is not None:                               # his colours match whoever you're talking to
+            self._p.em({"type": "persona", "key": getattr(core, "persona_key", "jarvis")})
         print("[music] player loaded")
         return True
 

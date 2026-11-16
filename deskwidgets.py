@@ -15,14 +15,15 @@ import time
 
 import config
 
-KINDS = ("stats", "music", "weather", "calendar", "notes", "discord")
+KINDS = ("stats", "stocks", "music", "weather", "calendar", "notes", "discord")
 
 
 def enabled():
     """Which widgets are on, from Settings."""
     if not config.DESK_WIDGETS:
         return []
-    return [k for k in KINDS if config.DESK_WIDGET_ON.get(k, True)]
+    import stocks
+    return [k for k in KINDS if config.DESK_WIDGET_ON.get(k, True) and (k != "stocks" or stocks.watchlist())]
 
 
 def config_event():
@@ -65,7 +66,7 @@ class DeskWidgets:
 
     def _loop(self):
         import glass_kinds
-        self._stop.wait(8)                          # let the desktop and her intro come up first
+        self._stop.wait(8)                          # let the desktop and his intro come up first
         self.desk.feed(config_event())
         while not self._stop.wait(2):
             on = enabled()

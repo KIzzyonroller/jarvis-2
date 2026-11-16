@@ -28,7 +28,7 @@ def _flag(core, key, value=None):
 
 
 def _busy_or_away(core, idle_ok=(3, 600)):
-    """True when she shouldn't speak up: muted, quiet hours, talking already, fullscreen, a call, or you're away."""
+    """True when he shouldn't speak up: muted, quiet hours, talking already, fullscreen, a call, or you're away."""
     import proactive
     if getattr(core, "muted", False) or proactive._in_quiet_hours():
         return True
@@ -310,7 +310,7 @@ def today_on_pc(core):
 
 
 def evening(core):
-    """Gather the wrap-up: (cards, facts text for her to sum up)."""
+    """Gather the wrap-up: (cards, facts text for him to sum up)."""
     cards, facts = [], []
     try:
         w = tomorrow_weather(core)

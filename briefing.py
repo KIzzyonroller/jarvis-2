@@ -177,7 +177,15 @@ def gather(reminder_items, watcher=None, discord_from=None, flags_get=None, flag
         if loc:
             facts["weather"] = weather(loc)
 
-    jobs = [threading.Thread(target=run, args=("weather", wx), daemon=True),
+    def markets():
+        import config
+        if not getattr(config, "STOCKS_BRIEFING", False):
+            return ""
+        import stocks
+        return stocks.briefing_line()
+
+    jobs = [threading.Thread(target=run, args=("markets", markets), daemon=True),
+            threading.Thread(target=run, args=("weather", wx), daemon=True),
             threading.Thread(target=run, args=("headlines", headlines), daemon=True),
             threading.Thread(target=run, args=("pc", pc_health), daemon=True)]
     if EMAIL_LINE is not None:
@@ -217,14 +225,14 @@ def prompt(facts, morning=True):
     lines = [f"{k}: {v}" for k, v in (("Weather", facts.get("weather")), ("Calendar", facts.get("calendar")),
                                       ("Reminders today", facts.get("reminders")),
                                       ("Discord", facts.get("discord")), ("Email", facts.get("email")),
-                                      ("PC", facts.get("pc")),
+                                      ("PC", facts.get("pc")), ("Markets", facts.get("markets")),
                                       ("Headlines", facts.get("headlines"))) if v]
     part = "morning" if 4 <= now.hour < 12 else "afternoon" if 12 <= now.hour < 18 else "evening"
     kind = (f"the user's {part} briefing (first time they're at the PC today)" if morning
             else "a quick catch-up briefing")
     return (f"[Give {kind}. It's {when}. Facts gathered just now:\n" + "\n".join(lines) +
             "\nSay it in your own voice: 4 to 6 short spoken sentences, most useful first (weather, then today's "
-            "reminders, then Discord and email (just who, not what), then one headline). Natural speech, no lists, no markdown. Use only these "
+            "reminders, then Discord and email (just who, not what), then markets in a few words if given, then one headline). Natural speech, no lists, no markdown. Use only these "
             "facts; skip anything missing. Don't call any tools.]")
 
 

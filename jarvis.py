@@ -287,7 +287,7 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     if desk:
         import deskwidgets
         deskwidgets.start(desk, core)
-    # Start tucked away (minimized, corner widget showing) so his window never covers Juno's intro or your work.
+    # Start tucked away (minimized, corner widget showing) so his window never covers your work.
     start_min = start_hidden or config.START_MINIMIZED
     kw = dict(url=str(config.RES_DIR / "ui" / "index.html"), js_api=bridge, width=1360, height=840, min_size=(1100, 700),
               background_color="#02060b", frameless=True, easy_drag=False)
@@ -456,7 +456,7 @@ def run_console(voice):
             phone[0].feed(ev)
         t = ev.get("type")
         if t == "msg":
-            who = {"user": "You", "jarvis": "Juno", "system": "**"}[ev["role"]]
+            who = {"user": "You", "jarvis": "Jarvis", "system": "**"}[ev["role"]]
             if ev["role"] != "user" or ev.get("source") == "voice":
                 print(f"{who}: {ev['text']}")
         elif t == "dictation":

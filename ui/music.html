@@ -9,7 +9,7 @@
 @font-face{font-family:"Chakra Petch";font-weight:600;font-display:block;src:url(fonts/chakra-petch-latin-600-normal.woff2) format("woff2")}
 @font-face{font-family:"Jost";font-weight:400;font-display:block;src:url(fonts/jost-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Jost";font-weight:500;font-display:block;src:url(fonts/jost-latin-500-normal.woff2) format("woff2")}
-/* her colors: violet, near-black, mint, lilac glow */
+/* his colors: violet, near-black, mint, lilac glow */
 :root{
   --ink:#f3eeff; --dim:#a99bc4; --faint:#6d5f8a;
   --violet:#5c1aac; --deep:#1f075d; --night:#0a0416; --lilac:#8e55de; --glow:#b79cff; --mint:#2ee59d;
@@ -157,7 +157,7 @@ function onLevel(v) {
 
 const wv = $("#waves"), wg = wv.getContext("2d");
 const BARS = 26, bars = new Float32Array(BARS), seeds = Array.from({ length: BARS }, (_, i) => 0.55 + 0.45 * Math.abs(Math.sin(i * 12.9898) * 1.7 % 1));
-// each AI's colours: Juno purple and mint, Jarvis blue and cyan, Ultron red and ember orange
+// his colours (blue and cyan); the other two sets are left from when there were three of them
 const THEMES = {
   juno:   { violet: "#5c1aac", deep: "#1f075d", night: "#0a0416", lilac: "#8e55de", glow: "#b79cff", mint: "#2ee59d",
             ink: "#f3eeff", dim: "#a99bc4", faint: "#6d5f8a", p1: "#1a0b38", p2: "#110628", p3: "#0b0419" },
@@ -167,15 +167,15 @@ const THEMES = {
             ink: "#ffeceb", dim: "#c79b98", faint: "#7a4a48", p1: "#2a080b", p2: "#1a0507", p3: "#0e0304" },
 };
 const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(",");
-let THEME = THEMES.juno, grad = null;
+let THEME = THEMES.jarvis, grad = null;
 function applyTheme(key) {
-  THEME = THEMES[key] || THEMES.juno;
+  THEME = THEMES[key] || THEMES.jarvis;
   const r = document.documentElement.style;
   for (const k of ["violet", "deep", "night", "lilac", "glow", "mint", "ink", "dim", "faint", "p1", "p2", "p3"]) r.setProperty("--" + k, THEME[k]);
   for (const k of ["lilac", "glow", "mint"]) r.setProperty(`--${k}-rgb`, rgb(THEME[k]));
   grad = wg.createLinearGradient(0, 0, 264, 0); grad.addColorStop(0, THEME.lilac); grad.addColorStop(1, THEME.mint);
 }
-applyTheme("juno");
+applyTheme("jarvis");
 function drawWaves(t) {
   const W = 264, H = 60, mid = H / 2, bw = 5, gap = (W - BARS * bw) / (BARS - 1);
   wg.clearRect(0, 0, W, H); wg.fillStyle = grad;
@@ -204,7 +204,7 @@ function spark() {
   }
 }
 
-// (She used to sit on the player; it's just the player now.)
+// (He used to sit on the player; it's just the player now.)
 function pose() {}
 let baseRuns = null;
 

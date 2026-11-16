@@ -86,6 +86,15 @@ HEAVY_HINTS = re.compile(r"\b(screen|see|look|watch|camera|webcam|file|folder|do
                          r"install|uninstall|explain|why|how (do|does|can|would|should|to)|compare|research|summari[sz]e|"
                          r"analy[sz]e|debug|fix|error|plan|delete|move|copy|rename|routine|dictat|translate|calculate|"
                          r"math|essay|story|poem|recipe|steps|guide|then|after that|and then)\b", re.I)
+# Questions he has to actually know the answer to: the main model takes these (it knows far more than the fast one)
+QUESTION_RE = re.compile(r"^(?:hey |ok |okay |so |um |uh )*(what|what's|whats|who|who's|whom|whose|when|where|which|why|how|is|"
+                         r"are|was|were|do|does|did|can|could|would|should|will|tell me|give me|any idea|have you heard)\b"
+                         r"|\?$", re.I)
+SIMPLE_Q = re.compile(r"\b(time|date|what day|today's date|volume|battery|playing|this song|song is this|you there|you up|"
+                      r"how are you|how's it going|you okay|you good|what's up|whats up|sup)\b", re.I)
+KNOW_HINTS = re.compile(r"\b(stock|stocks|share price|market|ticker|crypto|bitcoin|earnings|invest|history|science|"
+                        r"meaning|define|definition|who (is|was)|what (is|was|are|were) (a|an|the)|capital of|population|"
+                        r"lore|rules|recommend|opinion|think about|better|best|worth it|difference)\b", re.I)
 # Requests that will take a few seconds (tools, web, vision): worth an instant "On it."
 SLOW_HINTS = re.compile(r"\b(weather|forecast|news|search|look ?up|google|latest|score|scores|price|stock|who won|"
                         r"screen|look at|see|camera|find|file|folder|blender|model|build|make me|create|write|draft|"
@@ -305,11 +314,11 @@ class Core:
         self.events = queue.Queue()
         self.brains = {}
         st = self._load_state()
-        self.persona_key = personas.DEFAULT      # always start as Juno (switch to Jarvis or Ultron any time)
+        self.persona_key = personas.DEFAULT      # Jarvis (the only one now)
         self.duo = False                        # "both of you" (Jarvis and Ultron taking turns): off at every start
         self._duo_once = None             # lead key for a one-off duo turn ("Jarvis and Ultron?" then the question)
         self._duo_capture = None          # tool results from the lead, handed to the second
-        if self.persona_key not in personas.PERSONAS:     # e.g. left on Jarvis or Ultron, who are retired
+        if self.persona_key not in personas.PERSONAS:     # e.g. left on Juno or Ultron, who are retired
             self.persona_key = personas.DEFAULT
             self._save_state()
         self.listener = None
@@ -435,6 +444,21 @@ class Core:
             steam.start(self)                    # wishlist sales + patch notes for games you play (slow, background)
         except Exception as e:
             print(f"[check-ins] off: {e}")
+        try:
+            import stocks
+            stocks.start(self)                   # the watchlist widget and big-move heads-ups (every 5 minutes)
+        except Exception as e:
+            print(f"[stocks] off: {e}")
+        try:
+            import deskfacts
+            deskfacts.start(self)                # the desktop scene's real details (sunset, version, your apps)
+        except Exception as e:
+            print(f"[desk facts] off: {e}")
+        try:
+            import pulls
+            pulls.start(self)                    # what he pulls up beside him (and keeps live)
+        except Exception as e:
+            print(f"[pulls] off: {e}")
 
     def shutdown(self):
         if getattr(self, "_shut", False):
@@ -563,7 +587,7 @@ class Core:
                 self.listener.expecting = lambda: (self._hold is not None or self._turn is not None
                                                    or self._engaged() or self._pending is not None)
                 self.listener.start()
-                self._log('ALWAYS LISTENING  [SAY "JUNO", "JARVIS" OR "ULTRON"]')
+                self._log('ALWAYS LISTENING  [SAY "JARVIS"]')
                 self._start_hotkey()
             except Exception as e:
                 self.listener = None
@@ -1134,10 +1158,10 @@ class Core:
                 self.set_state(self._rest_state())
 
     def _handle(self, kind, payload):
-        if kind == "chat_first":                       # proactive.py: she starts a conversation
+        if kind == "chat_first":                       # proactive.py: he starts a conversation
             self._chat_first(payload)
             return
-        if kind == "song_chat":                        # proactive.py: she says something about the song
+        if kind == "song_chat":                        # proactive.py: he says something about the song
             self._song_chat(payload)
             return
         if kind == "journal":                          # moments.py: tonight's journal question
@@ -1221,6 +1245,12 @@ class Core:
         self._command(text, source, ended)
 
     def _switch(self, key, announce=True):
+        if key not in personas.PERSONAS or len(personas.ALL) < 2:    # Juno and Ultron are retired
+            key = self.persona_key
+            if announce:
+                self.speak(random.choice(["It's just me now.", "Only me here, I'm afraid. The others were retired.",
+                                          "Just me. I promise I'm enough."]))
+            return
         if key == self.persona_key:
             if announce:
                 self.speak("Already here.")
@@ -1331,7 +1361,7 @@ class Core:
 
     def _command(self, text, source, ended):
         duo_hit = False
-        single = len(personas.ORDER) < 2           # Juno only: nobody to share a turn with
+        single = len(personas.ORDER) < 2           # just Jarvis: nobody to share a turn with
         if not SWITCH_RE.search(text):            # "switch to Ultron" names him but isn't for both
             text, duo_hit = self._split_duo(text) if not single else (text, False)
         once, self._duo_once = self._duo_once, None
@@ -1566,7 +1596,7 @@ class Core:
                                  name="changelog-offer").start()
 
     def _offer_changelog_post(self, version):
-        """Just updated: once her bot is online and you're around, she asks whether to post what's new on Discord."""
+        """Just updated: once his bot is online and you're around, he asks whether to post what's new on Discord."""
         if not config.DISCORD_UPDATES_CHANNEL or config.DISCORD_BOT_ON_SERVER:
             return
         for _ in range(60):                                # the bot takes a few seconds to connect
@@ -1875,7 +1905,9 @@ class Core:
             print(f"[activity] {e}")
 
     def secret_code(self, source="voice"):
-        """Up up down down left right left right B A start: the two of them merge into Juno (or split again)."""
+        """Up up down down left right left right B A start (retired along with Juno and Ultron)."""
+        self.speak("Nice try. That door's been bricked up.")
+        return
         on = not self._state_flag("merged")
         self._state_flag("merged", on)
         print(f"[secret] merged {'on' if on else 'off'} ({source})")
@@ -2239,6 +2271,15 @@ class Core:
             self.emit({"type": "fps", "fps": config.ANIM_FPS})
         if "JUNO_DESK_VIZ" in keys:                        # where the desktop visualizers go, no restart
             self.emit({"type": "desk_viz", "viz": config.DESK_VIZ})
+        if "JUNO_STOCKS" in keys:
+            try:
+                import stocks
+                if stocks.WATCH is not None:
+                    stocks.WATCH.feed()
+            except Exception as e:
+                print(f"[stocks] {e}")
+        if {"JUNO_DESK_SCENE", "JUNO_DESK_CALM"} & set(keys):   # his scene and calm panels, no restart
+            self.emit({"type": "desk_scene", "scene": config.DESK_SCENE, "calm": config.DESK_CALM})
         if "JUNO_PHONE_NOTIFS" in keys and config.PHONE_NOTIFS and getattr(self, "phonelink", None) is None:
             self._start_phonelink()
         if config.WIDGET_KEYS & set(keys):
@@ -2247,7 +2288,7 @@ class Core:
                 deskwidgets.WIDGETS.refresh()
         if "JUNO_GLASS_WHERE" in keys and getattr(self, "glass", None) is not None:
             self.glass.move(config.GLASS_WHERE)
-        voice_keys = {"JUNO_VOICE": "juno", "JARVIS_VOICE": "jarvis", "ULTRON_VOICE": "ultron"}
+        voice_keys = {"JARVIS_VOICE": "jarvis"}
         for k in set(keys) & set(voice_keys):            # a new voice for one of them, straight away
             v = os.environ.get(k, "").strip()
             if v:
@@ -2280,7 +2321,7 @@ class Core:
         return where
 
     def set_corner_widget(self, on):
-        """Voice or Settings: the small corner widget that shows while her window is minimized."""
+        """Voice or Settings: the small corner widget that shows while his window is minimized."""
         settings.save({"JARVIS_MINI": "true" if on else "false"})
         os.environ["JARVIS_MINI"] = "true" if on else "false"
         config.reload_live()
@@ -2526,10 +2567,10 @@ class Core:
         print(f"[chat first] {info['what']} ({info['mins']} min): {text}")
         b = self.brain
         if b is not None and isinstance(getattr(b, "history", None), list) and (not b.history or b.history[-1]["role"] == "assistant"):
-            b.history.append({"role": "user", "content": ask})                 # so her next answer knows how this began
+            b.history.append({"role": "user", "content": ask})                 # so his next answer knows how this began
             b.history.append({"role": "assistant", "content": [{"type": "text", "text": text}]})
         self.say_line(text)
-        self._engage(config.FOLLOW_UP_TIMEOUT + 10)     # answer without saying her name
+        self._engage(config.FOLLOW_UP_TIMEOUT + 10)     # answer without saying his name
 
     def _evening_wrap(self):
         import moments
@@ -2568,7 +2609,7 @@ class Core:
         self.emit({"type": "msg", "role": "jarvis", "text": line})
         self.speak(line)
 
-    # ================================================================ reactions (small Juno on the music player / glass)
+    # ================================================================ reactions (nothing shows them now; kept for later)
     REACT_RULES = [
         ("cheer", re.compile(r"\b(i|we) (won|did it|got it|passed|beat it|escaped)\b|\bgg\b|\blet'?s go+\b|\bclutch(ed)?\b|\bvictory\b|\bfinally (done|finished)\b", re.I)),
         ("heart", re.compile(r"\b(thank(s| you)|ty|love you|you'?re (the best|amazing|awesome)|good (girl|job)|nice work|i appreciate)\b", re.I)),
@@ -2981,8 +3022,8 @@ class Core:
             print(f"[timing] slowest part: {biggest[0]}")
         return t["speech_end"], total
 
-    # ================================================================ her mood, and how your games are going
-    LOSS_RE = re.compile(r"\b(i|we) lost\b(?!\s+(my|your|his|her|our|a|an|track|it all)\b)|\b(i|we) (died|got (tunneled|tunnelled|camped|sacrificed|killed|hooked|wrecked|destroyed|"
+    # ================================================================ his mood, and how your games are going
+    LOSS_RE = re.compile(r"\b(i|we) lost\b(?!\s+(my|your|her|his|our|a|an|track|it all)\b)|\b(i|we) (died|got (tunneled|tunnelled|camped|sacrificed|killed|hooked|wrecked|destroyed|"
                          r"stomped))\b|\blost (again|another)\b|\banother loss\b|\bthat was (a )?(loss|rough)\b", re.I)
     WIN_RE = re.compile(r"\b(i|we) (won|escaped|got out|4k'?d|four[- ]k'?d)\b|\bgg\b.*\b(win|won)\b|\bvictory\b", re.I)
 
@@ -2997,7 +3038,7 @@ class Core:
             w.result("loss")
 
     def _mood_note(self):
-        """A light steer for her tone right now (never announced): the hour, how long you've been gone, your game."""
+        """A light steer for his tone right now (never announced): the hour, how long you've been gone, your game."""
         if not config.MOODS:
             return ""
         import gamemode
@@ -3056,9 +3097,15 @@ class Core:
         speedlog.record(rec)
 
     def _quick(self, text):
-        """Short, everyday request? Then the fast model answers it."""
-        return (bool(config.FAST_MODEL) and len(text.split()) <= 14 and not HEAVY_HINTS.search(text)
-                and not DETAIL_HINTS.search(text))
+        """Short, everyday request? Then the fast model answers it. Real questions (anything he has to KNOW, not just
+        do) go to the main model, which knows a lot more, unless it's one of the trivial ones (the time, the volume)."""
+        if not config.FAST_MODEL or len(text.split()) > 14 or HEAVY_HINTS.search(text) or DETAIL_HINTS.search(text):
+            return False
+        if KNOW_HINTS.search(text):
+            return False
+        if QUESTION_RE.search(text.strip()) and not SIMPLE_Q.search(text):
+            return False
+        return True
 
     def _run_turn(self, text, source, ended, max_words="auto", brain=None, prompt=None, allow_tools=True,
                   after=None, wait=True, who=None, quick="auto"):
@@ -3202,7 +3249,7 @@ class Core:
             "glass": self.glass_open,
             "calendar_mode": lambda: threading.Timer(1.0, self.switch_mode, args=("calendar",)).start() or "Switching to calendar mode...",
             "reset": lambda: (self.brain.reset() if self.brain else None) or "Memory wiped.",
-            # her window's Memory and Routines pages
+            # his window's Memory and Routines pages
             "forget_memory": lambda: tools.forget(str(value)),
             "edit_memory": lambda: tools.edit_memory(str((value or {}).get("id")), (value or {}).get("text")),
             "delete_routine": lambda: tools.delete_routine(str(value)),

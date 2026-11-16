@@ -1,11 +1,11 @@
-// The holographic panels from her main window (web search radar, PowerShell terminal, launch sequence, now playing,
-// weather and the rest), popping up on the desktop beside the big visualizer while she works. Built from the same
+// The holographic panels from his main window (web search radar, PowerShell terminal, launch sequence, now playing,
+// weather and the rest), popping up on the desktop beside the big visualizer while he works. Built from the same
 // code as the main window (index.html), so they look and behave the same. Display only: the desktop takes no clicks.
 "use strict";
 window.DeskHolo = (() => {
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const sfx = { play() {} };                          // the desktop stays quiet; her window makes the sounds
+const sfx = { play() {} };                          // the desktop stays quiet; his window makes the sounds
 const toolName = (n) => n.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const STEP_LABEL = { web_search: "Searching the web", screen: "Looking at your screen", look_at_screen: "Looking at your screen", look_at_camera: "Looking at you",
   run_command: "Running PowerShell", open: "Opening", close_app: "Closing", self_control: "Window", window_control: "Windows", keyboard_input: "Typing",

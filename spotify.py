@@ -285,7 +285,7 @@ _SHOW = {"on": False}     # did they ask to SEE Spotify ("open Spotify and play.
 
 def _tuck_away(prev):
     """Music is playing, nobody asked for the window: minimize Spotify without activating anything and hand focus
-    back to what you were using. Juno's own music player shows what's on instead."""
+    back to what you were using. His own music player shows what's on instead."""
     import ctypes
     import media_buttons
     import tools
@@ -436,7 +436,7 @@ def find_playlist(sp, name, who=None):
 
 
 def control(action, query=None, kind="auto", value=None, shuffle=None, owner=None, show=False):
-    """The Juno tool. Returns a short plain-English result. show: they asked to see the Spotify window."""
+    """The Spotify tool. Returns a short plain-English result. show: they asked to see the Spotify window."""
     _SHOW["on"] = bool(show)
     sp = client()
     if not sp.configured:

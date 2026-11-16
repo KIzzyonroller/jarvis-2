@@ -80,7 +80,7 @@ body.ultron #him-state{font-size:13px;letter-spacing:.14em}
 #help dt{color:var(--ink);font-weight:500}
 #help p{margin-top:8px;font-size:12px}
 .desk-only{display:none}
-/* on the desktop: no camera picture, her world shows through */
+/* on the desktop: no camera picture, his world shows through */
 html.desk,html.desk body{background:transparent}
 body.desk #cam{opacity:0}
 body.desk #veil{background:none}
@@ -247,7 +247,7 @@ body.ultron .card.glitch{animation:glitch .22s steps(2) 1}
 @media (prefers-reduced-motion:reduce){.card{transition:none}.card.ring-done,body.ultron .card.glitch{animation:none}}
 </style>
 </head>
-<body class="juno">
+<body class="jarvis">
 <video id="cam" autoplay playsinline muted></video>
 <div id="veil"></div>
 <div id="board"></div>
@@ -276,7 +276,7 @@ body.ultron .card.glitch{animation:glitch .22s steps(2) 1}
   </dl>
   <p class="win-only">The mouse works too: drag, throw, click, scroll to resize, right-click to crumple. Press H to hide this.</p>
   <p class="win-only">Dots not on your hand? <button id="calbtn" type="button">Line up my hand</button> (or press C).</p>
-  <p class="desk-only">On the desktop it's hands only. Dots not on your hand? Tell her "line up my hand".</p>
+  <p class="desk-only">On the desktop it's hands only. Dots not on your hand? Tell him "line up my hand".</p>
 </aside>
 <div id="gate" hidden></div>
 
@@ -340,7 +340,7 @@ function drawCalibration(now) {
   g.fillText(`Pinch here and hold (${CALIB.step + 1} of 2)`, x, y + r + 34);
   g.restore();
 }
-let persona = "juno", himState = "idle", voice = 0, voiceAt = 0, lastSpoke = -1e9;
+let persona = "jarvis", himState = "idle", voice = 0, voiceAt = 0, lastSpoke = -1e9;
 const rgb = () => persona === "ultron" ? [255, 48, 70] : persona === "juno" ? [201, 123, 255] : [127, 231, 255];
 const hot = () => persona === "ultron" ? [255, 138, 61] : persona === "juno" ? [255, 90, 224] : [223, 246, 255];
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${clamp(a, 0, 1).toFixed(3)})`;
@@ -657,7 +657,7 @@ function onLive(e) {
   if (e.type === "update") { const c = cards.get(e.id); if (c) { c.data = c.d.data = e.data; c.redraw ? c.redraw() : typeof c.live === "function" && c.live(e.data); measure(c); } return true; }
   if (e.type === "np") { cards.forEach((c) => { if (c.d.kind === "nowplaying") { c.live(e.data || {}); measure(c); } }); return true; }
   if (e.type === "gpu" || e.type === "telemetry") { cards.forEach((c) => c.d.kind === "stats" && c.live(e)); return true; }
-  if (e.type === "react") return true;            // (the glass has no picture of her to react)
+  if (e.type === "react") return true;            // (the glass has no picture of him to react)
   if (e.type === "game_timer") {             // "start the DS timer"
     const want = String(e.label || "").toLowerCase();
     cards.forEach((c) => { if (c.d.kind !== "game" || c.dead) return; const t = c.data.timers.find((x) => x.label.toLowerCase() === want) || c.data.timers.find((x) => x.label.toLowerCase().includes(want) || want.includes(x.label.toLowerCase()));

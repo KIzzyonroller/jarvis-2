@@ -78,7 +78,7 @@ def _stats(rows, key):
 def report(hours=None):
     rows = [r for r in load(hours) if not r.get("interrupted") and r.get("total") is not None]
     if not rows:
-        return "No timings yet. Use her for a while (a day of normal use is plenty), then ask again."
+        return "No timings yet. Use him for a while (a day of normal use is plenty), then ask again."
     lines = [f"{len(rows)} answers" + (f" in the last {hours:g} hours" if hours else "") + ". Median / slowest 10%:"]
 
     def block(title, rs):

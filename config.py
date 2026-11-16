@@ -87,13 +87,13 @@ COUNTRY = os.environ.get("JARVIS_COUNTRY", "")      # 2-letter code, e.g. CA, US
 TIMEZONE = os.environ.get("JARVIS_TIMEZONE", "")    # e.g. America/Toronto
 
 # ---------------------------------------------------------------- ears
-# Always listening. Say "Jarvis" (or "Ultron") at the START or END of what
+# Always listening. Say "Jarvis" at the START or END of what
 # you say: "Jarvis, open Spotify" / "open Spotify, Jarvis".
-LISTEN_NAMES = ["Jarvis", "Ultron"]
+LISTEN_NAMES = ["Jarvis"]
 SAMPLE_RATE = 16000
 CHUNK = 1280              # 80 ms
 # Speech recognition runs in two passes:
-#   fast:     every utterance, just to catch "Jarvis"/"Ultron". Cheap.
+#   fast:     every utterance, just to catch "Jarvis". Cheap.
 #   accurate: re-transcribes only what you say TO him, carefully. "auto" = large-v3-turbo on an
 #             NVIDIA GPU, distil-small.en on CPU (about twice as fast as small.en). Other options: small.en, medium.en, distil-large-v3, large-v3.
 WHISPER_FAST = os.environ.get("JARVIS_WHISPER_FAST", "tiny.en")   # just listens for the name; the accurate pass does the real work
@@ -101,12 +101,12 @@ WHISPER_THREADS = int(os.environ.get("JARVIS_WHISPER_THREADS", "4"))  # cap so l
 WHISPER_ACCURATE = os.environ.get("JARVIS_WHISPER", "auto")
 WHISPER_DEVICE = os.environ.get("JARVIS_WHISPER_DEVICE", "auto").lower()   # auto, cpu, cuda
 # Languages (langs.py): "en" = English only; "auto" = whatever you speak; or one of es fr it pt hi.
-# Anything but English switches hearing to Whisper's multilingual models, and her replies and voice follow.
+# Anything but English switches hearing to Whisper's multilingual models, and his replies and voice follow.
 LANGUAGE = os.environ.get("JUNO_LANGUAGE", "en").lower()
 LANGUAGES = LANGUAGE != "en"
 HEAR_LANGUAGE = "en" if not LANGUAGES else (None if LANGUAGE == "auto" else LANGUAGE)
 if LANGUAGES and not os.environ.get("JARVIS_WHISPER_FAST"):
-    WHISPER_FAST = "tiny"            # the English-only tiny model can't hear her name inside another language
+    WHISPER_FAST = "tiny"            # the English-only tiny model can't hear his name inside another language
 MEMORY_FILE_NAME = "memory.json"
 ROUTINES_FILE_NAME = "routines.json"
 MEMORY_LIMIT = 200            # facts kept
@@ -131,7 +131,7 @@ WHISPER_BEAM = int(os.environ.get("JARVIS_WHISPER_BEAM", "0"))   # careful-pass 
 HOLD_UNFINISHED = 2.5       # ends with "and", "the", "to", a comma...
 HOLD_NAME_ONLY = 1.6        # just "Jarvis" (then he says "Yes?")
 MAX_RECORD_SECONDS = 20
-FOLLOW_UP_TIMEOUT = float(os.environ.get("JUNO_FOLLOW_UP", "8"))   # after she asks you something, answer without her name for this long
+FOLLOW_UP_TIMEOUT = float(os.environ.get("JUNO_FOLLOW_UP", "8"))   # after he asks you something, answer without his name for this long
 MERGE_SECONDS = 3.0       # pause mid-command and keep talking within this, and he stitches it together
 # He reads out about this many words, then finishes the paragraph (the idea) he's on, up to 1.6x this.
 # Anything after that stays on screen and he says so. Ask for detail ("explain", "tell me more") for no limit.
@@ -170,6 +170,10 @@ TTS_RATE = "+8%"
 HOME = Path.home()
 JARVIS_DIR = HOME / "Documents" / "Jarvis"
 WRITE_ROOTS = [JARVIS_DIR]   # free to create/edit here; anywhere else asks (with an "always allow" option)
+MAKE_DIR = JARVIS_DIR / "Made"   # where documents he makes go when you don't say where
+# New files and folders in Desktop, Documents, Downloads, Pictures, Music and Videos without asking ("personal"),
+# or only in his own folder ("jarvis"). Changing, moving or deleting your existing files still asks either way.
+FREE_CREATE = os.environ.get("JARVIS_FREE_CREATE", "personal").lower()
 
 
 def _fixed_drives():
@@ -199,7 +203,7 @@ MODELS_3D_DIR = JARVIS_DIR / "3D"
 # Webcam: Jarvis only takes a photo when you ask him to look, then releases the camera.
 CAMERA_ENABLED = os.environ.get("JARVIS_CAMERA", "true").lower() != "false"
 CAMERA_INDEX = int(os.environ.get("JARVIS_CAMERA_INDEX", "0"))   # try 1 if you have several cameras
-# Apps she may never open, close, type into or click in (Settings > Application access), comma separated
+# Apps he may never open, close, type into or click in (Settings > Application access), comma separated
 BLOCKED_APPS = [a.strip().lower() for a in os.environ.get("JUNO_BLOCKED_APPS", "").split(",") if a.strip()]
 
 # --- staying out of your way
@@ -208,14 +212,16 @@ KEEP_FOCUS = os.environ.get("JARVIS_KEEP_FOCUS", "true").lower() != "false"
 KEEP_FOCUS_SECONDS = 12      # how long after launching he guards your focus against apps that grab it
 # A small always-on-top HUD in the top-right corner while the main window is minimized.
 MINI_HUD = os.environ.get("JARVIS_MINI", "true").lower() != "false"
-# The living desktop (livedesk.py): Juno becomes the wallpaper while she runs, desktop icons hidden.
+# The living desktop (livedesk.py): his world becomes the wallpaper while he runs, desktop icons hidden.
 LIVING_DESKTOP = os.environ.get("JARVIS_LIVING_DESKTOP", "true").lower() != "false"
-DESK_INTRO = os.environ.get("JARVIS_DESK_INTRO", "true").lower() != "false"     # Juno grabs the screen at startup
+DESK_INTRO = False                 # the old screen-shattering intro is gone: the desktop is just there
+DESK_SCENE = os.environ.get("JUNO_DESK_SCENE", "bench").lower()   # bench / station / archive / signal / chart
+DESK_CALM = os.environ.get("JUNO_DESK_CALM", "true").lower() != "false"   # panels just appear, no effects
 DESK_QUALITY = os.environ.get("JUNO_DESK_QUALITY", "medium").lower()   # low / medium / high: frame rate and detail
 DESK_VIZ = os.environ.get("JUNO_DESK_VIZ", "both").lower()             # both / corner / second / off
-# Her music player (music.py): pops up while music plays, with her sitting on it. Spotify stays in the background.
+# His music player (music.py): pops up while music plays. Spotify stays in the background.
 MUSIC_PLAYER = os.environ.get("JUNO_MUSIC_PLAYER", "true").lower() != "false"
-# Frame rate for her animations (desktop and music player), all the time. Say "set your animations to 60 fps" to change it.
+# Frame rate for his animations (desktop and music player), all the time. Say "set your animations to 60 fps" to change it.
 try:
     ANIM_FPS = max(5, min(60, int(os.environ.get("JUNO_FPS", "30"))))
 except ValueError:
@@ -224,7 +230,7 @@ except ValueError:
 SCREEN_WATCH = os.environ.get("JARVIS_SCREEN_WATCH", "true").lower() != "false"
 # Start with his window minimized (the corner widget shows him), so he never covers the desktop intro or your work.
 START_MINIMIZED = os.environ.get("JARVIS_START_MINIMIZED", "true").lower() != "false"
-# She starts conversations about what you're doing (proactive.py)
+# He starts conversations about what you're doing (proactive.py)
 CHAT_FIRST = os.environ.get("JUNO_CHAT_FIRST", "true").lower() != "false"
 CHAT_EVERY = os.environ.get("JUNO_CHAT_EVERY", "normal").lower()              # rarely / normal / often
 QUIET_HOURS = os.environ.get("JUNO_QUIET_HOURS", "23-8")                     # "23-8" = 11 PM to 8 AM; empty = none
@@ -277,7 +283,7 @@ DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "").strip()
 DISCORD_BOT_ON_SERVER = os.environ.get("DISCORD_BOT_ON_SERVER", "false").lower() == "true"   # server/run_bot.py runs it
 DISCORD_OWNER_ID = os.environ.get("DISCORD_OWNER_ID", "").strip()      # your Discord user ID: you skip the rate limits
 DISCORD_BOT_REPLY = os.environ.get("DISCORD_BOT_REPLY", "everyone").strip().lower()   # everyone, owner or off
-DISCORD_UPDATES_CHANNEL = os.environ.get("DISCORD_UPDATES_CHANNEL", "").strip()     # where she posts her update notes
+DISCORD_UPDATES_CHANNEL = os.environ.get("DISCORD_UPDATES_CHANNEL", "").strip()     # where he posts his update notes
 DISCORD_UPDATES_MODE = os.environ.get("DISCORD_UPDATES_MODE", "ask").lower()      # ask / auto / off, after an update
 # Started with Windows: seconds to wait after login before loading (keeps login snappy)
 STARTUP_DELAY = float(os.environ.get("JARVIS_STARTUP_DELAY", "10"))
@@ -288,6 +294,8 @@ INSTANT_COMMANDS = os.environ.get("JARVIS_INSTANT", "true").lower() != "false"
 # Short, simple requests go to a faster model; anything involving the screen, files, Blender, code etc. stays on MODEL.
 # Set JARVIS_FAST_MODEL= (empty) to always use MODEL.
 FAST_MODEL = os.environ.get("JARVIS_FAST_MODEL", "claude-haiku-5-5")
+# Tools on demand (tools.TOOL_GROUPS): a small core set plus the groups a request needs, instead of all of them
+LEAN_TOOLS = os.environ.get("JARVIS_LEAN_TOOLS", "true").lower() != "false"
 
 # Game mode: while you're in a fullscreen game or video he keeps answers to one short sentence
 # and shows non-urgent heads-ups on screen instead of talking over your game.
@@ -306,9 +314,9 @@ LIGHTS_SYNC_TARGET = os.environ.get("JUNO_LIGHTS_SYNC_TARGET", "all")
 STEAM_API_KEY = os.environ.get("STEAM_API_KEY", "")                            # steam.py (secret)
 STEAM_ID = os.environ.get("STEAM_ID", "")                                      # profile link, custom name or 17-digit id
 STEAM_SALE_ALERTS = os.environ.get("JUNO_STEAM_SALES", "true").lower() != "false"
-STEAM_SALE_MIN = _int_env("JUNO_STEAM_SALE_MIN", 20, 1, 95)                    # % off before she mentions it
+STEAM_SALE_MIN = _int_env("JUNO_STEAM_SALE_MIN", 20, 1, 95)                    # % off before he mentions it
 PATCH_NOTES = os.environ.get("JUNO_PATCH_NOTES", "true").lower() != "false"     # updates for games you play
-MOODS = os.environ.get("JUNO_MOODS", "true").lower() != "false"                 # her mood colors her tone
+MOODS = os.environ.get("JUNO_MOODS", "true").lower() != "false"                 # his mood colors his tone
 BANTER = os.environ.get("JUNO_BANTER", "true").lower() != "false"               # the AIs quip when you switch
 BIRTHDAYS = os.environ.get("JUNO_BIRTHDAYS", "true").lower() != "false"         # birthday reminders
 JOURNAL = os.environ.get("JUNO_JOURNAL", "true").lower() != "false"             # nightly journal question
@@ -327,9 +335,16 @@ PHONE_PORT = int(os.environ.get("JARVIS_PHONE_PORT", "8766"))
 # Glass mode (cards over your webcam that you move with your hands). Only ever on this PC (127.0.0.1).
 GLASS_PORT = int(os.environ.get("JARVIS_GLASS_PORT", "8767"))
 GLASS_WHERE = os.environ.get("JUNO_GLASS_WHERE", "window").lower()     # window (its own, with your camera) / desktop
-# Widgets on her desktop (deskwidgets.py): PC stats, now playing, weather, today, notes & timers, Discord
+# Widgets on his desktop (deskwidgets.py): PC stats, now playing, weather, today, notes & timers, Discord
 _W_KEYS = {"stats": "JUNO_W_STATS", "music": "JUNO_W_MUSIC", "weather": "JUNO_W_WEATHER", "calendar": "JUNO_W_CALENDAR",
-           "notes": "JUNO_W_NOTES", "discord": "JUNO_W_DISCORD"}
+           "notes": "JUNO_W_NOTES", "discord": "JUNO_W_DISCORD", "stocks": "JUNO_W_STOCKS"}
+# Stocks (stocks.py): watchlist in JUNO_STOCKS; heads-ups when one moves big; the market in the morning briefing
+STOCK_ALERTS = os.environ.get("JUNO_STOCK_ALERTS", "true").lower() != "false"
+STOCK_ALERT_PCT = float(os.environ.get("JUNO_STOCK_ALERT_PCT", "4") or 4)
+STOCKS_BRIEFING = os.environ.get("JUNO_STOCKS_BRIEFING", "true").lower() != "false"
+STOCKS_WEEKLY = os.environ.get("JUNO_STOCKS_WEEKLY", "true").lower() != "false"       # Sunday evening recap
+STOCK_EARNINGS = os.environ.get("JUNO_STOCK_EARNINGS", "true").lower() != "false"     # the evening before earnings
+GAME_BRIEFING = os.environ.get("JUNO_GAME_BRIEFING", "true").lower() != "false"       # a board when a game starts
 DESK_WIDGETS = os.environ.get("JUNO_DESK_WIDGETS", "true").lower() != "false"
 DESK_WIDGET_ON = {k: os.environ.get(v, "true").lower() != "false" for k, v in _W_KEYS.items()}
 DESK_WIDGETS_WHERE = os.environ.get("JUNO_DESK_WIDGETS_WHERE", "right").lower()      # right / left / second
@@ -339,7 +354,7 @@ INSTANT_ACK = os.environ.get("JARVIS_INSTANT_ACK", "true").lower() != "false"
 
 # Voice model: auto (setup.bat measures which is faster on your PC), full, or lite (compressed)
 KOKORO_MODEL = os.environ.get("JARVIS_KOKORO", "auto").lower()
-# Her voice effect's strength (Settings > Voice & effects): 0 = none of it, 1 = all of it
+# His voice effect's strength (Settings > Voice & effects): 0 = none of it, 1 = all of it
 VOICE_FX_STRENGTH = float(os.environ.get("JUNO_EFFECT_STRENGTH", "0.6"))
 
 # --- hearing
@@ -347,7 +362,7 @@ VOICE_FX_STRENGTH = float(os.environ.get("JUNO_EFFECT_STRENGTH", "0.6"))
 ECHO_CANCEL = os.environ.get("JARVIS_ECHO_CANCEL", "true").lower() != "false"
 VAD_THRESHOLD = float(os.environ.get("JARVIS_VAD", "0.5"))   # 0..1; raise if noise still triggers him
 
-# --- both at once ("Jarvis and Ultron, ...")
+# --- both at once (retired with Ultron; kept so old code paths still load)
 DUO_SECOND_WORDS = 45        # the one who answers second keeps it shorter
 
 # --- Blender (3D modelling)
@@ -368,7 +383,7 @@ DENY_HOTKEY = os.environ.get("JARVIS_DENY_HOTKEY", "ctrl+alt+n")
 COMMAND_TIMEOUT = 60      # max seconds a PowerShell command may run
 
 
-# Settings that apply the moment you save them (no restart). Everything else restarts her.
+# Settings that apply the moment you save them (no restart). Everything else restarts him.
 LIVE_KEYS = {"JARVIS_MINI", "JUNO_FPS", "JUNO_CHAT_FIRST", "JUNO_CHAT_EVERY", "JUNO_CHAT_MINUTES", "JUNO_CHAT_DWELL",
              "JUNO_CHAT_MAX", "JUNO_CHAT_PAUSE", "JUNO_CHAT_STYLE", "JUNO_CHAT_TOPICS", "JUNO_CHAT_MUSIC",
              "JUNO_QUIET_HOURS", "JUNO_CHAT_NEVER", "JUNO_EVENING_WRAP", "JUNO_EVENING_AT", "JUNO_RAIN_ALERT",
@@ -378,9 +393,12 @@ LIVE_KEYS = {"JARVIS_MINI", "JUNO_FPS", "JUNO_CHAT_FIRST", "JUNO_CHAT_EVERY", "J
              "HOME_ASSISTANT_TOKEN", "JUNO_LIGHTS_SYNC", "JUNO_LIGHTS_SYNC_TARGET", "JUNO_JOURNAL", "JUNO_JOURNAL_AT", "JUNO_JOURNAL_FILE",
              "JUNO_GOODNIGHT_PC", "JUNO_GOODNIGHT_LIGHTS", "JUNO_REACTIONS", "STEAM_API_KEY", "STEAM_ID",
              "JUNO_STEAM_SALES", "JUNO_STEAM_SALE_MIN", "JUNO_PATCH_NOTES", "JUNO_MOODS", "JUNO_BANTER", "JUNO_BIRTHDAYS",
-             "JUNO_VOICE", "JARVIS_VOICE", "ULTRON_VOICE", "JUNO_OPINIONS", "DISCORD_UPDATES_CHANNEL", "DISCORD_UPDATES_MODE", "JUNO_DESK_VIZ"}
+             "JUNO_VOICE", "JARVIS_VOICE", "ULTRON_VOICE", "JUNO_OPINIONS", "DISCORD_UPDATES_CHANNEL", "DISCORD_UPDATES_MODE", "JUNO_DESK_VIZ",
+             "JUNO_DESK_SCENE", "JUNO_DESK_CALM", "JUNO_STOCKS", "JUNO_STOCK_ALERTS", "JUNO_STOCK_ALERT_PCT",
+             "JUNO_STOCKS_BRIEFING", "JARVIS_LEAN_TOOLS", "JARVIS_FREE_CREATE", "JUNO_PULLS", "JUNO_GAME_BRIEFING", "JUNO_STOCKS_WEEKLY",
+             "JUNO_STOCK_EARNINGS"}
 WIDGET_KEYS = {"JUNO_DESK_WIDGETS", "JUNO_DESK_WIDGETS_WHERE", "JUNO_W_STATS", "JUNO_W_MUSIC", "JUNO_W_WEATHER",
-               "JUNO_W_CALENDAR", "JUNO_W_NOTES", "JUNO_W_DISCORD"}
+               "JUNO_W_CALENDAR", "JUNO_W_NOTES", "JUNO_W_DISCORD", "JUNO_W_STOCKS", "JUNO_STOCKS"}
 
 
 def reload_live():
@@ -410,8 +428,22 @@ def reload_live():
     global DISCORD_UPDATES_CHANNEL, DISCORD_UPDATES_MODE
     DISCORD_UPDATES_CHANNEL = os.environ.get("DISCORD_UPDATES_CHANNEL", "").strip()
     DISCORD_UPDATES_MODE = os.environ.get("DISCORD_UPDATES_MODE", "ask").lower()
-    global DESK_VIZ
+    global LEAN_TOOLS, FREE_CREATE
+    LEAN_TOOLS = on("JARVIS_LEAN_TOOLS")
+    FREE_CREATE = os.environ.get("JARVIS_FREE_CREATE", "personal").lower()
+    global STOCK_ALERTS, STOCK_ALERT_PCT, STOCKS_BRIEFING
+    global STOCKS_WEEKLY, STOCK_EARNINGS, GAME_BRIEFING
+    GAME_BRIEFING = on("JUNO_GAME_BRIEFING")
+    STOCK_ALERTS, STOCKS_BRIEFING = on("JUNO_STOCK_ALERTS"), on("JUNO_STOCKS_BRIEFING")
+    STOCKS_WEEKLY, STOCK_EARNINGS = on("JUNO_STOCKS_WEEKLY"), on("JUNO_STOCK_EARNINGS")
+    try:
+        STOCK_ALERT_PCT = float(os.environ.get("JUNO_STOCK_ALERT_PCT", "4") or 4)
+    except ValueError:
+        STOCK_ALERT_PCT = 4.0
+    global DESK_VIZ, DESK_SCENE, DESK_CALM
     DESK_VIZ = os.environ.get("JUNO_DESK_VIZ", "both").lower()
+    DESK_SCENE = os.environ.get("JUNO_DESK_SCENE", "bench").lower()
+    DESK_CALM = os.environ.get("JUNO_DESK_CALM", "true").lower() != "false"
     PHONE_NOTIFS, PHONE_SPEAK = on("JUNO_PHONE_NOTIFS"), os.environ.get("JUNO_PHONE_SPEAK", "false").lower() == "true"
     GLASS_WHERE = os.environ.get("JUNO_GLASS_WHERE", "window").lower()
     DESK_WIDGETS = on("JUNO_DESK_WIDGETS")

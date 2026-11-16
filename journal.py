@@ -1,5 +1,5 @@
 """
-Her journal for you: a plain text file on your desktop ("Juno Journal.txt") that you can open, edit, or delete
+His journal for you: a plain text file on your desktop ("Jarvis Journal.txt") that you can open, edit, or delete
 any time.
 
   * Once a day (from the hour you pick, 10 PM by default) she asks you one question about your day. Your answer goes
@@ -52,7 +52,13 @@ def path():
     custom = (config.JOURNAL_FILE or "").strip().strip('"')
     if custom:
         return Path(custom).expanduser()
-    return desktop() / "Juno Journal.txt"
+    new, old = desktop() / "Jarvis Journal.txt", desktop() / "Juno Journal.txt"
+    if old.exists() and not new.exists():          # carried over from when Juno kept it
+        try:
+            old.rename(new)
+        except OSError:
+            return old
+    return new
 
 
 def _day_title(d):
@@ -78,7 +84,7 @@ def add(text, question=None, when=None):
     else:
         chunk += f"[{stamp}] {text}\n\n"
     if not old:
-        chunk = ("Juno's journal for you. Plain text: edit or delete anything. She adds to the bottom.\n\n" + chunk)
+        chunk = ("Jarvis's journal for you. Plain text: edit or delete anything. He adds to the bottom.\n\n" + chunk)
     with p.open("a", encoding="utf-8") as f:
         f.write(chunk)
     return f"Written in your journal ({p.name})."

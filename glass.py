@@ -142,7 +142,7 @@ class GlassHub:
             if not any(c["kind"] == "stats" for c in self.cards.values()):
                 return
             return self._push({k: ev.get(k) for k in ("type", "cpu", "ram", "ram_used", "ram_total", "disk", "down_kbps", "up_kbps")})
-        if t == "confirm":                               # her yes/no question, as a card you can pinch
+        if t == "confirm":                               # his yes/no question, as a card you can pinch
             card, _ = self.put_kind("approval", ev.get("title") or "Approve?", {}, stage=True,
                                     data={"cid": ev.get("id"), "detail": str(ev.get("detail") or "")[:400]})
             return
@@ -613,7 +613,7 @@ def _make_handler(hub):
                                    "https://storage.googleapis.com; img-src 'self' https: data: blob:; style-src 'self' "
                                    "'unsafe-inline'; font-src 'self'; media-src 'self' blob: mediastream:; worker-src 'self' blob: "
                                    "https://cdn.jsdelivr.net" +
-                                   # on the desktop it lives inside her wallpaper page (a file:// page, which CSP can't
+                                   # on the desktop it lives inside his wallpaper page (a file:// page, which CSP can't
                                    # name). Still needs this run's secret key, so no website can frame it.
                                    ("" if "desk" in parse_qs(u.query, keep_blank_values=True) else "; frame-ancestors 'none'"),
                                    "Permissions-Policy": "camera=(self), microphone=()"})

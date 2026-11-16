@@ -1,5 +1,5 @@
 """
-Phone remote: talk to Jarvis/Ultron by typing on your phone, from anywhere in
+Phone remote: talk to Jarvis by typing on your phone, from anywhere in
 the house. Off by default; turn on with JARVIS_PHONE=true in .env.
 
 How it stays private:
@@ -224,7 +224,7 @@ form button{flex:none;background:var(--arc);color:var(--bg);font-weight:700;bord
 <script>
 const T="__TOKEN__", $=s=>document.querySelector(s), log=$("#log");
 const LABEL={idle:"Standby",listening:"Listening",thinking:"Thinking",speaking:"Speaking",awaiting:"Approval",dictating:"Dictating",booting:"Starting"};
-let next=0, cid=null, live={}, ai="juno";
+let next=0, cid=null, live={}, ai="jarvis";
 const api=(p,b)=>fetch(p,{method:b?"POST":"GET",headers:{"X-Token":T,"Content-Type":"application/json"},body:b?JSON.stringify(b):undefined}).then(r=>r.json());
 function add(cls,text,who){const d=document.createElement("div");d.className="m "+cls;
   if(who){const b=document.createElement("b");b.textContent=who.toUpperCase();b.className=who.toLowerCase();d.appendChild(b)}
@@ -232,7 +232,7 @@ function add(cls,text,who){const d=document.createElement("div");d.className="m 
 function on(e){switch(e.type){
   case"persona":ai=e.key;document.documentElement.dataset.ai=e.key;$("#wm").textContent=e.wordmark;break;
   case"state":document.body.className="st-"+e.state;$("#st").textContent=LABEL[e.state]||e.state;break;
-  case"msg":if(e.role==="user")add("user",e.text);else if(e.role==="system")add("sys",e.text);else add("ai",e.text,ai==="ultron"?"Ultron":ai==="juno"?"Juno":"Jarvis");break;
+  case"msg":if(e.role==="user")add("user",e.text);else if(e.role==="system")add("sys",e.text);else add("ai",e.text,"Jarvis");break;
   case"turn_start":live[e.id]={who:e.who||"Jarvis",el:null,text:""};break;
   case"reply_delta":{const t=live[e.id];if(!t)break;t.text+=e.text;if(!t.el)t.el=add("ai","",t.who);t.el.textContent=t.text;log.scrollTop=log.scrollHeight;break}
   case"turn_end":{const t=live[e.id];if(t&&!t.el&&e.text)add("ai",e.text,t.who);else if(!t&&e.text)add("ai",e.text,"");delete live[e.id];break}

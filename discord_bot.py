@@ -75,7 +75,7 @@ def _norm(s):
 
 
 class DiscordBot:
-    def __init__(self, make_brain, persona_key=lambda: "juno", on_change=None, on_chat=None, log=print):
+    def __init__(self, make_brain, persona_key=lambda: "jarvis", on_change=None, on_chat=None, log=print):
         self.make_brain = make_brain              # persona -> fresh Brain
         self.persona_key = persona_key
         self.on_change = on_change or (lambda: None)
@@ -301,7 +301,7 @@ class DiscordBot:
         if not text:
             text = "(they just mentioned you)"
         m = self.CHANGELOG_ASK.match(text.strip())
-        if m:                                             # "@Juno what's new" / "changelog 1.0.25": straight from the file
+        if m:                                             # "@Jarvis what's new" / "changelog 1.0.25": straight from the file
             import changelog
             ver = m.group(2) or m.group(4)
             full = bool(m.group(1) or m.group(3) is not None)
@@ -341,7 +341,7 @@ class DiscordBot:
                 await msg.channel.send(part)
         self.on_chat({"where": where, "who": msg.author.display_name, "text": text, "reply": reply})
 
-    # ------------------------------------------------------------------ her own update notes
+    # ------------------------------------------------------------------ his own update notes
     CHANGELOG_ASK = re.compile(r"^(?:what'?s new|changelog|change log|patch notes|update notes|updates?|"
                                r"what changed)(\s+full|\s+in full|\s+everything)?(?:\s+(?:for\s+|in\s+)?v?(\d+\.\d+\.\d+))?\??$"
                                r"|^full (?:changelog|patch notes)(\s*)(?:\s+(?:for\s+)?v?(\d+\.\d+\.\d+))?\??$", re.I)
@@ -376,7 +376,7 @@ class DiscordBot:
     def _display_name(self):
         import personas
         p = personas.PERSONAS.get(self.persona_key()) or {}
-        return p.get("name", "Juno")
+        return p.get("name", "Jarvis")
 
     def post_changelog(self, target=None, version=None, confirm=None, full=False):
         """From the PC ("post the changelog to #updates"): shows the approval card, then posts."""

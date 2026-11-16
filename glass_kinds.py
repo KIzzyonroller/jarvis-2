@@ -69,7 +69,7 @@ def _secs(text):
 
 
 def _place(core, place):
-    """(lat, lon, name) for a place name, or her usual location."""
+    """(lat, lon, name) for a place name, or his usual location."""
     import briefing
     if place:
         r = briefing._get("https://geocoding-api.open-meteo.com/v1/search", {"name": place, "count": 1}).json()
@@ -409,7 +409,7 @@ def act(hub, core, d):
     if do == "confirm":
         ok = core is not None and core.resolve_confirm(d.get("id"), bool(d.get("yes")))
         return bool(ok), ""
-    if do == "say":                             # a gesture answered her (thumbs, a number, read this out)
+    if do == "say":                             # a gesture answered him (thumbs, a number, read this out)
         text = str(d.get("text") or "").strip()[:300]
         if text and core is not None:
             core.submit(text, source="glass")

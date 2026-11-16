@@ -28,7 +28,7 @@ PERSONA = {0: "offline", 1: "online", 2: "busy", 3: "away", 4: "snoozing", 5: "l
 
 def _get(url, params=None, timeout=12):
     import requests
-    r = requests.get(url, params=params or {}, timeout=timeout, headers={"User-Agent": "Juno-desktop-assistant"})
+    r = requests.get(url, params=params or {}, timeout=timeout, headers={"User-Agent": "Jarvis-desktop-assistant"})
     r.raise_for_status()
     return r.json()
 
@@ -74,6 +74,23 @@ def steamid():
 
 
 # ------------------------------------------------------------------ friends
+def friends_list():
+    """[{name, game, state}] for friends who are online, players first. [] if none or not set up."""
+    if not ready():
+        return []
+    sid = steamid()
+    fl = _get(f"{API}/ISteamUser/GetFriendList/v1/", {"key": config.STEAM_API_KEY, "steamid": sid, "relationship": "friend"})
+    ids = [f["steamid"] for f in fl.get("friendslist", {}).get("friends", [])]
+    people = []
+    for i in range(0, len(ids), 100):
+        r = _get(f"{API}/ISteamUser/GetPlayerSummaries/v2/", {"key": config.STEAM_API_KEY, "steamids": ",".join(ids[i:i + 100])})
+        people += r.get("response", {}).get("players", [])
+    on = [p for p in people if p.get("personastate", 0) > 0 or p.get("gameextrainfo")]
+    on.sort(key=lambda p: not p.get("gameextrainfo"))
+    return [{"name": p.get("personaname", "?"), "game": p.get("gameextrainfo") or PERSONA.get(p.get("personastate", 0), "")}
+            for p in on]
+
+
 def friends():
     sid = steamid()
     fl = _get(f"{API}/ISteamUser/GetFriendList/v1/", {"key": config.STEAM_API_KEY, "steamid": sid, "relationship": "friend"})
@@ -106,7 +123,7 @@ def owned():
 
 
 def suggest(hours=None):
-    """Candidates by kind, for her to pick from with the user's mood in mind."""
+    """Candidates by kind, for him to pick from with the user's mood in mind."""
     games = owned()
     now = time.time()
     recent = sorted([g for g in games if g.get("playtime_2weeks")], key=lambda g: -g["playtime_2weeks"])[:6]

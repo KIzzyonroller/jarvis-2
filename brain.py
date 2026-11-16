@@ -42,7 +42,7 @@ class Brain:
     _done_calls = {}
     _started = {}
 
-    def __init__(self, persona="juno", on_tool=None):
+    def __init__(self, persona="jarvis", on_tool=None):
         if not config.ANTHROPIC_API_KEY or "paste-yours" in config.ANTHROPIC_API_KEY:
             raise SystemExit("No API key set. Open the .env file in the Jarvis folder and paste your Anthropic API key.")
         try:      # keep the connection to Claude open between requests (saves a TLS handshake each time)
@@ -63,6 +63,7 @@ class Brain:
             search["user_location"] = {"type": "approximate", **loc}
         self._search = search
         self.allowed = None       # a set of tool names to limit this brain to (background jobs), or None for all
+        self._groups = set()      # tool groups loaded for this conversation (tools.TOOL_GROUPS)
         self.tools = tools.TOOL_SPECS + [search]
         self.persona_key = persona
         self.persona = personas.system_prompt(persona, config.ADDRESS_AS)
@@ -143,6 +144,32 @@ class Brain:
             self.history.pop(0)
             while self.history and not self._starts_turn(self.history[0]):
                 self.history.pop(0)
+        self._slim(len(self.history) - 6)
+
+    def _slim(self, upto):
+        """Old web searches carry their whole result pages along (thousands of tokens each). Once a few turns old,
+        keep what he said about them and drop the pages. Only done during a trim, when the cache resets anyway."""
+        def kind(b):
+            return b.get("type") if isinstance(b, dict) else getattr(b, "type", None)
+        for m in self.history[:max(0, upto)]:
+            if m["role"] != "assistant" or not isinstance(m["content"], list):
+                continue
+            if not any(kind(b) in ("server_tool_use", "web_search_tool_result") for b in m["content"]):
+                continue
+            out = []
+            for b in m["content"]:
+                k = kind(b)
+                if k in ("server_tool_use", "web_search_tool_result", "thinking", "redacted_thinking"):
+                    continue
+                if k == "text":
+                    t = b.get("text") if isinstance(b, dict) else b.text
+                    if t and t.strip():
+                        out.append({"type": "text", "text": t})
+                else:
+                    out.append(b)
+            if not any(kind(b) == "text" and (b.get("text") if isinstance(b, dict) else "") for b in out):
+                out.insert(0, {"type": "text", "text": "(searched the web)"})
+            m["content"] = out
 
     @staticmethod
     def _starts_turn(m):
@@ -181,8 +208,17 @@ class Brain:
                     block["content"] = [c if c.get("type") != "image" else {"type": "text", "text": "[old screenshot removed]"}
                                         for c in block["content"]]
 
+    def _pick_groups(self, text):
+        self._groups |= tools.groups_for(text)
+
     def _tool_list(self):
-        specs = tools.all_specs()
+        if self.allowed is None and getattr(config, "LEAN_TOOLS", True):
+            specs = tools.lean_specs(self._groups)
+            more = tools.more_tools_spec(self._groups)
+            if more:
+                specs = specs + [more]
+        else:
+            specs = tools.all_specs()
         if self.allowed is not None:
             specs = [s for s in specs if s["name"] in self.allowed or (s["name"].count("__") and "connectors" in self.allowed)]
         out = specs + ([self._search] if self.allowed is None or "web_search" in self.allowed else [])
@@ -313,6 +349,12 @@ class Brain:
         return None
 
     def _run_one(self, b, on_event):
+        if b.name == "more_tools":                   # load tool groups for the next step (and the rest of the chat)
+            want = [g for g in (b.input or {}).get("groups", []) if g in tools.TOOL_GROUPS]
+            self._groups |= set(want)
+            print(f"   [tool] more_tools {want}")
+            return {"type": "tool_result", "tool_use_id": b.id,
+                    "content": ("Loaded: " + ", ".join(want) + ". Use them now.") if want else "No such group."}
         skip = self._guard(b)
         if skip is not None:
             print(f"   [tool] {b.name} skipped (duplicate)")
@@ -405,6 +447,11 @@ class Brain:
             self._notes = []
         note = tools.context_note() if self.private else ""
         self._ctx = f"[{note}]" if note else ""
+        front = tools.context_note(volatile=True) if self.private else ""
+        if front:
+            text = f"{text}\n[{front}]"
+        if allow_tools and self.allowed is None:
+            self._pick_groups(text)
         tools.new_turn()
         user_msg = {"role": "user", "content": self._stamp(text)}
         seen = self._preattach(text, on_event) if (self.private and allow_tools) else None
@@ -432,11 +479,21 @@ class Brain:
                                      "content": resp.content or [{"type": "text", "text": "(no response)"}]})
                 text_now = "".join(b.text for b in resp.content if b.type == "text").strip()
 
+                found, asked = [], ""
                 for b in resp.content:
                     if b.type == "server_tool_use":
                         q = (b.input or {}).get("query", "") if isinstance(b.input, dict) else ""
+                        asked = asked or q
                         on_event("tool_done", {"name": b.name, "args": b.input, "result": f"searched: {q}", "ok": True})
                         self.on_tool(b.name, b.input, "searching the web")
+                    elif b.type == "web_search_tool_result" and isinstance(getattr(b, "content", None), list):
+                        found += [{"url": getattr(r, "url", ""), "title": getattr(r, "title", "")} for r in b.content]
+                if found and self.private:                     # the sources he read, up on the desktop
+                    try:
+                        import pulls
+                        pulls.sources(asked or text, found)
+                    except Exception as e:
+                        print(f"[pulls] {e}")
 
                 if resp.stop_reason == "tool_use":
                     if text_now:

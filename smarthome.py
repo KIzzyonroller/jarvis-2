@@ -6,7 +6,7 @@ any brand: LIFX, Nanoleaf, Govee, Wiz, TP-Link... whatever you've added to it).
     like your other keys). She finds the bridge on your network by herself, or set its address in Settings.
   * Home Assistant: put its address (like http://homeassistant.local:8123) and a long-lived access token (your
     profile page in Home Assistant, at the bottom) in Settings > Connected apps > Smart home.
-  * "Her colours": when you switch between Juno, Jarvis and Ultron, the lights you pick change to that AI's colour.
+  * "His colours": the lights you pick can take Jarvis's blue (and used to follow whichever AI you talked to).
 
 Only lights are controlled (on/off, brightness, colour). No locks, alarms, cameras or anything else.
 """
@@ -100,7 +100,7 @@ def hue_pair():
     out = None
     for scheme in ("https", "http"):
         try:
-            out = _req("POST", f"{scheme}://{ip}/api", json={"devicetype": "juno#pc"})
+            out = _req("POST", f"{scheme}://{ip}/api", json={"devicetype": "jarvis#pc"})
             break
         except Exception:
             continue
@@ -231,7 +231,7 @@ def control(action, target="all", value=None, color=None):
     return f"{', '.join(done[:4])}{' and more' if len(done) > 4 else ''}: {what}."
 
 
-# ------------------------------------------------------------------ her colours follow whoever's talking
+# ------------------------------------------------------------------ his colours follow whoever's talking
 _last = {"p": None}
 
 

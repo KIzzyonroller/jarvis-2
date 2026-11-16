@@ -66,7 +66,7 @@ def short(notes, titles_only=False):
     return "\n".join(out)
 
 
-def for_discord(version=None, picked=None, name="Juno", full=False):
+def for_discord(version=None, picked=None, name="Jarvis", full=False):
     """A release's notes as Discord messages (each under 2000 characters): a header, then the bullets. Discord shows
     **bold**, - bullets and nested bullets fine; headings are turned into bold lines. By default the skim version
     (titles + first sentence); full=True for everything."""
@@ -112,7 +112,7 @@ def _split(text, size=1900):
 
 
 def save_for_discord():
-    """Write the newest release, ready to paste into Discord, to her data folder. Returns the path."""
+    """Write the newest release, ready to paste into Discord, to his data folder. Returns the path."""
     msgs = for_discord(full=True)
     p = config.JARVIS_DIR / "changelog_for_discord.txt"
     try:

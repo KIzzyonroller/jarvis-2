@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-ai="juno">
+<html lang="en" data-ai="jarvis">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -117,7 +117,7 @@ const STEP = { web_search: "Searching", look_at_screen: "Looking", look_at_camer
   memory: "Memory", reminders: "Reminder", display: "Display", system_info: "System", self_control: "Myself" };
 const stepName = (n) => STEP[n] || n.replace(/_/g, " ");
 
-let state = "idle", ai = "juno", muted = false, visible = false;
+let state = "idle", ai = "jarvis", muted = false, visible = false;
 let voice = 0, mic = 0, energy = 0, lastEvent = performance.now();
 
 // ---------------------------------------------------------------- events from Python
@@ -166,7 +166,7 @@ window.J = {
       case "sync": (e.events || []).forEach((x) => window.J.on(x)); break;
       case "window": visible = !!e.visible; if (visible) wake(); break;
       case "persona":
-        ai = COL[e.key] ? e.key : "juno";
+        ai = COL[e.key] ? e.key : "jarvis";
         document.documentElement.dataset.ai = ai;
         $("#wm").textContent = e.wordmark || "J.U.N.O.";
         break;

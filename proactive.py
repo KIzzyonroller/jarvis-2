@@ -1,5 +1,5 @@
 """
-Juno starts a conversation (Settings > Conversation & personality > "Start conversations about what I'm doing").
+Jarvis starts a conversation (Settings > Conversation & personality > "Start conversations about what I'm doing").
 
 What she knows: only the app in front and its window title, and how long you've been in it (plus the last few
 apps before that). Never the screen, never what you type. Those names go to Claude only at the moment she
@@ -7,7 +7,7 @@ decides to say something.
 
 When she'll speak up, all of these at once:
   * the option is on, you're not muted, and it isn't your quiet hours
-  * you haven't talked to her for a while, and she hasn't started one too recently (the "How often" setting)
+  * you haven't talked to him for a while, and he hasn't started one too recently (the "How often" setting)
   * you've been in the same thing a while (not just alt-tabbing)
   * you're there but paused: your last key press or mouse move was 6 to 120 seconds ago (not mid-typing, not away)
   * nothing fullscreen (games, videos), no call app in front (Zoom, Teams, Skype, Webex, a Discord call),
@@ -96,7 +96,7 @@ class Proactive:
         self.cur_since = time.time()
         self.cur_label = ""
         self.recent = []                # [(label, minutes)] of the last few things
-        self.last_talk = time.time()    # last time you and she talked (either way)
+        self.last_talk = time.time()    # last time you and he talked (either way)
         self.last_check_in = 0.0
         self.next_gap = 0.0
         self.today = (datetime.now().date(), 0)
