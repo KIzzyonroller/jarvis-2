@@ -18,6 +18,8 @@ import re
 import threading
 import time
 
+import json
+from datetime import date, datetime
 import config
 
 LIB_DIRS = re.compile(r"\\(steamapps\\common|epic games|riot games|xboxgames|gog galaxy\\games|gog games|ea games|"
@@ -108,6 +110,28 @@ class GameWatch:
         rs = self.results = getattr(self, "results", [])
         rs.append((time.time(), kind, self.name()))
         del rs[:-50]
+        _log_play({"t": time.time(), "result": kind, "game": self.name()})
+        self._maybe_break()                         # between matches is the moment for a break nudge
+
+    def _maybe_break(self):
+        """Long sitting? Suggest a break, once per session, right after a match (never mid-game)."""
+        try:
+            limit = int(os.environ.get("JARVIS_PLAY_BREAK", "180") or 0)
+        except ValueError:
+            limit = 180
+        cur = self.current
+        if not limit or not cur or cur.get("break_nudged"):
+            return
+        mins = (time.time() - cur["since"]) / 60
+        if mins < limit:
+            return
+        cur["break_nudged"] = True
+        w, l = self.record()
+        span = f"{mins / 60:.1f} hours".replace(".0 ", " ")
+        line = random.choice([f"That's {span} of {cur['name']}. Good moment for a five-minute break before the next one?",
+                              f"{span[0].upper() + span[1:]} straight. Water, stretch, then back in?"])
+        self.core.events.put(("moment", {"line": line, "cards": [{"title": "Break?", "big": span,
+                                                                    "text": f"{w}W {l}L so far" if w or l else cur["name"]}]}))
 
     def loss_streak(self):
         """Losses in a row, counting only the last 3 hours."""
@@ -172,6 +196,12 @@ class GameWatch:
             pulls.game_briefing(info["name"])          # friends on, queues, latest patch: up while it loads
         except Exception as e:
             print(f"[game] briefing: {e}")
+        try:
+            import triggers
+            triggers.on_game(info["name"])             # "when I open DBD, ..."
+        except Exception as e:
+            print(f"[game] triggers: {e}")
+        threading.Thread(target=self._patch_alert, args=(info["name"],), daemon=True).start()
         hub = getattr(self.core, "glass", None)
         if hub is not None and hub.connected():
             try:
@@ -184,6 +214,8 @@ class GameWatch:
         if not cur:
             return
         mins = (time.time() - cur["since"]) / 60
+        if mins >= 1:
+            _log_play({"t": time.time(), "game": cur["name"], "start": cur["since"], "minutes": round(mins, 1)})
         self.last_session = {"name": cur["name"], "minutes": round(mins), "ended": time.time()}
         print(f"[game] stopped {cur['name']} after {mins:.0f} min")
         self.core.emit({"type": "game", "on": False, "name": cur["name"], "minutes": round(mins)})
@@ -194,6 +226,63 @@ class GameWatch:
             pass
         if not quiet and config.GAME_CHECKIN and mins >= CHECKIN_MINUTES:
             threading.Thread(target=self._checkin, args=(cur["name"], mins), daemon=True).start()
+
+    def _patch_alert(self, name):
+        """The game updated in the last two days and he hasn't told you yet: say the gist while it loads."""
+        if os.environ.get("JARVIS_PATCH_ALERTS", "true").lower() == "false":
+            return
+        try:
+            import steam
+            app = steam.appid_for(name)
+            if not app:
+                return
+            items = steam.news(app, 3)
+        except Exception as e:
+            print(f"[game] patch check: {e}")
+            return
+        import re as _re
+        fresh = [it for it in items if time.time() - it.get("date", 0) < 2 * 86400
+                 and _re.search(r"patch|update|hotfix|fix|notes|balance", (it.get("title", "") + " " + it.get("feedlabel", "")), _re.I)]
+        if not fresh:
+            return
+        it = fresh[0]
+        st = steam._load()                                   # shared with the background patch check: never told twice
+        seen = st.setdefault("seen_news", {})
+        if seen.get(str(app)) == it.get("gid"):
+            return
+        seen[str(app)] = it.get("gid")
+        steam._save(st)
+        body = steam._clean(it.get("contents", ""))
+        bits = [x.strip(" -•*") for x in _re.split(r"[\r\n]+", body) if 10 < len(x.strip()) < 120][:3]
+        when = "today" if time.time() - it.get("date", 0) < 86400 else "yesterday"
+        line = f"Heads up, {name} got a patch {when}" + (f": {bits[0].rstrip('.')}" if bits else f": {it.get('title', '')}") + \
+            (". There's more on your screen." if len(bits) > 1 else ".")
+        self.core.events.put(("moment", {"line": line, "cards": [{"title": f"{name} patch", "list": [
+            {"time": "", "text": b} for b in bits] or [{"time": "", "text": it.get("title", "")}]}]}))
+
+    def stats(self, days=1):
+        """Play time and wins/losses for today (days=1) or the last N days."""
+        rows = _read_play()
+        cut = time.time() - days * 86400 if days > 1 else datetime.combine(date.today(), datetime.min.time()).timestamp()
+        mins, games, w, l = 0.0, {}, 0, 0
+        for r in rows:
+            if r["t"] < cut:
+                continue
+            if "minutes" in r:
+                mins += r["minutes"]
+                games[r["game"]] = games.get(r["game"], 0) + r["minutes"]
+            elif r.get("result") == "win":
+                w += 1
+            elif r.get("result") == "loss":
+                l += 1
+        if self.current:
+            live = (time.time() - self.current["since"]) / 60
+            if self.current["since"] >= cut:
+                mins += live
+                games[self.current["name"]] = games.get(self.current["name"], 0) + live
+        return {"minutes": round(mins), "games": {k: round(v) for k, v in sorted(games.items(), key=lambda x: -x[1])},
+                "wins": w, "losses": l, "playing": self.name(),
+                "session": round((time.time() - self.current["since"]) / 60) if self.current else 0}
 
     def _checkin(self, name, mins):
         """Ask how it went, once you're back (not if you went straight into another game, a call or went quiet)."""
@@ -215,6 +304,25 @@ class GameWatch:
             f"Done with {name}? Tell me how it went.",
         ])
         self.core.events.put(("moment", {"line": line, "cards": [{"title": name, "big": span, "text": "game session"}]}))
+
+
+def _play_file():
+    return config.JARVIS_DIR / "play_log.jsonl"
+
+
+def _log_play(row):
+    try:
+        with open(_play_file(), "a", encoding="utf-8") as f:
+            f.write(json.dumps(row) + "\n")
+    except Exception as e:
+        print(f"[game] log: {e}")
+
+
+def _read_play():
+    try:
+        return [json.loads(l) for l in _play_file().read_text(encoding="utf-8").splitlines()[-3000:] if l.strip()]
+    except Exception:
+        return []
 
 
 WATCH = None

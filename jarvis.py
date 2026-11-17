@@ -363,12 +363,15 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         away["on"] = True
         emitter({"type": "window", "visible": False})
         if mini:
+            mini.away = True
             mini.show()
 
     def came_back():
         away["on"] = False
         emitter({"type": "window", "visible": True})
         if mini:
+            mini.away = False
+            mini._for_approval = False
             mini.hide()
 
     def mini_switch(on):

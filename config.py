@@ -131,7 +131,9 @@ WHISPER_BEAM = int(os.environ.get("JARVIS_WHISPER_BEAM", "0"))   # careful-pass 
 HOLD_UNFINISHED = 2.5       # ends with "and", "the", "to", a comma...
 HOLD_NAME_ONLY = 1.6        # just "Jarvis" (then he says "Yes?")
 MAX_RECORD_SECONDS = 20
-FOLLOW_UP_TIMEOUT = float(os.environ.get("JUNO_FOLLOW_UP", "8"))   # after he asks you something, answer without his name for this long
+FOLLOW_UP_TIMEOUT = float(os.environ.get("JUNO_FOLLOW_UP", "8"))
+CONVO_SECS = float(os.environ.get("JARVIS_CONVO", "45") or 0)       # conversation mode: no name needed for this long after he answers
+PRIVATE = os.environ.get("JARVIS_PRIVATE", "false").lower() == "true"   # private mode: no cloud speech recognition at all   # after he asks you something, answer without his name for this long
 MERGE_SECONDS = 3.0       # pause mid-command and keep talking within this, and he stitches it together
 # He reads out about this many words, then finishes the paragraph (the idea) he's on, up to 1.6x this.
 # Anything after that stays on screen and he says so. Ask for detail ("explain", "tell me more") for no limit.
@@ -395,7 +397,10 @@ LIVE_KEYS = {"JARVIS_MINI", "JUNO_FPS", "JUNO_CHAT_FIRST", "JUNO_CHAT_EVERY", "J
              "JUNO_STEAM_SALES", "JUNO_STEAM_SALE_MIN", "JUNO_PATCH_NOTES", "JUNO_MOODS", "JUNO_BANTER", "JUNO_BIRTHDAYS",
              "JUNO_VOICE", "JARVIS_VOICE", "ULTRON_VOICE", "JUNO_OPINIONS", "DISCORD_UPDATES_CHANNEL", "DISCORD_UPDATES_MODE", "JUNO_DESK_VIZ",
              "JUNO_DESK_SCENE", "JUNO_DESK_CALM", "JUNO_STOCKS", "JUNO_STOCK_ALERTS", "JUNO_STOCK_ALERT_PCT",
-             "JUNO_STOCKS_BRIEFING", "JARVIS_LEAN_TOOLS", "JARVIS_FREE_CREATE", "JUNO_PULLS", "JUNO_GAME_BRIEFING", "JUNO_STOCKS_WEEKLY",
+             "JUNO_STOCKS_BRIEFING", "JARVIS_LEAN_TOOLS", "JARVIS_FREE_CREATE", "JUNO_PULLS", "JUNO_GAME_BRIEFING",
+             "JARVIS_CONVO", "JARVIS_PRIVATE", "JARVIS_VOICE_ID", "JARVIS_VOICE_ID_STRICT", "JARVIS_WHISPER",
+             "JARVIS_WHISPER_FROM", "JARVIS_WHISPER_TO", "JARVIS_WHISPER_VOL", "JARVIS_TRIGGERS", "JARVIS_PLAY_BREAK",
+             "JARVIS_WELCOME_BACK", "JARVIS_AMBIENT", "JARVIS_LETTER", "JARVIS_PATCH_ALERTS", "JUNO_STOCKS_WEEKLY",
              "JUNO_STOCK_EARNINGS"}
 WIDGET_KEYS = {"JUNO_DESK_WIDGETS", "JUNO_DESK_WIDGETS_WHERE", "JUNO_W_STATS", "JUNO_W_MUSIC", "JUNO_W_WEATHER",
                "JUNO_W_CALENDAR", "JUNO_W_NOTES", "JUNO_W_DISCORD", "JUNO_W_STOCKS", "JUNO_STOCKS"}
@@ -428,6 +433,12 @@ def reload_live():
     global DISCORD_UPDATES_CHANNEL, DISCORD_UPDATES_MODE
     DISCORD_UPDATES_CHANNEL = os.environ.get("DISCORD_UPDATES_CHANNEL", "").strip()
     DISCORD_UPDATES_MODE = os.environ.get("DISCORD_UPDATES_MODE", "ask").lower()
+    global CONVO_SECS, PRIVATE
+    try:
+        CONVO_SECS = float(os.environ.get("JARVIS_CONVO", "45") or 0)
+    except ValueError:
+        CONVO_SECS = 0.0
+    PRIVATE = os.environ.get("JARVIS_PRIVATE", "false").lower() == "true"
     global LEAN_TOOLS, FREE_CREATE
     LEAN_TOOLS = on("JARVIS_LEAN_TOOLS")
     FREE_CREATE = os.environ.get("JARVIS_FREE_CREATE", "personal").lower()

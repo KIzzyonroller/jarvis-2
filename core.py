@@ -445,6 +445,17 @@ class Core:
         except Exception as e:
             print(f"[check-ins] off: {e}")
         try:
+            import quiet
+            quiet.start()                        # whisper mode: late, or on a call
+            import extras
+            extras.start(self)                   # ambient lines, the weekly letter, inside jokes
+            import triggers
+            triggers.start(self)                 # "when I open DBD..." / "every weekday at 8..."
+            import comeback
+            comeback.start(self)                 # "where did I leave off" + "when I get back" triggers
+        except Exception as e:
+            print(f"[whisper] off: {e}")
+        try:
             import stocks
             stocks.start(self)                   # the watchlist widget and big-move heads-ups (every 5 minutes)
         except Exception as e:
@@ -798,6 +809,11 @@ class Core:
         if secret.is_code(text):                 # the secret: works with or without his name
             self.secret_code("voice")
             return
+        import voiceid
+        if voiceid.ENROLL["on"] and audio is not None:     # learning your voice: listen, don't act
+            print(f"[voice id] learning: {len(audio) / 16000:.1f}s")
+            voiceid.feed_enroll(audio)
+            return
         if self._dictation:
             if audio is not None and self.listener:
                 text = self.listener.refine(audio) or text       # accuracy matters when it's being typed
@@ -813,6 +829,17 @@ class Core:
         quick_cmd = self._is_quick_cmd(text)
         if quick_cmd:
             refined = True                   # "pause", "volume 30"... the fast transcript is plenty, skip the slow pass
+        if audio is not None and voiceid.on():
+            aimed = (awaiting_answer or self._hold or self._turn is not None or self._started_engaged(ended, audio)
+                     or find_address(text)[0] or self._maybe_for_us(text))
+            if aimed:
+                ok, sc = voiceid.is_owner(audio)
+                if not ok:
+                    print(f"[not your voice {sc:.2f}] {text}")
+                    self.emit({"type": "heard", "text": text, "addressed": False})
+                    return
+                if sc is not None:
+                    print(f"[your voice {sc:.2f}]")
         if (audio is not None and self.listener and not refined and self.listener.careful_too_slow(len(audio) / 16000)):
             print("[voice] careful pass would be too slow on this PC; using the quick transcript")
             refined = True
@@ -1171,6 +1198,8 @@ class Core:
             if self.state == "idle" and self._turn is None:
                 self.emit({"type": "cards", "cards": payload.get("cards", [])})
                 self.say_line(payload["line"])
+                if payload.get("engage"):
+                    self._engage(payload["engage"])
             return
         if kind == "evening":                          # moments.py: the evening wrap-up
             self._evening_wrap()
@@ -3188,6 +3217,12 @@ class Core:
                 self._vibe = (r, time.time())
             self._game_result(text)
             note = self._mood_note()
+            try:
+                import quiet
+                q = quiet.note()
+                note = (note + "\n" + q).strip() if q else note
+            except Exception:
+                pass
             if note:
                 prompt = (prompt or text) + "\n" + note
         detail = bool(DETAIL_HINTS.search(text))
@@ -3286,6 +3321,8 @@ class Core:
         final = (turn["text"].strip() or reply or "")
         if not turn["interrupted"] and source == "voice" and wait and final.rstrip().endswith("?"):
             self._engage()
+        elif not turn["interrupted"] and source == "voice" and wait and config.CONVO_SECS > 0:
+            self._engage(config.CONVO_SECS)            # conversation mode: keep going without his name
         return {"reply": final if reply is not None else None, "interrupted": turn["interrupted"] or reply is None,
                 "stream": stream}
 

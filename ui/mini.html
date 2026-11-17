@@ -47,6 +47,7 @@ body.muted .st{color:var(--alarm)}
 .b{width:22px;height:22px;display:grid;place-items:center;border:1px solid rgba(var(--crgb),.2);background:transparent;color:var(--ink);
   cursor:pointer;transition:border-color .12s,background .12s}
 .b:hover{border-color:var(--c);background:rgba(var(--crgb),.12)}
+.b.x:hover,.b.x:focus-visible{border-color:#ff5a6a;color:#ff5a6a;background:rgba(255,90,106,.12)}
 .b svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:square}
 .b.stop{display:none} body.st-speaking .b.stop,body.st-thinking .b.stop{display:grid}
 body.muted .b.mic{border-color:var(--alarm);color:var(--alarm)}
@@ -79,12 +80,13 @@ body.confirming .confirm{display:flex}
   <div class="reactor" title="Double-click to open"><canvas id="cv" width="126" height="126"></canvas></div>
   <div class="info">
     <div class="top">
-      <span class="wm" id="wm">J.U.N.O.</span>
+      <span class="wm" id="wm">J.A.R.V.I.S.</span>
       <span class="st" id="st">Standby</span>
       <span class="btns">
         <button class="b stop" id="b-stop" title="Stop"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7"/></svg></button>
         <button class="b mic" id="b-mic" title="Mute mic"><svg viewBox="0 0 12 12"><g class="on"><rect x="4" y="1" width="4" height="6.5" rx="2"/><path d="M2.2 6a3.8 3.8 0 0 0 7.6 0M6 9.8V11.4"/></g><g class="off"><rect x="4" y="1" width="4" height="6.5" rx="2"/><path d="M2.2 6a3.8 3.8 0 0 0 7.6 0M6 9.8V11.4M1 1l10 10"/></g></svg></button>
         <button class="b" id="b-exp" title="Open the full HUD"><svg viewBox="0 0 12 12"><path d="M7 1.5h3.5V5M10.5 1.5 6.5 5.5M5 10.5H1.5V7M1.5 10.5l4-4"/></svg></button>
+        <button class="b x" id="b-x" title="Close the corner widget (it only comes back for approvals; turn it on again in Settings)" aria-label="Close the corner widget"><svg viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>
       </span>
     </div>
     <div class="cap" id="cap"></div>
@@ -196,6 +198,7 @@ window.J = {
 
 // ---------------------------------------------------------------- buttons
 $("#b-exp").onclick = () => call("expand");
+$("#b-x").onclick = () => call("dismiss");
 $("#b-mic").onclick = () => call("toggle_mute");
 $("#b-stop").onclick = () => call("stop");
 $("#c-yes").onclick = () => { if (confirmId) call("confirm", confirmId, true); };

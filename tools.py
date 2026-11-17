@@ -3190,6 +3190,8 @@ def birthdays_tool(action="upcoming", name=None, month=None, day=None, year=None
         return birthdays.add(name, month, day, year, note)
     if a == "remove":
         return birthdays.remove(name or "")
+    if a == "gifts":
+        return birthdays.gift_context(name or "")
     return birthdays.upcoming()
 
 
@@ -3782,6 +3784,50 @@ TOOL_SPECS = [
            "side": {"type": "string", "enum": ["long", "short"]}, "take": S,
            "symbols": {"type": "array", "items": S}, "range": S, "add": {"type": "array", "items": S},
            "remove": {"type": "array", "items": S}}, ["action"]),
+    _spec("voice_id", "Only answering the owner's voice (checked on this PC). learn: start learning their voice (they "
+                      "talk ~20 s; use when they say 'learn my voice'); forget; on / off; strictness (relaxed/normal/"
+                      "strict); status. Friends saying your name are ignored while it's on.",
+          {"action": {"type": "string", "enum": ["learn", "forget", "on", "off", "strictness", "status"]},
+           "strictness": S}, ["action"]),
+    _spec("privacy", "private_on / private_off: private mode (speech recognition only on this PC, nothing to Groq; "
+                     "Claude still answers). whisper_on / whisper_off / whisper_auto: talk quietly and briefly (auto = "
+                     "late at night or while they're on a call). convo (minutes: how long after each answer they can "
+                     "keep talking without your name; 0 turns it off). status.",
+          {"action": {"type": "string", "enum": ["private_on", "private_off", "whisper_on", "whisper_off", "whisper_auto",
+                                                 "convo", "status"]}, "minutes": N}, ["action"]),
+    _spec("triggers", "Things you do by yourself when something happens. add: when = app (name: a program or game "
+                      "opening, e.g. 'Dead by Daylight', 'discord'), time (at: '8:00' / '6pm', days: daily, weekdays, "
+                      "weekends or 'mon,wed,fri'), or back (they return to the PC after a break); do = plain-English "
+                      "instructions run exactly as if they said them ('turn the lights red, open Discord and play my DBD "
+                      "playlist', 'tell me the market and the weather'). list; remove / pause / resume (id or words). "
+                      "Read the trigger back in one sentence after adding it. Never set one to click or type in a game.",
+          {"action": {"type": "string", "enum": ["add", "list", "remove", "pause", "resume"]},
+           "when": {"type": "string", "enum": ["app", "time", "back"]}, "do": S, "name": S, "at": S, "days": S, "id": S},
+          ["action"]),
+    _spec("find", "Instant file finder over Windows Search's index of their user folder (names AND words inside "
+                  "documents). query: the words that'd be in it ('landlord lease', 'budget'); kind: pdf, word, doc, "
+                  "excel, spreadsheet, powerpoint, image, photo, video, audio, zip, code, text; when: today, yesterday, "
+                  "this week, last week, this month, last month, 'last 3 months', this year. Results go up numbered on "
+                  "the desktop. open: a result number to open ('open the second one'). Prefer this over files search.",
+          {"query": S, "kind": S, "when": S, "inside": B, "open": N}),
+    _spec("recipe_card", "Put a recipe up on their desktop. Use after suggesting a dish from what they have: "
+                         "ingredients as [{item: '2 eggs', have: true/false}] so the missing ones stand out, steps "
+                         "(short, max 10), time ('25 min'), serves, difficulty, tip.",
+          {"title": S, "ingredients": {"type": "array", "items": {"type": "object", "properties": {"item": S, "have": B}}},
+           "steps": {"type": "array", "items": S}, "time": S, "serves": N, "difficulty": S, "tip": S}, ["title"]),
+    _spec("jokes", "Inside jokes. add (text: short, what it's about and why it was funny) when something genuinely "
+                   "made you both laugh or they say 'remember that'; used (id) right after you bring one back; list; "
+                   "remove.",
+          {"action": {"type": "string", "enum": ["add", "used", "list", "remove"]}, "text": S, "id": S}, ["action"]),
+    _spec("weekly_letter", "Write their weekly letter right now (normally Sunday evening on its own): a Word file on the "
+                           "desktop about their week, from you."),
+    _spec("play_stats", "How long they've played today (days=1) or over N days, per game, and the wins/losses they "
+                        "told you about.", {"days": N}),
+    _spec("diagnostics", "Check every part of you (mic, speech, Claude key, internet, prices, live stream, scores, flights, "
+                         "weather, Steam, lights, Discord bot, desktop, OCR, documents, disk, settings, voice ID) in ~10 s, "
+                         "with a checklist on their desktop. run, fix (fix = an id from the results, or 'all'), errors "
+                         "(recent tool crashes). Use when they say something's broken, 'run diagnostics', 'fix yourself'.",
+          {"action": {"type": "string", "enum": ["run", "fix", "errors"]}, "fix": S}, []),
     _spec("browse", "Look things up in THEIR browser, one tab each ('google X', 'pull up X on Google', 'open a bunch of "
                     "tabs on Y', 'show me pictures of Z'). searches = search terms (each its own tab), urls = pages to "
                     "open (domains are fine), kind = web / images / news / videos / shopping / maps / youtube / reddit / "
@@ -3814,8 +3860,9 @@ TOOL_SPECS = [
                            "(true) or animate (false). No arguments = which one is on.",
           {"scene": {"type": "string", "enum": ["bench", "station", "archive", "signal", "chart"]}, "calm": {"type": "boolean"}}, []),
     _spec("birthdays", "Birthday radar: add (name, month, day, year if known, note like gift ideas) whenever they mention "
-                       "someone's birthday; remove (name); upcoming. He reminds them 3 days before and on the day.",
-          {"action": {"type": "string", "enum": ["add", "remove", "upcoming"]}, "name": S, "month": S, "day": N,
+                       "someone's birthday; remove (name); upcoming; gifts (name: what you know about them, to suggest "
+                       "real gift ideas from). He reminds them a week before (offering gift ideas), 3 days before and on the day.",
+          {"action": {"type": "string", "enum": ["add", "remove", "upcoming", "gifts"]}, "name": S, "month": S, "day": N,
            "year": N, "note": S}, ["action"]),
     _spec("desktop_card", "Put a card on their desktop wallpaper (his world behind their windows), NOT glass mode: use "
                           "this when they say 'on my desktop' / 'not the glass'. A list (items) or short text; stays up "
@@ -4044,6 +4091,158 @@ TOOL_SPECS = [
           {"task": S}, ["task"]),
 ]
 
+
+def diagnostics_tool(action="run", fix=None):
+    import diagnostics
+    if (action or "run") == "fix":
+        return diagnostics.fix(_VOICE_CORE, fix or "all")
+    if action == "errors":
+        p = config.JARVIS_DIR / "errors.jsonl"
+        if not p.exists():
+            return "No tool crashes logged."
+        rows = [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines()[-12:] if l.strip()]
+        return "Recent tool crashes: " + "; ".join(f"{r['t']} {r['tool']}: {r['error']}" for r in rows)
+    return diagnostics.summary(diagnostics.run(_VOICE_CORE))
+
+
+# =================================================================== 1.0.34: who he listens to, triggers, finder, life
+def voice_id_tool(action="status", strictness=None):
+    """Answers only your voice: learn it, forget it, check it, how strict."""
+    import voiceid
+    a = (action or "status").lower()
+    if a == "learn":
+        if _VOICE_CORE is None:
+            return "Not available."
+        core = _VOICE_CORE
+
+        def done(ok, msg):
+            core.events.put(("say", msg))
+            if ok:
+                core.set_widgets({"JARVIS_VOICE_ID": "true"})
+        voiceid.start_enroll(seconds=60, done=done)
+        try:
+            import pulls
+            pulls.pull("briefing", {"game": "Learning your voice", "friends": [], "queue": [
+                "Talk normally for about 20 seconds.", "Read something out, describe your day, anything.",
+                "Only you, no music or TV if you can help it."]}, id="voiceid", title="Your voice", ttl=70, focus=True, auto=False)
+        except Exception:
+            pass
+        return ("Listening now: tell them to just talk normally for about 20 seconds (anything: their day, a game, "
+                "read something out). Nothing they say is acted on while it learns. Say exactly that, briefly.")
+    if a == "forget":
+        return voiceid.forget()
+    if a in ("on", "off"):
+        _VOICE_CORE.set_widgets({"JARVIS_VOICE_ID": "true" if a == "on" else "false"})
+        return "Only answering your voice." if a == "on" else "Answering anyone who says my name."
+    if a == "strictness":
+        v = (strictness or "normal").lower()
+        if v not in ("relaxed", "normal", "strict"):
+            return "relaxed, normal or strict."
+        _VOICE_CORE.set_widgets({"JARVIS_VOICE_ID_STRICT": v})
+        return f"Voice match set to {v}."
+    return voiceid.status()
+
+
+def privacy_tool(action="status", minutes=None):
+    """Private mode (no cloud speech recognition), whisper mode, conversation mode."""
+    import quiet
+    a = (action or "status").lower()
+    core = _VOICE_CORE
+    if core is None:
+        return "Not available."
+    if a == "private_on":
+        core.set_widgets({"JARVIS_PRIVATE": "true"})
+        return ("Private mode on: speech recognition stays on this PC, nothing you say goes to Groq. What you ask me "
+                "still goes to Claude to answer, that part can't be local.")
+    if a == "private_off":
+        core.set_widgets({"JARVIS_PRIVATE": "false"})
+        return "Private mode off: back to fast cloud recognition for things said to me."
+    if a in ("whisper_on", "whisper_off", "whisper_auto"):
+        mode = a.split("_")[1]
+        quiet.set_manual(mode if mode != "auto" else None)
+        core.set_widgets({"JARVIS_WHISPER": {"on": "on", "off": "off", "auto": "auto"}[mode]})
+        return {"on": "Whisper mode on.", "off": "Whisper mode off, normal volume.", "auto": "Whisper mode back to automatic."}[mode]
+    if a == "convo":
+        secs = int(float(minutes or 0) * 60) if minutes is not None else 45
+        core.set_widgets({"JARVIS_CONVO": str(secs)})
+        return f"Conversation mode: {secs} seconds after each answer without my name." if secs else "Conversation mode off."
+    return (f"Private mode {'on' if config.PRIVATE else 'off'}. Whisper: {quiet.STATE.get('why') or 'off'}. "
+            f"Conversation mode: {int(config.CONVO_SECS)}s.")
+
+
+def triggers_tool(action="list", when=None, do=None, name=None, at=None, days=None, id=None):
+    import triggers
+    a = (action or "list").lower()
+    if a == "add":
+        return triggers.add(when, do, name=name, at=at, days=days)
+    if a == "remove":
+        return triggers.remove(id or name or "")
+    if a in ("pause", "resume"):
+        return triggers.pause(id or name or "all", a == "resume")
+    return triggers.listing()
+
+
+def find_tool(query="", kind=None, when=None, inside=True, open=None):
+    import finder
+    if open:
+        p = finder.pick(open)
+        if not p:
+            return "No result with that number; search first."
+        return open_path(p)
+    return finder.find(query, kind=kind, when=when, inside=inside if inside is not None else True)
+
+
+def recipe_card(title, ingredients=None, steps=None, time=None, serves=None, tip=None, difficulty=None):
+    """Put a recipe up on the desktop (ingredients: [{item, have}] so missing ones show)."""
+    ings = []
+    for it in ingredients or []:
+        if isinstance(it, dict):
+            ings.append({"item": str(it.get("item", ""))[:80], "have": it.get("have", True) is not False})
+        else:
+            ings.append({"item": str(it)[:80], "have": True})
+    data = {"title": str(title or "")[:80], "ingredients": ings[:20], "steps": [str(s)[:240] for s in (steps or [])][:10],
+            "time": time, "serves": serves, "tip": (tip or "")[:160], "difficulty": difficulty}
+    try:
+        import pulls
+        pulls.pull("recipe", data, id="recipe", title="Recipe", ttl=1800, focus=True, auto=False)
+    except Exception as e:
+        return f"Couldn't show it: {e}"
+    need = [i["item"] for i in ings if not i["have"]]
+    return "It's on the desktop for 30 minutes." + (f" Missing: {', '.join(need)}." if need else "")
+
+
+def jokes_tool(action="list", text=None, id=None):
+    import extras
+    return extras.joke_tool(action, text, id)
+
+
+def letter_tool():
+    import extras
+    if _VOICE_CORE is None:
+        return "Not available."
+    msg, _ = extras.letter(_VOICE_CORE, force=True)
+    return msg + " It's up on the desktop too. Tell them in one line, don't read it out."
+
+
+def play_stats(days=1):
+    import gamemode
+    if gamemode.WATCH is None:
+        return "Game mode isn't running, so I haven't tracked play time."
+    s = gamemode.WATCH.stats(days=int(days or 1))
+    label = "today" if int(days or 1) <= 1 else f"the last {int(days)} days"
+    if not s["minutes"] and not (s["wins"] or s["losses"]):
+        return f"No games {label}."
+    h, m = divmod(s["minutes"], 60)
+    out = f"Played {h}h {m}m {label}" if h else f"Played {m} minutes {label}"
+    if s["games"]:
+        out += ": " + ", ".join(f"{g} {v // 60}h{v % 60:02d}" if v >= 60 else f"{g} {v}m" for g, v in s["games"].items())
+    if s["wins"] or s["losses"]:
+        out += f". Results you told me: {s['wins']}W {s['losses']}L"
+    if s["playing"]:
+        out += f". In {s['playing']} now, {s['session']} minutes this sitting"
+    return out + "."
+
+
 FUNCS = {
     "open": open_thing, "close_app": close_app, "self_control": self_control, "window_control": window_control,
     "keyboard_input": keyboard_input, "clipboard": clipboard, "screen_text": screen_text, "screen": screen, "mouse": mouse,
@@ -4051,7 +4250,8 @@ FUNCS = {
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "stocks": stocks_tool, "desktop_scene": desktop_scene_tool,
-    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
+    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "voice_id": voice_id_tool, "privacy": privacy_tool, "triggers": triggers_tool,
+    "find": find_tool, "recipe_card": recipe_card, "jokes": jokes_tool, "weekly_letter": letter_tool, "play_stats": play_stats, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
     "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
 
@@ -4077,11 +4277,12 @@ TOOL_GROUPS = {
                  "look_at_camera", "watch", "activity", "close_app"],
     "calendar_email": ["calendar", "email"],
     "discord_phone": ["discord", "phone"],
-    "games": ["game_mode", "steam"],
+    "games": ["game_mode", "steam", "play_stats"],
+    "automation": ["triggers", "voice_id", "privacy"],
     "stocks": ["stocks"],
     "desktop": ["glass", "desk_widgets", "desktop_scene", "frame_rate", "corner_widget", "rgb", "voice_settings",
                 "lights", "track"],
-    "life": ["journal", "birthdays", "goodnight", "changelog", "speed_report"],
+    "life": ["journal", "birthdays", "goodnight", "changelog", "speed_report", "recipe_card", "jokes", "weekly_letter"],
     "studio": ["blender", "blender_expert", "unreal_expert"],
     "apps": [],              # the user's own connectors (MCP tools, names with "__")
 }
@@ -4096,13 +4297,18 @@ GROUP_HINTS = {
     "calendar_email": r"\b(calendar|event|meeting|appointment|schedule|tomorrow|next week|email|emails|inbox|mail)\b",
     "discord_phone": r"\b(discord|message|messages|dm|server|channel|phone|text(ed)?|notification|notifications|post)\b",
     "games": r"\b(game|games|gaming|steam|play next|what should i play|patch|dbd|dead by daylight|queue|ranked|lost|won|"
-             r"match|wishlist|sale|friends online)\b",
+             r"match|wishlist|sale|friends online|played|playing|hours|session|w/?l)\b",
     "stocks": r"\b(stock|stocks|share|shares|market|markets|ticker|nasdaq|s&p|dow|crypto|bitcoin|ethereum|earnings|"
               r"watchlist|portfolio|invest|investing|nvidia|tesla|apple|amd|etf)\b",
     "desktop": r"\b(track|tracking|score|scores|flight|download|downloading|glass|widget|widgets|desktop|wallpaper|scene|fps|frame rate|corner|rgb|keyboard lights|lights?|lamp|"
                r"hue|voice|sound like|accent|speak (faster|slower))\b",
     "life": r"\b(journal|diary|birthday|birthdays|goodnight|good night|bed|changelog|what'?s new|patch notes for you|"
-            r"speed report|how fast)\b",
+            r"speed report|how fast|cook|cooking|recipe|dinner|lunch|breakfast|eat|food|fridge|ingredients?|gift|gifts|"
+            r"present|joke|jokes|funny|remember that|letter)\b",
+    "automation": r"\b(when i (open|launch|start|get back|come back)|every (day|morning|night|weekday|weekend|monday|"
+                  r"tuesday|wednesday|thursday|friday|saturday|sunday)|at \d|trigger|triggers|automat\w*|my voice|"
+                  r"only (listen|answer)|private mode|privacy|whisper|quiet mode|conversation mode|"
+                  r"keep listening|stop listening to)\b",
     "studio": r"\b(blender|unreal|3d|model|mesh|render|sculpt|ue5)\b",
 }
 
@@ -4195,4 +4401,23 @@ def run_tool(name, args):
         out = fn(**(args or {}))
         return out if isinstance(out, list) else str(out)
     except Exception as e:
-        return f"Tool {name} failed: {type(e).__name__}: {e}"
+        _log_failure(name, e)
+        return (f"Tool {name} failed: {type(e).__name__}: {e}. [Self-repair: tell them in a few words what broke, and "
+                f"offer to run diagnostics (which can fix most things) if it looks like more than a one-off.]")
+
+
+_FAILS = {}
+
+
+def _log_failure(name, e):
+    """Crashes in tools, kept for diagnostics (errors.jsonl, last 300)."""
+    import traceback
+    _FAILS[name] = _FAILS.get(name, 0) + 1
+    try:
+        p = config.JARVIS_DIR / "errors.jsonl"
+        line = json.dumps({"t": datetime.now().isoformat(timespec="seconds"), "tool": name, "error": f"{type(e).__name__}: {e}",
+                           "where": traceback.format_exc().strip().splitlines()[-3:]})
+        old = p.read_text(encoding="utf-8").splitlines()[-299:] if p.exists() else []
+        p.write_text("\n".join(old + [line]) + "\n", encoding="utf-8")
+    except Exception:
+        pass

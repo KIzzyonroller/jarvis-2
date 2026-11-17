@@ -47,6 +47,31 @@ FIELDS = [
      "Things like a full drive, overheating or a download stuck. Never during games.", None),
 
     # ---------------------------------------------------------------- Conversation & personality
+    ("Whisper mode", "JARVIS_WHISPER", "Whisper mode", "choice",
+     "He talks quietly and keeps it short. Auto: between the hours below, and whenever a call app (Discord, Zoom, "
+     "Teams, Meet...) is using your mic. Or say \"whisper mode on\".", [("auto", "Auto"), ("on", "Always"), ("off", "Never")]),
+    ("Whisper mode", "JARVIS_WHISPER_FROM", "Quiet from", "choice", "", [('0', '12 am'), ('1', '1 am'), ('2', '2 am'), ('3', '3 am'), ('4', '4 am'), ('5', '5 am'), ('6', '6 am'), ('7', '7 am'), ('8', '8 am'), ('9', '9 am'), ('10', '10 am'), ('11', '11 am'), ('12', '12 pm'), ('13', '1 pm'), ('14', '2 pm'), ('15', '3 pm'), ('16', '4 pm'), ('17', '5 pm'), ('18', '6 pm'), ('19', '7 pm'), ('20', '8 pm'), ('21', '9 pm'), ('22', '10 pm'), ('23', '11 pm')]),
+    ("Whisper mode", "JARVIS_WHISPER_TO", "Until", "choice", "", [('0', '12 am'), ('1', '1 am'), ('2', '2 am'), ('3', '3 am'), ('4', '4 am'), ('5', '5 am'), ('6', '6 am'), ('7', '7 am'), ('8', '8 am'), ('9', '9 am'), ('10', '10 am'), ('11', '11 am'), ('12', '12 pm'), ('13', '1 pm'), ('14', '2 pm'), ('15', '3 pm'), ('16', '4 pm'), ('17', '5 pm'), ('18', '6 pm'), ('19', '7 pm'), ('20', '8 pm'), ('21', '9 pm'), ('22', '10 pm'), ('23', '11 pm')]),
+    ("Whisper mode", "JARVIS_WHISPER_VOL", "How quiet", "choice", "",
+     [("20", "Very quiet"), ("35", "Quiet"), ("55", "A bit quieter")]),
+    ("Automation", "JARVIS_TRIGGERS", "Triggers", "bool",
+     "Things he does by himself when something happens: a game or app opens, a time of day, you get back to the PC. "
+     "Set them up by voice: \"when I open Dead by Daylight, turn the lights red and open Discord\", \"every "
+     "weekday at 8, tell me the market and the weather\".", None),
+    ("While you're away", "JARVIS_WELCOME_BACK", "\"Where did I leave off\" when you're back", "choice",
+     "After a break this long, he tells you what you were doing, what you last asked him, and what's due soon.",
+     [("0", "Off"), ("10", "After 10 minutes away"), ("20", "After 20 minutes"), ("45", "After 45 minutes")]),
+    ("While you're away", "JARVIS_AMBIENT", "Little lines from his world", "choice",
+     "Now and then (never mid-game or mid-call), one line that fits his scene: the station, the archive...",
+     [("off", "Off"), ("rare", "Rarely (a few a day)"), ("sometimes", "Sometimes")]),
+    ("Weekly letter", "JARVIS_LETTER", "A letter every Sunday", "bool",
+     "Sunday evening he writes you a letter (a Word file on your desktop): what you did this week, what he noticed, "
+     "and some honest commentary.", None),
+    ("Games and alerts", "JARVIS_PLAY_BREAK", "Gaming break nudge", "choice",
+     "After this much play in one sitting he suggests a break, between matches, never mid-game.",
+     [("0", "Off"), ("120", "After 2 hours"), ("180", "After 3 hours"), ("240", "After 4 hours")]),
+    ("Games and alerts", "JARVIS_PATCH_ALERTS", "Patch heads-up when you launch a game", "bool",
+     "If the game updated in the last two days, he tells you the gist as it loads.", None),
     ("Personality", "JUNO_PERSONALITY", "His personality", "choice", "How he comes across. His rules stay the same.",
      [("classic", "Classic (dry British wit, calm)"), ("warm", "Warm (loyal old butler)"),
       ("sharp", "Sharp (sardonic, unimpressed)"), ("focused", "Focused (businesslike)"),
@@ -180,6 +205,19 @@ FIELDS = [
 
     # ---------------------------------------------------------------- Microphone
     ("Microphone", "JUNO_MIC", "Microphone", "choice", "If it's unplugged he uses Windows' default.", None),
+    ("Who he listens to", "JARVIS_VOICE_ID", "Only answer my voice", "bool",
+     "Once he's learned your voice (say \"Jarvis, learn my voice\" and talk for about 20 seconds), anything said "
+     "in another voice is ignored, even with his name. Checked on this PC; nothing is uploaded.", None),
+    ("Who he listens to", "JARVIS_VOICE_ID_STRICT", "How sure he has to be", "choice",
+     "Strict ignores more people but may sometimes miss you on a bad mic.",
+     [("relaxed", "Relaxed"), ("normal", "Normal"), ("strict", "Strict")]),
+    ("Who he listens to", "JARVIS_CONVO", "Conversation mode", "choice",
+     "After he answers, keep talking without saying his name for this long. Best with \"Only answer my voice\" on, "
+     "or friends in the room will be talking to him too.",
+     [("0", "Off"), ("20", "20 seconds"), ("45", "45 seconds"), ("120", "2 minutes")]),
+    ("Who he listens to", "JARVIS_PRIVATE", "Private mode", "bool",
+     "Speech recognition runs only on this PC (never Groq), even for things you say to him. A bit slower and less "
+     "accurate on a slow PC. What you ask him still goes to Claude to answer.", None),
     ("Microphone", "JUNO_MIC_FLOOR", "How loud you have to be", "choice",
      "Raise it if background noise keeps setting him off.",
      [("250", "Quiet voice is fine"), ("400", "Normal"), ("650", "Speak up"), ("900", "Noisy room")]),
@@ -351,7 +389,8 @@ PAGES = {
     "Personality": "conversation", "Starting conversations": "conversation", "Check-ins": "conversation", "Answering": "conversation",
     "Voice effect": "voice", "Voice engine": "voice",
     "Language": "languages",
-    "Microphone": "mic", "Faster hearing": "mic",
+    "Microphone": "mic", "Faster hearing": "mic", "Who he listens to": "mic", "Whisper mode": "voice",
+    "Automation": "conversation", "While you're away": "conversation", "Weekly letter": "conversation",
     "His desktop": "appearance", "Music player": "appearance", "Desktop widgets": "appearance", "Glass mode": "appearance",
     "What he can use": "access", "Activity memory": "access",
 }
@@ -371,7 +410,10 @@ DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir",
             "JARVIS_TTS": "kokoro", "JUNO_ELEVENLABS_VOICE_ID": "EXAVITQu4vr4xnSDxMaL", "JUNO_LANGUAGE": "en",
             "JUNO_MIC": "default", "JUNO_MIC_FLOOR": "400", "JARVIS_VAD": "0.5", "JARVIS_PAUSE": "1.5",
             "JARVIS_SMART_PAUSE": "true", "JARVIS_ECHO_CANCEL": "true", "JARVIS_MUTE_HOTKEY": "ctrl+alt+m",
-            "JUNO_DESK_SCENE": "bench", "JUNO_DESK_CALM": "true", "JUNO_STOCK_ALERTS": "true", "JUNO_STOCK_ALERT_PCT": "4", "JUNO_STOCKS_BRIEFING": "true", "JARVIS_LEAN_TOOLS": "true", "JARVIS_FREE_CREATE": "personal", "JUNO_PULLS": "true", "JUNO_GAME_BRIEFING": "true", "JUNO_STOCKS_WEEKLY": "true", "JUNO_STOCK_EARNINGS": "true", "JUNO_W_STOCKS": "true", "JUNO_FPS": "30", "JUNO_DESK_VIZ": "both", "JUNO_GLASS_WHERE": "window", "JUNO_DESK_WIDGETS": "true",
+            "JUNO_DESK_SCENE": "bench", "JUNO_DESK_CALM": "true", "JUNO_STOCK_ALERTS": "true", "JUNO_STOCK_ALERT_PCT": "4", "JUNO_STOCKS_BRIEFING": "true", "JARVIS_LEAN_TOOLS": "true", "JARVIS_VOICE_ID": "true", "JARVIS_VOICE_ID_STRICT": "normal", "JARVIS_CONVO": "45",
+            "JARVIS_PRIVATE": "false", "JARVIS_WHISPER": "auto", "JARVIS_WHISPER_FROM": "23", "JARVIS_WHISPER_TO": "7",
+            "JARVIS_WHISPER_VOL": "35", "JARVIS_TRIGGERS": "true", "JARVIS_PLAY_BREAK": "180", "JARVIS_WELCOME_BACK": "20",
+            "JARVIS_AMBIENT": "rare", "JARVIS_LETTER": "true", "JARVIS_PATCH_ALERTS": "true", "JARVIS_FREE_CREATE": "personal", "JUNO_PULLS": "true", "JUNO_GAME_BRIEFING": "true", "JUNO_STOCKS_WEEKLY": "true", "JUNO_STOCK_EARNINGS": "true", "JUNO_W_STOCKS": "true", "JUNO_FPS": "30", "JUNO_DESK_VIZ": "both", "JUNO_GLASS_WHERE": "window", "JUNO_DESK_WIDGETS": "true",
             "JUNO_DESK_WIDGETS_WHERE": "right", "JUNO_W_STATS": "true", "JUNO_W_MUSIC": "true", "JUNO_W_WEATHER": "true",
             "JUNO_W_CALENDAR": "true", "JUNO_W_NOTES": "true", "JUNO_W_DISCORD": "true", "JUNO_MUSIC_PLAYER": "true", "JARVIS_CAMERA": "true",
             "JARVIS_DISCORD_READ": "true", "JUNO_PHONE_NOTIFS": "true", "JUNO_PHONE_SPEAK": "false", "JARVIS_KEEP_FOCUS": "true", "DISCORD_BOT_REPLY": "everyone", "DISCORD_UPDATES_MODE": "ask",

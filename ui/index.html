@@ -2054,6 +2054,7 @@ window.J = {
       }
       case "setup": showKeys(e); break;
       case "settings": S.fields = e.fields || []; S.voices = e.voices || null; if (!$("#settings").hidden) renderSettings(); break;
+      case "open_settings": openSettings(); if (e.page) { S.page = e.page; } break;
       case "desk_arrange": S.arrange = e; if (!$("#settings").hidden && S.page === "arrange" && !S.dragging) renderSettings(); break;
       case "voices": S.voices = { personas: e.personas, voices: e.voices, engine: e.engine, speed: e.speed, pitch: e.pitch };
         if (!$("#settings").hidden && $("#set-voice")) $("#set-voice").replaceWith(voiceSection());

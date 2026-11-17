@@ -3,6 +3,29 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.34
+
+- **He checks himself.** "Run diagnostics" tests every part of him (mic, speech, Claude, voice, internet, live prices, scores, flights, weather, Steam, lights, Discord, desktop, screen reading, documents, disk, settings, voice ID, file search, triggers) in a few seconds and puts a pass / warn / fail list on your desktop (also saved as diagnostics.txt). "Fix it" repairs what he can: restarts his hearing or voice, the live price stream or the Discord bot, finds your lights again, picks a working mic, fixes a broken settings file (asks first). When a tool fails mid-answer, he now tries the matching fix once before giving up.
+- **He only answers your voice.** Say "Jarvis, learn my voice" and talk for about 20 seconds. After that, anyone else saying his name is ignored. It's checked on your PC (nothing uploaded) and slowly adapts to your mic. Settings > Microphone > Who he listens to, with how strict it is.
+- **Conversation mode.** After he answers, keep talking for 45 seconds without saying his name (20 s, 45 s or 2 minutes, or off).
+- **Private mode.** "Private mode on": every word is recognised on your PC, never sent to Groq. (What you ask him still goes to Claude to answer.)
+- **Whisper mode.** Late at night (11pm to 7am by default) or whenever Discord, Zoom, Teams etc. is using your mic, he talks quietly and keeps it short. "Whisper mode on/off" any time.
+- **Triggers.** "When I open Dead by Daylight, turn the lights red, open Discord and play my DBD playlist." "Every weekday at 8, tell me the market and the weather." "When I get back to my PC, tell me what I missed on Discord." Anything he can do, on an app or game opening, a time and days, or you coming back. "What triggers do I have", "pause the DBD one".
+- **Play time.** He keeps track of how long you play each game. "How long have I played today?" gives the time per game and the wins and losses you've told him. After 3 hours in one sitting (you choose) he suggests a break, right after a match, never mid-game.
+- **Patch heads-up.** Launch a game that updated in the last two days and he gives you the gist while it loads.
+- **Instant file finder.** "Find that PDF from my landlord last month", "where's the budget spreadsheet": searches Windows' own index (names and words inside documents) across your user folder in under a second, numbered on your desktop. "Open number two."
+- **Where did I leave off.** Back after 20+ minutes away, he tells you what you were in, the last thing you asked him and what's coming up.
+- **"What's this?"** looks at the window in front of you and tells you.
+- **Cooking.** "What can I make with eggs, rice and spinach?" One or two real dishes, then the recipe up on your desktop with what you're missing highlighted.
+- **Gift ideas.** A week before a birthday he offers ideas built from what he actually knows about that person. "Gift ideas for Kai" any time.
+- **Inside jokes.** When something gets a real laugh he remembers it, and brings it back now and then. Rarely.
+- **Little lines from his world.** Every so often (rarely by default) one line that fits his scene. Never mid-game or mid-call.
+- **A letter every Sunday.** Sunday evening he writes you a letter about your week (a Word file on your desktop): what you did, what he noticed, and a couple of honest observations. "Write my weekly letter" does it now.
+
+## 1.0.33
+
+- **The corner widget can be closed.** It now has a ×. Now that his desktop shows what he's doing, you can close it for good: it only comes back, briefly, when he needs you to approve something while his window is minimized (you can still answer those by voice or hotkey). Turn it back on in Settings or say "bring back the corner widget".
+
 ## 1.0.30
 
 - **Picking a microphone works again.** Choosing a mic in Settings > Microphone crashed the save, so it quietly stayed on Windows' default. Fixed.

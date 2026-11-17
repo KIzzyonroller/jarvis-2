@@ -13,7 +13,8 @@ window.DeskPulls = (() => {
   const P = { list: [], layout: {}, focus: null, tel: null, gpu: null, max: 3, hist: [] };
   const DEFAULT_WHERE = { pc: "right", network: "right", briefing: "right", weather: "right" };
   const TITLES = { stock: "Market", weather: "Weather", calendar: "Today", sources: "Sources", pc: "Your PC", file: "Made",
-                   network: "Network", briefing: "Briefing", tracker: "Tracking" };
+                   network: "Network", briefing: "Briefing", tracker: "Tracking", checklist: "Diagnostics", files: "Found",
+                   recipe: "Recipe" };
   const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ------------------------------------------------------------------ little builders
@@ -357,6 +358,60 @@ window.DeskPulls = (() => {
     el.querySelector(".pls").textContent = d.game || "";
   }
 
+  // ------------------------------------------------------------------ diagnostics: every part of him, pass / warn / fail
+  function renderChecklist(el, d) {
+    const b = body(el); b.replaceChildren();
+    const items = d.items || [], n = (st) => items.filter((r) => r.status === st).length;
+    const sum = h("div", "ck-sum");
+    for (const [st, label] of [["pass", "fine"], ["warn", "worth a look"], ["fail", "broken"]]) {
+      const c = h("span", "ck-n " + st); c.append(h("b", null, String(n(st))), h("i", null, label)); sum.append(c);
+    }
+    b.append(sum);
+    const ul = h("ul", "ck");
+    for (const r of items) {
+      const li = h("li", "ck-" + r.status);
+      li.append(h("i", "ck-dot"), h("b", null, r.name), h("span", null, r.detail || ""));
+      if (r.fix) li.append(h("em", null, "fix: " + (r.fix_label || r.fix)));
+      ul.append(li);
+    }
+    b.append(ul);
+    el.querySelector(".pls").textContent = d.at ? "checked " + d.at : "";
+    foot(el, n("fail") || n("warn") ? "Say \u201cfix it\u201d and he'll repair what he can." : "Everything checks out.");
+  }
+
+  // ------------------------------------------------------------------ file finder results
+  function renderFiles(el, d) {
+    const b = body(el); b.replaceChildren();
+    if (d.query) b.append(h("div", "q", "\u201c" + d.query + "\u201d"));
+    const ol = h("ol", "found");
+    for (const r of (d.rows || []).slice(0, 12)) {
+      const li = h("li"); const ext = (r.name.split(".").pop() || "").slice(0, 4);
+      li.append(h("i", "fx", ext), h("b", null, r.name), h("span", null, r.folder), h("em", null, [r.when, r.size].filter(Boolean).join(" \u00b7 ")));
+      ol.append(li);
+    }
+    b.append(ol);
+    el.querySelector(".pls").textContent = (d.rows || []).length + (d.via === "walk" ? " (folder scan)" : "");
+    foot(el, "\u201cOpen number two\u201d");
+  }
+
+  // ------------------------------------------------------------------ recipe from what you've got
+  function renderRecipe(el, d) {
+    const b = body(el); b.replaceChildren();
+    const meta = h("div", "rc-meta");
+    for (const m of [d.time, d.serves && "serves " + d.serves, d.difficulty]) if (m) meta.append(h("span", null, m));
+    b.append(h("div", "rc-title", d.title || ""), meta);
+    const cols = h("div", "rc-cols");
+    const ing = h("ul", "rc-ing");
+    for (const it of d.ingredients || []) {
+      const li = h("li", it.have === false ? "need" : "have"); li.append(h("i"), h("span", null, it.item || it)); ing.append(li);
+    }
+    const st = h("ol", "rc-steps");
+    for (const x of (d.steps || []).slice(0, 10)) st.append(h("li", null, x));
+    cols.append(ing, st); b.append(cols);
+    el.querySelector(".pls").textContent = (d.ingredients || []).filter((x) => x.have === false).length ? "missing a few" : "you have it all";
+    foot(el, d.tip || "");
+  }
+
   // ------------------------------------------------------------------ 6. trackers: scores, downloads, flights, timers
   function renderTracker(el, d) {
     const b = body(el), before = el._prev || {}; b.replaceChildren();
@@ -405,7 +460,8 @@ window.DeskPulls = (() => {
   }
 
   const RENDER = { stock: renderStock, weather: renderWeather, calendar: renderCalendar, sources: renderSources, pc: renderPC,
-                   file: renderFile, network: renderNetwork, briefing: renderBriefing, tracker: renderTracker };
+                   file: renderFile, network: renderNetwork, briefing: renderBriefing, tracker: renderTracker,
+                   checklist: renderChecklist, files: renderFiles, recipe: renderRecipe };
 
   // ------------------------------------------------------------------ placement
   function geom() {

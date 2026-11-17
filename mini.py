@@ -85,6 +85,8 @@ class Mini:
         self.bridge = None
         self.snap = {}                  # latest persona / state / mic / caption / confirm, replayed on show
         self._confirm = False
+        self.away = False               # the main window is minimized (set by jarvis.py)
+        self._for_approval = False      # shown only to answer an approval, though it's switched off
         self._lock = threading.Lock()
         self._guard_on = threading.Event()
 
@@ -109,8 +111,15 @@ class Mini:
                 self.snap.pop("confirm", None)
         if t == "confirm":
             self._set_confirm(True)
+            if not config.MINI_HUD and self.away and not self.visible:
+                # closed with ×, but an approval needs a button to press while his window is minimized
+                self._for_approval = True
+                self.show(force=True)
         elif t == "confirm_done":
             self._set_confirm(False)
+            if self._for_approval:
+                self._for_approval = False
+                threading.Timer(1.2, self.hide).start()
         if self.visible:
             self.em(ev)
 
@@ -237,8 +246,8 @@ class Mini:
         if self.hwnd and _u().GetWindowRect(self.hwnd, ctypes.byref(r)) and r.left > PARK + 1000:
             self.pos = (r.left, r.top)
 
-    def show(self):
-        if not config.MINI_HUD or not self.window or not IS_WINDOWS or self.visible:
+    def show(self, force=False):
+        if (not config.MINI_HUD and not force) or not self.window or not IS_WINDOWS or self.visible:
             return
         if not self._handle():
             return
@@ -315,6 +324,17 @@ class MiniBridge:
 
     def expand(self):
         self._mini.on_expand()
+
+    def dismiss(self):
+        """× on the widget: off for good (his desktop shows what he's doing now). Settings or "bring back the
+        corner widget" turns it on again. It still pops up for an approval while his window is minimized."""
+        if self._mini._for_approval:
+            self._mini.hide()
+            return
+        if self._core:
+            threading.Thread(target=self._core.set_widgets, args=({"JARVIS_MINI": "false"},), daemon=True).start()
+        else:
+            self._mini.hide()
 
     def toggle_mute(self):
         if self._core:

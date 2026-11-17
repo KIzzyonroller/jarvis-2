@@ -79,6 +79,8 @@ def clean_for_speech(text):
 
 
 # =================================================================== audio container
+GAIN = 1.0                 # playback volume multiplier; quiet.py lowers it for whisper mode
+
 class Audio:
     """Either PCM samples in memory, or an audio file on disk."""
 
@@ -621,6 +623,8 @@ class Speaker:
             print(f"[tts] envelope failed: {e}")
 
     def _play_pcm(self, pcm, sr):
+        if GAIN != 1.0:                                    # whisper mode (quiet.py): same voice, much softer
+            pcm = np.asarray(pcm, dtype=np.float32) * GAIN
         if self._out is None and not self._out_failed:
             try:
                 self._out = _Output()

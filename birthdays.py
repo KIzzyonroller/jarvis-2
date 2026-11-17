@@ -4,6 +4,7 @@ and she reminds you 3 days ahead (time to get something) and on the day. "Whose 
 next few. Edit or remove by voice ("forget Kai's birthday").
 """
 import json
+import re
 from datetime import date
 
 import config
@@ -73,6 +74,29 @@ def upcoming(n=6):
     return "\n".join(out)
 
 
+def gift_context(name):
+    """What he knows about a person, for gift ideas: the birthday note plus every memory that mentions them."""
+    import tools
+    want = (name or "").strip().lower()
+    if not want:
+        return "Whose birthday?"
+    b = next((x for x in _load() if want in x["name"].lower()), None)
+    first = want.split()[0]
+    facts = [m["text"] for m in tools.memories() if re.search(rf"\b{re.escape(first)}\b", m["text"], re.I)]
+    out = []
+    if b:
+        d = _next(b)
+        out.append(f"{b['name']}'s birthday: {d:%B} {d.day} (in {(d - date.today()).days} days)"
+                   + (f", turning {d.year - b['year']}" if b.get("year") else "") + (f". Note: {b['note']}" if b.get("note") else ""))
+    out += [f"- {f}" for f in facts[:25]]
+    if not facts:
+        out.append("(Nothing remembered about them yet beyond the birthday.)")
+    return ("\n".join(out) + "\n\nSuggest 4 or 5 specific gift ideas built on these facts (say which fact each idea "
+            "comes from), across a few price levels, plus one experience idea. If you know too little, say so honestly "
+            "and ask two quick questions about them instead of guessing generic stuff. Offer to search for current "
+            "prices or put the list on the desktop.")
+
+
 def due(today=None):
     """[(kind, birthday, date)] for reminders today: 'soon' (3 days ahead) and 'today'."""
     today = today or date.today()
@@ -86,4 +110,6 @@ def due(today=None):
             out.append(("today", b, d))
         elif days == 3:
             out.append(("soon", b, d))
+        elif days == 7:
+            out.append(("week", b, d))
     return out

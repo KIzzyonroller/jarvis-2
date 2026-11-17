@@ -447,6 +447,8 @@ class Listener:
 
     @property
     def cloud_on(self):
+        if config.PRIVATE:                       # private mode: every word stays on this PC
+            return False
         return self.cloud is not None and self.cloud.available
 
     # Whisper always works on a fixed 30-second window, so each pass costs about the same whatever

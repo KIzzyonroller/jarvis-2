@@ -71,7 +71,8 @@ class Moments:
     def _loop(self):
         self._stop.wait(90)                  # let startup (and the morning briefing) finish first
         while not self._stop.wait(30):
-            for check in (self._breaks, self._birthdays, self._evening, self._journal, self._rain, self._butler):
+            for check in (self._breaks, self._birthdays, self._evening, self._journal, self._rain, self._butler,
+                          self._letter, self._ambient):
                 try:
                     if check():
                         break                # one thing at a time
@@ -140,11 +141,15 @@ class Moments:
             if kind == "today":
                 line = random.choice([f"It's {b['name']}'s birthday today! Send them something.",
                                       f"Hey, today's {b['name']}'s birthday. Don't forget to say happy birthday."])
+            elif kind == "week":
+                line = (f"{b['name']}'s birthday is a week from today. Enough time to order something decent. "
+                        f"Want a few gift ideas based on what I know about them?")
             else:
                 line = (f"{b['name']}'s birthday is in three days, on {d:%A}. Want a few gift ideas?"
                         + (f" You noted: {b['note']}." if b.get("note") else ""))
             self.core.events.put(("moment", {"line": line, "cards": [{"title": "Birthday", "big": b["name"],
-                                                                        "text": "today" if kind == "today" else f"{d:%A %B} {d.day}"}]}))
+                                                                        "text": "today" if kind == "today" else f"{d:%A %B} {d.day}"}],
+                                             "engage": 0 if kind == "today" else 30}))   # "yeah go on" works without his name
             return True
         return False
 
@@ -192,6 +197,15 @@ class Moments:
             return False
         self.core.events.put(("moment", {"line": line, "cards": [card]}))
         return True
+
+    # ------------------------------------------------------------------ extras.py: Sunday letter, ambient lines
+    def _letter(self):
+        import extras
+        return extras.weekly_letter(self.core)
+
+    def _ambient(self):
+        import extras
+        return extras.ambient(self.core)
 
     # ------------------------------------------------------------------ rain heads-up
     def _rain(self):
