@@ -365,6 +365,7 @@ def _close_tabs(tabs):
         if not tools._wait_front(w, timeout=2.0) or (tools._wtitle(h) or "").strip() != title:
             continue
         pyautogui.hotkey("ctrl", "w")
+        __import__("tools").release_modifiers()
         time.sleep(0.4)
         done.append(re.sub(r"\s+[-\u2013\u2014|]\s+(Google Chrome|Microsoft\u200b? Edge|Mozilla Firefox|Brave|Opera|Vivaldi).*$", "", title))
     if not done:

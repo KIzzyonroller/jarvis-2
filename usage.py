@@ -21,7 +21,7 @@ import config
 
 # dollars per million tokens: input, output, cache write (5-minute), cache read
 PRICES = {
-    "claude-sonnet-5-5": {"in": 2.0, "out": 10.0, "cache_write": 2.5, "cache_read": 0.20},
+    "claude-sonnet-5-5": {"in": 2.0, "out": 10.0, "cache_write": 2.5, "cache_read": 0.10},     # cache reads halved Oct 7 2026
     "claude-opus-5-5": {"in": 4.0, "out": 20.0, "cache_write": 5.0, "cache_read": 0.40},
     "claude-haiku-5-5": {"in": 0.10, "out": 0.50, "cache_write": 0.125, "cache_read": 0.01},    # prompts under 100k tokens
 }

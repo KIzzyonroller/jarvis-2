@@ -81,6 +81,7 @@ def send(target, text, confirm):
         return "Couldn't bring Discord to the front, so nothing was sent."
     before = (w.title or "")
     pyautogui.hotkey("ctrl", "k")
+    __import__("tools").release_modifiers()
     time.sleep(0.6)
     tools._paste(target)
     time.sleep(1.0)                                          # let the switcher find matches

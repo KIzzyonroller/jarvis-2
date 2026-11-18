@@ -175,11 +175,16 @@ def feed_enroll(audio):
     """Called with each sentence heard while learning. Returns True when it has enough."""
     secs = len(audio) / 16000
     if secs >= MIN_SECS:
-        try:
-            ENROLL["embs"].append(embed(audio))
-            ENROLL["secs"] += secs
-        except Exception as e:
-            print(f"[voice id] {e}")
+        step = 4 * 16000                                 # long speech: one sample per ~4 seconds
+        chunks = [audio[i:i + step] for i in range(0, len(audio), step)] if secs > 6 else [audio]
+        for c in chunks:
+            if len(c) / 16000 < MIN_SECS:
+                continue
+            try:
+                ENROLL["embs"].append(embed(c))
+                ENROLL["secs"] += len(c) / 16000
+            except Exception as e:
+                print(f"[voice id] {e}")
     if ENROLL["secs"] >= 20 or time.time() > ENROLL["until"]:
         return finish_enroll()
     return False

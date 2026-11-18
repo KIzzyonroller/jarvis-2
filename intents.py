@@ -87,8 +87,18 @@ def _media(key, label):
     return f
 
 
+def _diag(m):
+    if _DRY.on:
+        return HIT
+    import diagnostics
+    out = diagnostics.summary(diagnostics.run(tools._VOICE_CORE))
+    return out.split(".")[0] + ". The full list is up on your desktop.", out
+
+
 def _open(m):
     target = m.group(1).strip()
+    if re.match(r"^(your|ur|yourself)\b", target):
+        return None                                        # "run your diagnostics": about him, not a Windows app
     if COMPOUND.search(target) or len(target.split()) > 4 or target in ("it", "that", "this", "something", "the app"):
         return None
     if re.search(r"\b(play|playing|song|music by|video|search|for me|i|that|which|where|from|with|about|last|latest|recent|new|glass|mode|tutorial|card|list)\b", target):
@@ -385,6 +395,7 @@ RULES = [
     (r"^(?:previous|last|go back(?: a)?|back)(?: (?:song|track|one))$|^previous$|^play the last song$|^go back a song$",
      _media("previous", "Previous")),
     (r"^(?:open|launch|start|run|pull up|bring up|show)(?: up)? (?:the |my )?glass(?: mode)?(?: tutorial| help)?$", _glass_open),
+    (r"^(?:run|do|start|check)(?: a| the| some| your| ur)? (?:self[- ]?)?(?:diagnostics?|self[- ]?checks?|system checks? on yourself)(?: on yourself| for yourself| please)?$", _diag),
     (r"^(?:open|launch|start|run|fire up|load up|boot up|pull up|bring up)(?: up)? (?:the |my )?(.+?)(?: app| application)?$", _open),
     (r"^(?:close|quit|exit|kill) (?:the |my )?(.+?)(?: app| application)?$", _close),
     (r"^(?:what(?:'s| is) the time|what time is it|time|what time is it right now|got the time)$", _time),

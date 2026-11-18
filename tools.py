@@ -368,6 +368,34 @@ def _is_user_app(h):
         return False
 
 
+_MODS = (0x10, 0x11, 0x12, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C)    # shift, ctrl, alt (both sides), win
+
+
+def release_modifiers():
+    """Send key-ups for any modifier Windows thinks is held. After our own fake key presses this guarantees nothing
+    is left stuck; a real held key just needs pressing again."""
+    try:
+        _, _, u, _ = _win()
+        for vk in _MODS:
+            if u.GetAsyncKeyState(vk) & 0x8000:
+                u.keybd_event(vk, 0, 2, 0)
+    except Exception as e:
+        print(f"[keys] release: {e}")
+
+
+def _elevated(h):
+    """Window of an admin / system process (UAC prompts, Task Manager, Memory Diagnostics, games run as admin)?
+    We can't send keys or take focus from those, so we leave them alone."""
+    if not h:
+        return False
+    try:
+        import psutil
+        psutil.Process(_wpid(h)).exe()
+        return False
+    except Exception:
+        return True
+
+
 def _force_foreground(h):
     """Windows only lets the foreground process hand out focus. Borrowing the
     current foreground thread's input queue for a moment gets around that."""
@@ -389,10 +417,14 @@ def _force_foreground(h):
         finally:
             for t in attached:
                 u.AttachThreadInput(me, t, False)
-        if _fg() != h:                                  # last resort: a key press unlocks SetForegroundWindow
+        if _fg() != h and not _elevated(_fg()) and not _elevated(h):
+            # last resort: a key press unlocks SetForegroundWindow. Press AND release Alt before switching, so Alt
+            # can never be left held down (if the key-up landed in an admin window, Windows would drop it and
+            # Alt would stay stuck: every click in Chrome becomes a download, typing triggers menus).
             u.keybd_event(0x12, 0, 0, 0)
-            u.SetForegroundWindow(h)
             u.keybd_event(0x12, 0, 2, 0)
+            u.SetForegroundWindow(h)
+        release_modifiers()
         return _fg() == h
     except Exception as e:
         print(f"[focus] couldn't refocus: {e}")
@@ -452,6 +484,8 @@ def _hold_focus(prev, seconds=None):
             return                                      # the user went somewhere on purpose: back off
         if not _is_user_app(cur) or _wpid(cur) == prev_pid:
             continue                                    # taskbar flash, or their own app's popup
+        if _elevated(cur):
+            return                                      # an admin window / UAC prompt: never fight it
         if now - last_reclaim < 1.0:
             fights += 1                                 # it grabbed focus right back: it's fighting
         if reclaims >= 3 or fights >= 2:
@@ -864,7 +898,10 @@ def _paste(text):
         old = None
     pyperclip.copy(text)
     time.sleep(0.05)
-    pyautogui.hotkey("ctrl", "v")
+    try:
+        pyautogui.hotkey("ctrl", "v")
+    finally:
+        pyautogui.keyUp("ctrl")
     time.sleep(0.25)                    # let the app read the clipboard before we restore it
     if old is not None:
         try:
@@ -905,7 +942,15 @@ def keyboard_input(action, text=None, keys=None, times=1, window=None):
     if action == "hotkey":
         if not keys:
             return "No keys given."
-        pyautogui.hotkey(*[k.lower() for k in keys])
+        try:
+            pyautogui.hotkey(*[k.lower() for k in keys], interval=0.03)
+        finally:
+            for k in keys:
+                try:
+                    pyautogui.keyUp(k.lower())
+                except Exception:
+                    pass
+            release_modifiers()
         return opened + f"Pressed {'+'.join(keys)}."
     if action == "press":
         key = (keys or [text or ""])[0].lower()

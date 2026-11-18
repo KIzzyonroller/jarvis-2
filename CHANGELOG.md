@@ -3,6 +3,13 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.35
+
+- **Fixed: your keyboard acting up and Chrome downloading pages instead of opening them.** When he handed focus back to your window he briefly pressed Alt, and if an admin window (a UAC prompt, Task Manager, Memory Diagnostics) was in front, Windows threw away the "let go of Alt" half. Alt stayed held down, so every click in Chrome became Alt+click, which downloads the link as an .html file, and typing set off menu shortcuts. He now presses and releases Alt before switching, never fights admin windows for focus, and lets go of every modifier after any key press of his own.
+- **Fixed: "run your diagnostics" opened Windows Memory Diagnostics.** It now runs his own check, instantly.
+- **Fixed: learning your voice failed if you talked in one long go.** Long speech now counts as several samples.
+- His spending estimate uses Sonnet 5.5's lower cache price (cut in October), so it no longer over-counts.
+
 ## 1.0.34
 
 - **He checks himself.** "Run diagnostics" tests every part of him (mic, speech, Claude, voice, internet, live prices, scores, flights, weather, Steam, lights, Discord, desktop, screen reading, documents, disk, settings, voice ID, file search, triggers) in a few seconds and puts a pass / warn / fail list on your desktop (also saved as diagnostics.txt). "Fix it" repairs what he can: restarts his hearing or voice, the live price stream or the Discord bot, finds your lights again, picks a working mic, fixes a broken settings file (asks first). When a tool fails mid-answer, he now tries the matching fix once before giving up.
