@@ -4387,12 +4387,13 @@ def more_tools_spec(loaded):
         or list(TOOL_GROUPS)
     desc = {"media": "Spotify, YouTube, Netflix, Apple Music", "computer": "files, commands, PC doctor, power, displays, "
             "mouse, camera, screen text, screen history", "calendar_email": "calendar and email", "discord_phone":
-            "Discord and phone notifications", "games": "game mode and Steam", "stocks": "stocks and markets",
+            "Discord and phone notifications", "games": "game mode, Steam, play time", "stocks": "stocks and markets",
+            "automation": "triggers and schedules, voice ID, private / whisper / conversation modes",
             "desktop": "glass mode, desktop widgets and scene, RGB and smart lights, his voice settings", "life":
-            "journal, birthdays, goodnight, his changelog, speed report", "studio": "Blender and Unreal",
+            "journal, birthdays and gift ideas, goodnight, recipes, inside jokes, the weekly letter, his changelog, speed report", "studio": "Blender and Unreal",
             "apps": "the user's connected apps"}
     return {"name": "more_tools", "description": "Load more of your tools when the ones you have can't do the job. "
-            "Groups: " + "; ".join(f"{g} ({desc[g]})" for g in rest) + ". They're available from your next step on.",
+            "Groups: " + "; ".join(f"{g} ({desc.get(g, g)})" for g in rest) + ". They're available from your next step on.",
             "input_schema": {"type": "object", "properties": {"groups": {"type": "array", "items": {"type": "string",
                              "enum": rest}}}, "required": ["groups"]}}
 

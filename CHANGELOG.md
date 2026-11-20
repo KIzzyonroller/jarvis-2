@@ -3,6 +3,10 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.36
+
+- **Fixed: "something broke on my end" on every request (KeyError: 'automation').** The new automation tools from 1.0.34 were missing from the list he uses to offer extra tools, so every question crashed before reaching Claude. Fixed, and that list can no longer crash on a group it doesn't know.
+
 ## 1.0.35
 
 - **Fixed: your keyboard acting up and Chrome downloading pages instead of opening them.** When he handed focus back to your window he briefly pressed Alt, and if an admin window (a UAC prompt, Task Manager, Memory Diagnostics) was in front, Windows threw away the "let go of Alt" half. Alt stayed held down, so every click in Chrome became Alt+click, which downloads the link as an .html file, and typing set off menu shortcuts. He now presses and releases Alt before switching, never fights admin windows for focus, and lets go of every modifier after any key press of his own.
