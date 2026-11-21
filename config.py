@@ -233,7 +233,13 @@ def _weak_pc():
 PERF_SETTING = os.environ.get("JARVIS_PERFORMANCE", "auto").lower()
 LITE = PERF_SETTING == "lite" or (PERF_SETTING == "auto" and _weak_pc())
 DESK_INTRO = False                 # the old screen-shattering intro is gone: the desktop is just there
-DESK_SCENE = os.environ.get("JUNO_DESK_SCENE", "bench").lower()   # bench / station / archive / signal / chart
+DESK_SCENE = os.environ.get("JUNO_DESK_SCENE", "bench").lower()   # bench / station / archive / signal / chart / greenhouse
+# Living worlds (1.0.42): small things move in his scene, his ring can be an orb, a screensaver of his world, and
+# your RGB and smart lights can take the world's colour when you switch.
+WORLD_MOTION = os.environ.get("JARVIS_WORLD_MOTION", "true").lower() != "false" and not LITE
+PRESENCE = os.environ.get("JARVIS_PRESENCE", "dial").lower()                # dial / orb
+SAVER_MIN = max(0, min(240, int(os.environ.get("JARVIS_SAVER", "0")))) if os.environ.get("JARVIS_SAVER", "0").isdigit() else 0  # idle minutes; 0 = off
+WORLD_LIGHTS = os.environ.get("JARVIS_WORLD_LIGHTS", "false").lower() == "true"
 DESK_CALM = os.environ.get("JUNO_DESK_CALM", "true").lower() != "false" or LITE   # panels just appear, no effects
 DESK_QUALITY = os.environ.get("JUNO_DESK_QUALITY", "medium").lower()   # low / medium / high: frame rate and detail
 DESK_VIZ = os.environ.get("JUNO_DESK_VIZ", "both").lower()             # both / corner / second / off
@@ -419,7 +425,7 @@ LIVE_KEYS = {"JARVIS_MINI", "JUNO_FPS", "JUNO_CHAT_FIRST", "JUNO_CHAT_EVERY", "J
              "JARVIS_CONVO", "JARVIS_PRIVATE", "JARVIS_VOICE_ID", "JARVIS_VOICE_ID_STRICT", "JARVIS_WHISPER",
              "JARVIS_WHISPER_FROM", "JARVIS_WHISPER_TO", "JARVIS_WHISPER_VOL", "JARVIS_TRIGGERS", "JARVIS_PLAY_BREAK",
              "JARVIS_WELCOME_BACK", "JARVIS_AMBIENT", "JARVIS_LETTER", "JARVIS_PATCH_ALERTS", "JARVIS_CRASH_REPORTS", "JARVIS_BEDTIME", "JARVIS_POSTMATCH", "JARVIS_HENRIK_KEY", "JARVIS_RIOT_ID", "JARVIS_RIOT_REGION", "JARVIS_CLIP_WITH", "JARVIS_SALES_RADAR", "JARVIS_MONTH_REPORT", "JARVIS_GUEST_MODE", "JARVIS_BARGE_IN", "JARVIS_EMOTION", "JUNO_STOCKS_WEEKLY",
-             "JUNO_STOCK_EARNINGS"}
+             "JUNO_STOCK_EARNINGS", "JARVIS_WORLD_MOTION", "JARVIS_PRESENCE", "JARVIS_SAVER", "JARVIS_WORLD_LIGHTS"}
 WIDGET_KEYS = {"JUNO_DESK_WIDGETS", "JUNO_DESK_WIDGETS_WHERE", "JUNO_W_STATS", "JUNO_W_MUSIC", "JUNO_W_WEATHER",
                "JUNO_W_CALENDAR", "JUNO_W_NOTES", "JUNO_W_DISCORD", "JUNO_W_STOCKS", "JUNO_STOCKS"}
 
@@ -469,7 +475,11 @@ def reload_live():
         STOCK_ALERT_PCT = float(os.environ.get("JUNO_STOCK_ALERT_PCT", "4") or 4)
     except ValueError:
         STOCK_ALERT_PCT = 4.0
-    global DESK_VIZ, DESK_SCENE, DESK_CALM
+    global DESK_VIZ, DESK_SCENE, DESK_CALM, WORLD_MOTION, PRESENCE, SAVER_MIN, WORLD_LIGHTS
+    WORLD_MOTION = on("JARVIS_WORLD_MOTION") and not LITE
+    PRESENCE = os.environ.get("JARVIS_PRESENCE", "dial").lower()
+    SAVER_MIN = _int_env("JARVIS_SAVER", 0, 0, 240)
+    WORLD_LIGHTS = os.environ.get("JARVIS_WORLD_LIGHTS", "false").lower() == "true"
     DESK_VIZ = os.environ.get("JUNO_DESK_VIZ", "both").lower()
     DESK_SCENE = os.environ.get("JUNO_DESK_SCENE", "bench").lower()
     DESK_CALM = os.environ.get("JUNO_DESK_CALM", "true").lower() != "false" or LITE

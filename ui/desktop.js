@@ -1,13 +1,14 @@
 // The living desktop: Jarvis's world as your wallpaper. One still scene per monitor (ui/scenes/*.svg), his voice
-// ring in the middle, and the pop-up panels and widgets on top. Nothing moves unless you two are talking: when he's
-// idle there is no frame loop at all. Events arrive from livedesk.py through window.J, same as the main window.
+// ring in the middle, and the pop-up panels and widgets on top. The ring only moves while you two are talking; the
+// small things that live in each scene (ambient.js) move slowly at 10 frames a second, and not at all in performance
+// mode or while a game is up. Events arrive from livedesk.py through window.J, same as the main window.
 "use strict";
 (() => {
   const SC = window.SCENES || {};
   const S = {
     monitors: [{ x: 0, y: 0, w: 1, h: 1, wx: 0, wy: 0, ww: 1, wh: 1, primary: true }],
     scene: "bench", calm: true, state: "booting", confirm: false, level: 0, levelT: 0,
-    paused: false, built: false, viz: "both", fps: 30, facts: {},
+    paused: false, built: false, viz: "both", fps: 30, facts: {}, ambient: true, presence: "dial",
   };
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const scene = () => SC[S.scene] || SC.bench || { bg: "#0b1b2e", ink: "#a9d4ff", accent: "#ffb347", text: "#e7f2ff",
@@ -38,6 +39,7 @@
     applyScene();
     const box = document.getElementById("scenes");
     box.innerHTML = "";
+    const holders = [];
     for (const m of S.monitors.map(px)) {
       const d = document.createElement("div");
       d.className = "scene";
@@ -45,6 +47,11 @@
                                backgroundImage: `url(scenes/${encodeURIComponent(S.scene)}.svg)` });
       d.appendChild(labelLayer());
       box.appendChild(d);
+      holders.push(d);
+    }
+    if (window.DeskAmbient) {
+      DeskAmbient.set({ on: S.ambient, paused: S.paused, facts: S.facts.all || {} });
+      if (S.ambient) DeskAmbient.attach(holders, S.scene, scene().size); else DeskAmbient.detach();
     }
     // the voice ring sits where the scene leaves room for it (each scene says where), on each monitor you picked
     const T = scene(), p = primary(), o = others()[0];
@@ -119,6 +126,7 @@
       const { x, y, r: R } = vc;
       vg.clearRect(x - vc.half, y - vc.half, vc.half * 2, vc.half * 2);
       const col = mode === "ask" ? `${ar},${ag},${ab}` : `${r},${g},${b}`;
+      if (S.presence === "orb") { drawOrb(vg, x, y, R, mode, t, lvl, col); continue; }
       // the dial
       vg.lineWidth = 1.2; vg.strokeStyle = `rgba(${col},.55)`;
       vg.beginPath(); vg.arc(x, y, R, 0, 6.283); vg.stroke();
@@ -144,6 +152,37 @@
         const a0 = mode === "think" ? t * 2.4 : -1.5708;
         vg.lineWidth = Math.max(2, R * .03); vg.strokeStyle = `rgba(${col},.9)`;
         vg.beginPath(); vg.arc(x, y, R * .72, a0, a0 + (mode === "ask" ? 6.283 * (.5 + .5 * Math.sin(t * 3)) : 1.1)); vg.stroke();
+      }
+    }
+  }
+
+  // The other way to show him: a soft orb of light instead of an instrument dial. Still and dim when he's idle; it
+  // breathes while he listens, three sparks circle it while he thinks, and its edge moves with his voice.
+  function drawOrb(vg, x, y, R, mode, t, lvl, col) {
+    const r0 = R * .42, br = mode === "idle" ? .55 : .8 + lvl * .2;
+    const halo = vg.createRadialGradient(x, y, r0 * .5, x, y, R * 1.25);
+    halo.addColorStop(0, `rgba(${col},${(.22 * br + lvl * .2).toFixed(2)})`); halo.addColorStop(1, `rgba(${col},0)`);
+    vg.fillStyle = halo; vg.beginPath(); vg.arc(x, y, R * 1.25, 0, 6.283); vg.fill();
+    const breathe = mode === "listen" ? 1 + .06 * Math.sin(t * 3) : 1;
+    vg.beginPath();
+    for (let i = 0; i <= 64; i++) {
+      const an = i / 64 * 6.283;
+      let rr = r0 * breathe;
+      if (mode === "talk") rr *= 1 + lvl * .32 * (.5 * Math.sin(an * 3 + t * 5) + .3 * Math.sin(an * 5 - t * 7) + .2 * Math.sin(an * 2 + t * 3));
+      const px_ = x + Math.cos(an) * rr, py = y + Math.sin(an) * rr;
+      i ? vg.lineTo(px_, py) : vg.moveTo(px_, py);
+    }
+    vg.closePath();
+    const body = vg.createRadialGradient(x - r0 * .3, y - r0 * .35, r0 * .05, x, y, r0 * 1.2);
+    body.addColorStop(0, `rgba(255,255,255,${(.55 * br).toFixed(2)})`); body.addColorStop(.35, `rgba(${col},${(.75 * br).toFixed(2)})`);
+    body.addColorStop(1, `rgba(${col},${(.18 * br).toFixed(2)})`);
+    vg.fillStyle = body; vg.fill();
+    vg.lineWidth = Math.max(1.2, R * .012); vg.strokeStyle = `rgba(${col},${(.6 * br).toFixed(2)})`; vg.stroke();
+    if (mode === "think" || mode === "ask") {
+      const n = mode === "ask" ? 1 : 3;
+      for (let k = 0; k < n; k++) {
+        const an = (mode === "ask" ? -1.5708 + Math.sin(t * 3) * .3 : t * 2.2) + k * 2.094, rr = R * .7;
+        vg.fillStyle = `rgba(${col},.95)`; vg.beginPath(); vg.arc(x + Math.cos(an) * rr, y + Math.sin(an) * rr, Math.max(3, R * .035), 0, 6.283); vg.fill();
       }
     }
   }
@@ -178,18 +217,22 @@
       if (e.viz) S.viz = e.viz; if (e.fps) S.fps = +e.fps;
       if (e.scene && SC[e.scene]) S.scene = e.scene;
       if (e.calm != null) S.calm = !!e.calm;
+      if (e.ambient != null) S.ambient = !!e.ambient;
+      if (e.presence) S.presence = e.presence;
       build();
     },
     desk_layout(e) { if (JSON.stringify(e.monitors) !== JSON.stringify(S.monitors)) { S.monitors = e.monitors; build(); } },
     desk_scene(e) {
       if (e.scene && SC[e.scene]) S.scene = e.scene;
       if (e.calm != null) S.calm = !!e.calm;
+      if (e.ambient != null) S.ambient = !!e.ambient;
+      if (e.presence) S.presence = e.presence;
       if (S.built) build();
     },
-    desk_facts(e) { S.facts = e.facts || {}; fillLabels(); },
+    desk_facts(e) { S.facts = e.facts || {}; fillLabels(); if (window.DeskAmbient) DeskAmbient.set({ facts: S.facts.all || {} }); },
     fps(e) { S.fps = Math.max(5, Math.min(60, +e.fps || 30)); },
     desk_viz(e) { if (e.viz) { S.viz = e.viz; build(); } },
-    desk_pause(e) { S.paused = !!e.on; if (!S.paused) kick(); },
+    desk_pause(e) { S.paused = !!e.on; if (window.DeskAmbient) DeskAmbient.set({ paused: S.paused }); if (!S.paused) kick(); },
     state(e) { S.state = e.state; kick(); },
     voice(e) { S.level = e.v || 0; S.levelT = performance.now(); kick(); },
     confirm() { S.confirm = true; kick(); },
@@ -230,7 +273,7 @@
   setTimeout(() => {
     if (S.built || window.pywebview) return;
     const q = new URLSearchParams(location.search);
-    handlers.desk_init({ scene: q.get("scene") || "bench" });
+    handlers.desk_init({ scene: q.get("scene") || "bench", presence: q.get("presence") || "dial" });
     if (q.get("state")) { handlers.state({ state: q.get("state") }); if (q.get("state") === "speaking") setInterval(() => handlers.voice({ v: .3 + Math.random() * .6 }), 80); }
   }, 300);
 })();

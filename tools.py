@@ -279,7 +279,7 @@ def _start_apps():
 # focus, so we ask nicely (SW_SHOWNOACTIVATE) and then, for a few seconds,
 # quietly hand focus back to the user's window if the new app steals it.
 # If the user clicks or alt-tabs somewhere themselves, we back off immediately.
-SELF_TITLES = {"J.U.N.O.", "J.A.R.V.I.S.", "U.L.T.R.O.N.", "Jarvis Mini", "Jarvis Desktop"}
+SELF_TITLES = {"J.U.N.O.", "J.A.R.V.I.S.", "U.L.T.R.O.N.", "Jarvis Mini", "Jarvis Desktop", "Jarvis Screensaver"}
 _SHELL_CLASSES = {
     "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd", "Windows.UI.Core.CoreWindow",
     "NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland", "XamlExplorerHostIslandWindow",
@@ -1040,7 +1040,7 @@ def _grab():
 # The last picture he was sent this turn, so an unchanged screen isn't sent twice.
 _LOOK_TURN = 0
 _LAST_SENT = {}
-OWN_TITLES = ("J.U.N.O.", "J.A.R.V.I.S.", "Jarvis Mini", "Jarvis Desktop", "Jarvis Glass", "Juno Glass")
+OWN_TITLES = ("J.U.N.O.", "J.A.R.V.I.S.", "Jarvis Mini", "Jarvis Desktop", "Jarvis Glass", "Juno Glass", "Jarvis Screensaver")
 
 
 def new_turn():
@@ -3228,12 +3228,15 @@ def track_tool(kind, query=None, league=None, path=None, stop=False):
         return f"Couldn't track that ({type(e).__name__}: {e})."
 
 
-def desktop_scene_tool(scene=None, calm=None):
-    """Which scene his desktop shows, and calm panels on or off."""
+def desktop_scene_tool(scene=None, calm=None, motion=None, presence=None, screensaver=None, lights=None):
+    """Which scene his desktop shows, calm panels, the living scene, dial or orb, the screensaver, matching lights."""
     import config
     names = {"bench": "the drafting bench", "station": "the orbital station", "archive": "the archive",
-             "signal": "the listening post", "chart": "the cartographer's map"}
-    if scene is None and calm is None:
+             "signal": "the listening post", "chart": "the cartographer's map", "greenhouse": "the greenhouse"}
+    if screensaver is not None and str(screensaver).lower() in ("now", "show", "start"):
+        import saver
+        return saver.tool("show")
+    if all(v is None for v in (scene, calm, motion, presence, screensaver, lights)):
         return f"The desktop shows {names.get(config.DESK_SCENE, config.DESK_SCENE)}. Options: " + ", ".join(
             f"{k} ({v})" for k, v in names.items()) + "."
     if _VOICE_CORE is None:
@@ -3246,10 +3249,35 @@ def desktop_scene_tool(scene=None, calm=None):
         ch["JUNO_DESK_SCENE"] = key
     if calm is not None:
         ch["JUNO_DESK_CALM"] = "true" if calm else "false"
+    if motion is not None:
+        ch["JARVIS_WORLD_MOTION"] = "true" if motion else "false"
+    if presence:
+        if str(presence).lower() not in ("dial", "orb"):
+            return "presence is dial or orb."
+        ch["JARVIS_PRESENCE"] = str(presence).lower()
+    if screensaver is not None:
+        s = str(screensaver).lower()
+        mins = 0 if s in ("off", "0", "false", "no") else int(s) if s.isdigit() else None
+        if mins is None:
+            return "screensaver is now, off, or a number of idle minutes."
+        ch["JARVIS_SAVER"] = str(max(0, min(240, mins)))
+    if lights is not None:
+        ch["JARVIS_WORLD_LIGHTS"] = "true" if lights else "false"
     _VOICE_CORE.set_widgets(ch)
     out = f"Desktop switched to {names[ch['JUNO_DESK_SCENE']]}." if "JUNO_DESK_SCENE" in ch else ""
     if "JUNO_DESK_CALM" in ch:
         out += (" Panels just appear now." if calm else " Panels animate again.")
+    if "JARVIS_WORLD_MOTION" in ch:
+        out += (" The scene moves again." if motion else " The scene is a still picture now.")
+        if motion and config.LITE:
+            out += " (Performance mode keeps it still, though.)"
+    if "JARVIS_PRESENCE" in ch:
+        out += f" I'm {'an orb' if ch['JARVIS_PRESENCE'] == 'orb' else 'the dial'} now."
+    if "JARVIS_SAVER" in ch:
+        m = int(ch["JARVIS_SAVER"])
+        out += f" Screensaver after {m} minutes idle." if m else " Screensaver off."
+    if "JARVIS_WORLD_LIGHTS" in ch:
+        out += (" Your lights will follow the world." if lights else " Lights stay as they are when the world changes.")
     if not getattr(_VOICE_CORE, "desk", None):
         out += " (His world as your desktop is off in Settings, so you won't see it until that's on.)"
     return out.strip()
@@ -4016,10 +4044,14 @@ TOOL_SPECS = [
                    "like UA123), package (not possible: say so and offer a web lookup). stop = true stops (kind optional).",
           {"kind": {"type": "string", "enum": ["score", "download", "flight", "package"]}, "query": S, "league": S, "path": S,
            "stop": {"type": "boolean"}}, ["kind"]),
-    _spec("desktop_scene", "His desktop wallpaper scene: bench (drafting bench), station (orbital station), archive "
-                           "(his library), signal (listening post), chart (cartographer's map). calm = panels just appear "
-                           "(true) or animate (false). No arguments = which one is on.",
-          {"scene": {"type": "string", "enum": ["bench", "station", "archive", "signal", "chart"]}, "calm": {"type": "boolean"}}, []),
+    _spec("desktop_scene", "His world on the desktop. scene: bench (drafting bench), station (orbital station), archive "
+                           "(his library), signal (listening post), chart (cartographer's map), greenhouse (glasshouse in "
+                           "the rain). calm: panels just appear (true) or animate. motion: the scene's small moving things "
+                           "(false = still picture). presence: dial or orb (how he looks). screensaver: now, off, or idle "
+                           "minutes. lights: RGB and smart lights take the world's colour on switch. No arguments = status.",
+          {"scene": {"type": "string", "enum": ["bench", "station", "archive", "signal", "chart", "greenhouse"]}, "calm": {"type": "boolean"},
+           "motion": {"type": "boolean"}, "presence": {"type": "string", "enum": ["dial", "orb"]}, "screensaver": S,
+           "lights": {"type": "boolean"}}, []),
     _spec("birthdays", "Birthday radar: add (name, month, day, year if known, note like gift ideas) whenever they mention "
                        "someone's birthday; remove (name); upcoming; gifts (name: what you know about them, to suggest "
                        "real gift ideas from). He reminds them a week before (offering gift ideas), 3 days before and on the day.",

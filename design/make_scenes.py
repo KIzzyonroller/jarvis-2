@@ -773,6 +773,146 @@ def chart():
     return S, (1800, 1100), {"p1": "Render Ridge", "p2": "Queue Basin", "p3": "Mount Inbox", "p4": "Patchnote Shoals"}
 
 
+# =====================================================================================================================
+# 6. Greenhouse: a glasshouse at night in the rain; his plants grow with your streaks
+# =====================================================================================================================
+def greenhouse():
+    S = Scene("greenhouse", "Greenhouse", 23)
+    ink, accent = "#b9f0c8", "#ffc46b"
+    HAND = "'Segoe Print','Bradley Hand','Comic Sans MS',cursive"
+    MONO = "'IBM Plex Mono',Consolas,monospace"
+    VX, VY = 1920, 980
+    S.d('<linearGradient id="skyg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050b12"/><stop offset=".7" stop-color="#0b1a22"/><stop offset="1" stop-color="#1b2a2a"/></linearGradient>'
+        '<linearGradient id="glassg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9fd8c0" stop-opacity=".06"/><stop offset="1" stop-color="#9fd8c0" stop-opacity=".02"/></linearGradient>'
+        '<radialGradient id="bulb" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffd59a" stop-opacity=".6"/><stop offset="1" stop-color="#ffd59a" stop-opacity="0"/></radialGradient>'
+        '<radialGradient id="city" cx="50%" cy="100%" r="70%"><stop offset="0" stop-color="#ff9e5a" stop-opacity=".25"/><stop offset="1" stop-color="#ff9e5a" stop-opacity="0"/></radialGradient>'
+        '<linearGradient id="floorg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#101814"/><stop offset="1" stop-color="#070b09"/></linearGradient>'
+        '<linearGradient id="benchg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b2a1c"/><stop offset="1" stop-color="#1c140d"/></linearGradient>'
+        '<filter id="gb4"><feGaussianBlur stdDeviation="4"/></filter><filter id="gb24"><feGaussianBlur stdDeviation="24"/></filter>')
+    S.add(f'<rect width="{W}" height="{H}" fill="url(#skyg)"/>')
+    # the night outside: distant hills, a town's glow, trees, all seen through wet glass
+    S.add(f'<rect x="0" y="700" width="{W}" height="700" fill="url(#city)"/>')
+    hills = [(0, 1180)] + [(x, 1150 - 60 * math.sin(x / 520) - 30 * math.sin(x / 190)) for x in range(0, W + 1, 40)] + [(W, 1180)]
+    S.add(f'<polygon points="{poly(hills)}" fill="#0a1613"/>')
+    for _ in range(140):                                   # far windows
+        x, y = random.uniform(300, 3500), random.uniform(1060, 1150)
+        S.add(f'<rect x="{x:.0f}" y="{y:.0f}" width="6" height="5" fill="#ffcf8a" fill-opacity="{random.uniform(.25, .7):.2f}"/>')
+    for x in range(-100, W + 200, 170):                    # tree line
+        h = random.uniform(140, 300)
+        pts, _ = noise_loop(x, 1180 - h / 2, h / 2, .7, 1, step=12)
+        S.add(f'<polygon points="{poly(pts)}" fill="#07110e"/>')
+    for _ in range(900):                                    # rain streaks on the glass, baked faintly (they also move, live)
+        x, y = random.uniform(0, W), random.uniform(0, 1500)
+        L = random.uniform(18, 60)
+        S.add(f'<line x1="{x:.0f}" y1="{y:.0f}" x2="{x - L * .12:.0f}" y2="{y + L:.0f}" stroke="#cfe9ff" stroke-opacity="{random.uniform(.05, .16):.2f}" stroke-width="1.6"/>')
+    for _ in range(400):                                    # beads of water
+        x, y = random.uniform(0, W), random.uniform(0, 1450)
+        S.add(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{random.uniform(2, 6):.1f}" fill="#dff2ff" fill-opacity="{random.uniform(.06, .2):.2f}"/>')
+    # the glasshouse frame: back wall panes, the arched roof, the side walls in perspective
+    bx0, bx1, by0, by1 = 760, 3080, 360, 1380
+    S.add(f'<rect x="{bx0}" y="{by0}" width="{bx1 - bx0}" height="{by1 - by0}" fill="url(#glassg)"/>')
+    for x in range(bx0, bx1 + 1, 145):
+        S.add(f'<line x1="{x}" y1="{by0}" x2="{x}" y2="{by1}" stroke="#1d2b25" stroke-width="{12 if (x - bx0) % 580 == 0 else 6}"/>')
+    for y in range(by0, by1 + 1, 170):
+        S.add(f'<line x1="{bx0}" y1="{y}" x2="{bx1}" y2="{y}" stroke="#1d2b25" stroke-width="6"/>')
+    roof = f"M 0 380 Q {VX} -260 {W} 380"
+    S.add(f'<path d="{roof}" fill="none" stroke="#24352d" stroke-width="26"/>')
+    S.add(f'<path d="M {bx0} {by0} Q {VX} 120 {bx1} {by0}" fill="none" stroke="#24352d" stroke-width="16"/>')
+    for k in range(-8, 9):                                  # roof ribs from the near arch to the far one
+        t = (k + 8) / 16
+        nx = t * W
+        ny = 380 - 4 * 640 * t * (1 - t) + 0
+        fx = bx0 + t * (bx1 - bx0)
+        fy = by0 - 4 * 240 * t * (1 - t)
+        S.add(f'<line x1="{nx:.0f}" y1="{ny:.0f}" x2="{fx:.0f}" y2="{fy:.0f}" stroke="#1d2b25" stroke-width="7"/>')
+    for side in (-1, 1):                                     # side walls
+        x_near = 0 if side < 0 else W
+        x_far = bx0 if side < 0 else bx1
+        S.add(f'<polygon points="{x_near},380 {x_far},{by0} {x_far},{by1} {x_near},{H}" fill="url(#glassg)"/>')
+        for i in range(1, 7):
+            t = i / 7
+            xa = x_near + (x_far - x_near) * t
+            S.add(f'<line x1="{xa:.0f}" y1="{380 + (by0 - 380) * t:.0f}" x2="{xa:.0f}" y2="{H + (by1 - H) * t:.0f}" stroke="#1d2b25" stroke-width="{10 - i}"/>')
+        for yy in (700, 1000, 1300, 1600):
+            S.add(f'<line x1="{x_near}" y1="{yy + (0 if side < 0 else 0)}" x2="{x_far}" y2="{by0 + (yy - 380) * (by1 - by0) / (H - 380):.0f}" stroke="#1d2b25" stroke-width="5"/>')
+    # floor: brick path down the middle, gravel either side
+    S.add(f'<polygon points="0,{H} {W},{H} {bx1},{by1} {bx0},{by1}" fill="url(#floorg)"/>')
+    path = [(1500, H), (2340, H), (2040, by1), (1800, by1)]
+    S.add(f'<polygon points="{poly(path)}" fill="#2a1b14" fill-opacity=".8"/>')
+    for i in range(1, 22):
+        t = (i / 22) ** 1.6
+        y = H + (by1 - H) * t
+        xl = 1500 + (1800 - 1500) * t
+        xr = 2340 + (2040 - 2340) * t
+        S.add(f'<line x1="{xl:.0f}" y1="{y:.0f}" x2="{xr:.0f}" y2="{y:.0f}" stroke="#4a3020" stroke-opacity=".5" stroke-width="2"/>')
+    for _ in range(1600):
+        x, y = random.uniform(0, W), random.uniform(by1, H)
+        S.add(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{random.uniform(1, 3):.1f}" fill="#9fb6a6" fill-opacity="{random.uniform(.03, .09):.2f}"/>')
+
+    def leaf(x, y, L, wdt, ang, col, op=.9):
+        a = math.radians(ang)
+        tx, ty = x + L * math.cos(a), y + L * math.sin(a)
+        nx, ny = -math.sin(a) * wdt, math.cos(a) * wdt
+        mx, my = (x + tx) / 2, (y + ty) / 2
+        S.add(f'<path d="M {x:.0f} {y:.0f} Q {mx + nx:.0f} {my + ny:.0f} {tx:.0f} {ty:.0f} Q {mx - nx:.0f} {my - ny:.0f} {x:.0f} {y:.0f} Z" '
+              f'fill="{col}" fill-opacity="{op}"/>')
+        S.add(f'<line x1="{x:.0f}" y1="{y:.0f}" x2="{tx:.0f}" y2="{ty:.0f}" stroke="#0b1a12" stroke-opacity=".5" stroke-width="2"/>')
+
+    greens = ["#1f4a32", "#2b5e3f", "#356f48", "#3f7f52", "#4e915d", "#5fa267"]
+
+    def plant(x, y, size, kind):
+        if kind == "fern":
+            for k in range(14):
+                ang = -90 + random.uniform(-80, 80)
+                leaf(x, y, size * random.uniform(.7, 1.1), size * .09, ang, random.choice(greens))
+        elif kind == "palm":
+            S.add(f'<line x1="{x}" y1="{y}" x2="{x + 10}" y2="{y - size * .8:.0f}" stroke="#4a3a26" stroke-width="{size * .06:.0f}"/>')
+            for k in range(9):
+                leaf(x + 10, y - size * .8, size * .8, size * .12, -180 + k * 22 + random.uniform(-6, 6), random.choice(greens))
+        else:                                                # broad leaves
+            for k in range(8):
+                ang = -90 + random.uniform(-70, 70)
+                leaf(x, y, size * random.uniform(.6, 1.0), size * .28, ang, random.choice(greens), .95)
+
+    def pot(x, y, w, h, col="#8a4a2e"):
+        S.add(f'<polygon points="{x - w / 2:.0f},{y} {x + w / 2:.0f},{y} {x + w * .38:.0f},{y + h} {x - w * .38:.0f},{y + h}" fill="{col}"/>'
+              f'<rect x="{x - w * .55:.0f}" y="{y - h * .14:.0f}" width="{w * 1.1:.0f}" height="{h * .18:.0f}" fill="{col}" />'
+              f'<rect x="{x - w * .55:.0f}" y="{y - h * .14:.0f}" width="{w * 1.1:.0f}" height="{h * .05:.0f}" fill="#000" fill-opacity=".25"/>')
+
+    # benches, left and right, with pots and plants (the middle stays clear for his ring)
+    for side in (-1, 1):
+        x0 = 120 if side < 0 else 2620
+        x1 = 1220 if side < 0 else 3720
+        top = 1500
+        S.add(f'<rect x="{x0}" y="{top}" width="{x1 - x0}" height="46" fill="url(#benchg)"/>')
+        S.add(f'<rect x="{x0}" y="{top + 46}" width="{x1 - x0}" height="12" fill="#120c07"/>')
+        for lx in (x0 + 60, x1 - 80):
+            S.add(f'<rect x="{lx}" y="{top + 58}" width="22" height="{H - top}" fill="#1c140d"/>')
+        for i, px_ in enumerate(range(x0 + 150, x1 - 60, 260)):
+            sz = random.uniform(240, 360)
+            plant(px_, top - 100, sz, ("fern", "broad", "palm", "broad", "fern")[(i + (side > 0)) % 5])
+            pot(px_, top - 90, 150, 90, random.choice(("#8a4a2e", "#6e3c26", "#a35a36")))
+    # big plants in the near corners framing the view
+    for x, y, sz, kind in ((90, 2200, 700, "broad"), (3640, 2120, 820, "broad"), (1120, 2200, 520, "fern"), (3160, 2200, 560, "fern")):
+        plant(x, y, sz, kind)
+    # hanging bulbs
+    for x, y in ((1100, 520), (1920, 380), (2740, 520), (1500, 640), (2340, 640)):
+        S.add(f'<line x1="{x}" y1="0" x2="{x}" y2="{y}" stroke="#0e1512" stroke-width="3"/>')
+        S.add(f'<circle cx="{x}" cy="{y}" r="200" fill="url(#bulb)"/>')
+        S.add(f'<circle cx="{x}" cy="{y}" r="16" fill="#ffe2b0"/>')
+    # the slate sign and plant tags (live text from deskfacts.py)
+    S.add(f'<rect x="380" y="1700" width="600" height="300" rx="10" fill="#1b2421" stroke="#5a4630" stroke-width="18"/>')
+    S.text(680, 1772, "the greenhouse", fill="#dfe8e2", fill_opacity=".8", font_size="44", text_anchor="middle", font_family=HAND)
+    S.label("streak", "watered {days} days", 420, 1850, fill="#dfe8e2", fill_opacity=".75", font_size="36", font_family=HAND)
+    S.label("outside", "outside: {temp}", 420, 1910, fill="#dfe8e2", fill_opacity=".7", font_size="36", font_family=HAND)
+    S.label("planted", "planted {planted}", 420, 1965, fill="#dfe8e2", fill_opacity=".55", font_size="30", font_family=HAND)
+    for k, (x, y) in zip(("t1", "t2", "t3"), ((2700, 1600), (3020, 1600), (3340, 1600))):
+        S.add(f'<rect x="{x - 10}" y="{y - 32}" width="230" height="44" fill="#e8e2cf" fill-opacity=".85"/>')
+        S.label(k, "{" + k + "}", x, y, fill="#2a2a20", font_size="24", font_family=MONO)
+    return S, (VX, VY), {"days": "12", "temp": "18°", "planted": "the first night", "t1": "basil", "t2": "fern no. 3",
+                         "t3": "stubborn one"}
+
+
 # ---------------------------------------------------------------------------------------------------- colours + output
 THEME = {
     "bench": dict(bg="#0b1b2e", ink="#a9d4ff", accent="#ffb347", panel="rgba(9,24,42,.9)", border="rgba(169,212,255,.5)",
@@ -783,6 +923,8 @@ THEME = {
                     text="#f3e9d6", dim="#b8a68a", style="card", ring=.11),
     "signal": dict(bg="#03100d", ink="#5dffc8", accent="#ffcf5d", panel="rgba(3,20,16,.9)", border="rgba(93,255,200,.45)",
                    text="#d9fff1", dim="#8fc7b4", style="scope", ring=.14),
+    "greenhouse": dict(bg="#06100c", ink="#b9f0c8", accent="#ffc46b", panel="rgba(8,20,15,.9)", border="rgba(185,240,200,.45)",
+                       text="#eafaf0", dim="#9fbfa9", style="card", ring=.12),
     "chart": dict(bg="#071a1e", ink="#9fe3d6", accent="#ff9f5a", panel="rgba(6,28,32,.9)", border="rgba(159,227,214,.5)",
                   text="#eafaf6", dim="#9cc4bc", style="legend", ring=.1),
 }
@@ -790,13 +932,13 @@ THEME = {
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     meta = {}
-    for make in (bench, station, archive, signal, chart):
+    for make in (bench, station, archive, signal, chart, greenhouse):
         S, (vx, vy), defaults = make()
         data = S.svg()
         open(os.path.join(OUT, S.key + ".svg"), "w", encoding="utf-8").write(data)
         meta[S.key] = dict(title=S.title, viz=[vx / W, vy / H], size=[W, H], labels=S.labels, defaults=defaults, **THEME[S.key])
         print(f"{S.key:8s} {len(data) // 1024:5d} KB")
     with open(os.path.join(OUT, "scenes.js"), "w", encoding="utf-8") as fh:
-        fh.write("// The five desktop scenes, made by design/make_scenes.py (still pictures: nothing moves but his ring).\n"
+        fh.write("// The desktop scenes, made by design/make_scenes.py (the pictures; ui/ambient.js adds the small things that move).\n"
                  "// labels: text from your real data (deskfacts.py), drawn over the picture. viz: where his ring sits.\n"
                  "window.SCENES = " + json.dumps(meta, indent=1, ensure_ascii=False) + ";\n")

@@ -382,6 +382,7 @@ class LiveDesk:
         self.em({"type": "desk_init", "monitors": monitors(), "shot": shot, "intro": bool(config.DESK_INTRO),
                  "persona": persona, "merged": merged, "quality": config.DESK_QUALITY, "viz": config.DESK_VIZ,
                  "scene": config.DESK_SCENE, "calm": config.DESK_CALM,
+                 "ambient": config.WORLD_MOTION, "presence": config.PRESENCE,
                  "fps": config.ANIM_FPS})
         for k in ("desk_facts", "pull_layout", "state", "music", "fps", "widgets", "w_gpu", "w_np", "w_weather", "w_cal", "w_notes"):
             if k in self.snap:

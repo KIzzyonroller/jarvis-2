@@ -2253,7 +2253,8 @@ class Core:
     # ================================================================ first-run tour (after the keys)
     ONBOARD_SCENES = [("bench", "Home Bench", "a drafting table at night"), ("station", "Observation Ring", "a space station deck"),
                       ("archive", "The Archive", "a library after hours"), ("signal", "Listening Post", "a radio room"),
-                      ("chart", "Chart of the Island", "a hand-drawn sea chart")]
+                      ("chart", "Chart of the Island", "a hand-drawn sea chart"),
+                      ("greenhouse", "The Greenhouse", "a glasshouse in the rain")]
 
     def _used_before(self):
         """Signs someone has already been using him (so an update doesn't push a 'first time' tour on them).
@@ -2477,8 +2478,12 @@ class Core:
                     stocks.WATCH.feed()
             except Exception as e:
                 print(f"[stocks] {e}")
-        if {"JUNO_DESK_SCENE", "JUNO_DESK_CALM"} & set(keys):   # his scene and calm panels, no restart
-            self.emit({"type": "desk_scene", "scene": config.DESK_SCENE, "calm": config.DESK_CALM})
+        if {"JUNO_DESK_SCENE", "JUNO_DESK_CALM", "JARVIS_WORLD_MOTION", "JARVIS_PRESENCE"} & set(keys):   # no restart
+            self.emit({"type": "desk_scene", "scene": config.DESK_SCENE, "calm": config.DESK_CALM,
+                       "ambient": config.WORLD_MOTION, "presence": config.PRESENCE})
+        if "JUNO_DESK_SCENE" in keys or ("JARVIS_WORLD_LIGHTS" in keys and config.WORLD_LIGHTS):
+            import worlds
+            worlds.match_lights(config.DESK_SCENE)
         if "JUNO_PHONE_NOTIFS" in keys and config.PHONE_NOTIFS and getattr(self, "phonelink", None) is None:
             self._start_phonelink()
         if config.WIDGET_KEYS & set(keys):

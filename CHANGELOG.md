@@ -3,6 +3,15 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.42
+
+- **His world moves now.** Small things live in each scene: stars twinkle and the odd shooting star crosses the station window, dust drifts through the archive's moonlight while the desk lamp breathes, the listening post's waterfall scrolls, glints catch the sea on the chart while a little ship works along the route. It runs at 10 frames a second, stops completely while a game or anything fullscreen is up, and is off in performance mode. Settings > His desktop > Living scene turns it off if you'd rather have a still picture.
+- **A new world: the greenhouse.** A glasshouse at night with rain running down the glass and warm bulbs overhead. The slate by the door counts the days you've kept him, the temperature outside and when he was "planted", and the plant tags are named after the apps you tend most. "Switch your desktop to the greenhouse."
+- **The light follows your day.** Every scene lifts a little in daylight, warms at golden hour and sinks in the small hours, timed to your real sunrise and sunset. When it's actually raining or snowing where you are, it rains or snows in his world (not on the station: space has no weather). A few days of the year have a little something extra.
+- **His orb.** Settings > His desktop > How he looks > Orb: a soft ball of light instead of the dial. It breathes while he listens, sparks circle it while he thinks, and its edge moves with his voice.
+- **Screensaver.** Settings > His desktop > Screensaver (5 to 30 minutes): his world fills the screen, drifting slowly, with the clock, your next event and the weather. Touch anything and it's gone. It won't come up during a game, a video, anything fullscreen or while he's talking. "Start your screensaver" shows it now.
+- **Lights that match his world.** Settings > His desktop > Lights match his world: switch scenes and your RGB (OpenRGB, SignalRGB, iCUE, Synapse, G HUB) and smart lights take that world's colour. Discord can't be themed by another app, and the main window keeps your persona's colours.
+
 ## 1.0.41
 
 - **Post-match stats.** For Steam games that publish stats (Dead by Daylight, CS2 and lots more), he notes your Steam stats when the game opens and, a minute or two after it closes, tells you what changed: escapes, generators, kills, wins. "How did that go?" asks mid-session. Needs your Steam key and ID and Steam's "Game details" set to public.

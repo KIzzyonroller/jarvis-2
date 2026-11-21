@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Jarvis Screensaver</title>
+<!-- His screensaver (saver.py): his world, slowly drifting, with the clock, your next event and the weather.
+     Any key or click closes it (and saver.py closes it the moment the mouse moves). -->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; cursor: none; }
+  #world { position: fixed; inset: -4%; background: center / cover no-repeat; opacity: 0; transition: opacity 2.5s ease;
+           animation: drift 140s ease-in-out infinite alternate; transform-origin: 40% 55%; }
+  #world.in { opacity: 1; }
+  @keyframes drift {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    50%  { transform: scale(1.06) translate(-1.2%, .8%); }
+    100% { transform: scale(1.10) translate(1.4%, -1%); }
+  }
+  @media (prefers-reduced-motion: reduce) { #world { animation: none; } }
+  #shade { position: fixed; inset: 0; pointer-events: none;
+           background: linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,0) 42%); }
+  #info { position: fixed; left: 6vw; bottom: 7vh; color: var(--text, #eef4ff); opacity: 0; transition: opacity 2s ease 1s, left 4s ease, bottom 4s ease;
+          font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; text-shadow: 0 2px 18px rgba(0,0,0,.55); }
+  #info.in { opacity: 1; }
+  #clock { font-size: clamp(64px, 11vw, 190px); font-weight: 200; line-height: .9; letter-spacing: -.02em;
+           font-variant-numeric: tabular-nums; }
+  #clock small { font-size: .28em; font-weight: 300; margin-left: .25em; letter-spacing: 0; opacity: .7; }
+  #date { font-size: clamp(18px, 1.7vw, 30px); font-weight: 300; margin-top: .6em; opacity: .85; }
+  .line { font-size: clamp(15px, 1.3vw, 24px); font-weight: 400; margin-top: .45em; opacity: .75; }
+  .line b { font-weight: 600; color: var(--accent, #ffb347); opacity: 1; }
+  .line:empty { display: none; }
+</style>
+</head>
+<body>
+<div id="world" aria-hidden="true"></div>
+<div id="shade"></div>
+<div id="info">
+  <div id="clock"></div>
+  <div id="date"></div>
+  <div class="line" id="next"></div>
+  <div class="line" id="weather"></div>
+</div>
+<script src="scenes/scenes.js"></script>
+<script src="ambient.js"></script>
+<script>
+"use strict";
+(() => {
+  const SC = window.SCENES || {}, $ = (id) => document.getElementById(id);
+  let h12 = true;
+
+  function show(d) {
+    const key = SC[d.scene] ? d.scene : "bench", T = SC[key];
+    h12 = d.h12 !== false;
+    const w = $("world");
+    w.style.backgroundImage = `url(scenes/${encodeURIComponent(key)}.svg)`;
+    document.documentElement.style.setProperty("--text", T.text || "#eef4ff");
+    document.documentElement.style.setProperty("--accent", T.accent || "#ffb347");
+    if (window.DeskAmbient) {
+      DeskAmbient.set({ on: d.motion !== false, facts: d.light || {} });
+      if (d.motion !== false) DeskAmbient.attach([w], key, T.size);
+    }
+    $("next").innerHTML = d.next ? "<b>Next</b>&ensp;" + esc(d.next) : "";
+    $("weather").textContent = d.weather || "";
+    requestAnimationFrame(() => { w.classList.add("in"); $("info").classList.add("in"); });
+  }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function tick() {
+    const n = new Date();
+    let h = n.getHours(), ap = "";
+    if (h12) { ap = h < 12 ? "am" : "pm"; h = h % 12 || 12; }
+    $("clock").innerHTML = `${h}:${String(n.getMinutes()).padStart(2, "0")}` + (ap ? `<small>${ap}</small>` : "");
+    $("date").textContent = n.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  }
+  tick(); setInterval(tick, 1000);
+
+  // the text drifts between corners every few minutes, so nothing sits on one spot of the screen for hours
+  const spots = [["6vw", "7vh"], ["58vw", "7vh"], ["6vw", "55vh"]];
+  let si = 0;
+  setInterval(() => { si = (si + 1) % spots.length; Object.assign($("info").style, { left: spots[si][0], bottom: spots[si][1] }); }, 300000);
+
+  const wake = () => { try { window.pywebview.api.wake(); } catch (e) { /* opened outside Jarvis */ } };
+  addEventListener("keydown", wake); addEventListener("mousedown", wake); addEventListener("wheel", wake);
+
+  const load = () => {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api) { const q = new URLSearchParams(location.search); show({ scene: q.get("scene") || "bench", next: "3:30 pm  Dentist", weather: "18°C  Light rain" }); return; }
+    api.info().then(show).catch(() => show({ scene: "bench" }));
+    setInterval(() => api.info().then((d) => {           // the event and the weather, kept fresh
+      $("next").innerHTML = d.next ? "<b>Next</b>&ensp;" + esc(d.next) : ""; $("weather").textContent = d.weather || "";
+    }).catch(() => {}), 120000);
+  };
+  if (window.pywebview && window.pywebview.api) load();
+  else { addEventListener("pywebviewready", load); setTimeout(() => { if (!window.pywebview) load(); }, 800); }
+})();
+</script>
+</body>
+</html>

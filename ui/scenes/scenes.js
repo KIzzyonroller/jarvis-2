@@ -1,4 +1,4 @@
-// The five desktop scenes, made by design/make_scenes.py (still pictures: nothing moves but his ring).
+// The desktop scenes, made by design/make_scenes.py (the pictures; ui/ambient.js adds the small things that move).
 // labels: text from your real data (deskfacts.py), drawn over the picture. viz: where his ring sits.
 window.SCENES = {
  "bench": {
@@ -263,5 +263,104 @@ window.SCENES = {
   "dim": "#9cc4bc",
   "style": "legend",
   "ring": 0.1
+ },
+ "greenhouse": {
+  "title": "Greenhouse",
+  "viz": [
+   0.5,
+   0.4537037037037037
+  ],
+  "size": [
+   3840,
+   2160
+  ],
+  "labels": [
+   {
+    "k": "streak",
+    "tpl": "watered {days} days",
+    "attrs": {
+     "x": "420",
+     "y": "1850",
+     "fill": "#dfe8e2",
+     "fill-opacity": ".75",
+     "font-size": "36",
+     "font-family": "'Segoe Print','Bradley Hand','Comic Sans MS',cursive"
+    }
+   },
+   {
+    "k": "outside",
+    "tpl": "outside: {temp}",
+    "attrs": {
+     "x": "420",
+     "y": "1910",
+     "fill": "#dfe8e2",
+     "fill-opacity": ".7",
+     "font-size": "36",
+     "font-family": "'Segoe Print','Bradley Hand','Comic Sans MS',cursive"
+    }
+   },
+   {
+    "k": "planted",
+    "tpl": "planted {planted}",
+    "attrs": {
+     "x": "420",
+     "y": "1965",
+     "fill": "#dfe8e2",
+     "fill-opacity": ".55",
+     "font-size": "30",
+     "font-family": "'Segoe Print','Bradley Hand','Comic Sans MS',cursive"
+    }
+   },
+   {
+    "k": "t1",
+    "tpl": "{t1}",
+    "attrs": {
+     "x": "2700",
+     "y": "1600",
+     "fill": "#2a2a20",
+     "font-size": "24",
+     "font-family": "'IBM Plex Mono',Consolas,monospace"
+    }
+   },
+   {
+    "k": "t2",
+    "tpl": "{t2}",
+    "attrs": {
+     "x": "3020",
+     "y": "1600",
+     "fill": "#2a2a20",
+     "font-size": "24",
+     "font-family": "'IBM Plex Mono',Consolas,monospace"
+    }
+   },
+   {
+    "k": "t3",
+    "tpl": "{t3}",
+    "attrs": {
+     "x": "3340",
+     "y": "1600",
+     "fill": "#2a2a20",
+     "font-size": "24",
+     "font-family": "'IBM Plex Mono',Consolas,monospace"
+    }
+   }
+  ],
+  "defaults": {
+   "days": "12",
+   "temp": "18°",
+   "planted": "the first night",
+   "t1": "basil",
+   "t2": "fern no. 3",
+   "t3": "stubborn one"
+  },
+  "bg": "#06100c",
+  "ink": "#b9f0c8",
+  "accent": "#ffc46b",
+  "panel": "rgba(8,20,15,.9)",
+  "border": "rgba(185,240,200,.45)",
+  "text": "#eafaf0",
+  "dim": "#9fbfa9",
+  "style": "card",
+  "ring": 0.12
  }
 };

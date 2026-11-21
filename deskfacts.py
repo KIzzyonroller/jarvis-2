@@ -1,6 +1,7 @@
 """
-The desktop scene's live details: real things written into the still picture, refreshed every few minutes. Nothing
-animates; a label just reads differently the next time you look.
+The desktop scene's live details: real things written into the picture, refreshed every few minutes. A label just
+reads differently the next time you look. (What moves lives in ui/ambient.js; this also sends it today's sunrise,
+sunset and weather, as facts["all"].)
 
   bench    "listening core, rev. 28" (his real version), "the old bearing squeaked. replaced 11/14" (his last
            update), "Checked: <what he calls you>"
@@ -9,6 +10,7 @@ animates; a label just reads differently the next time you look.
   signal   "CH2 HOUSE 18°C  CH3 NETWORK 23 ms" (outside temperature, internet latency)
   chart    the four places are named after the apps you've used most this week (needs activity memory on;
            otherwise Render Ridge, Queue Basin, Mount Inbox, Patchnote Shoals)
+  greenhouse  "watered 214 days", "outside: 18°C", "planted March 3", and plant tags named after your top apps
 """
 import re
 import socket
@@ -53,12 +55,13 @@ def _sun(core):
         f = (config.COUNTRY or loc[3] or "").upper() == "US"
         j = briefing._get("https://api.open-meteo.com/v1/forecast", {
             "latitude": loc[0], "longitude": loc[1], "timezone": "auto", "forecast_days": 2,
-            "daily": "sunrise,sunset", "current": "temperature_2m",
+            "daily": "sunrise,sunset", "current": "temperature_2m,weather_code",
             "temperature_unit": "fahrenheit" if f else "celsius"}).json()
         d = j.get("daily") or {}
         _SUN.update(at=time.time(), rise=[datetime.fromisoformat(x) for x in d.get("sunrise", [])],
                     set=[datetime.fromisoformat(x) for x in d.get("sunset", [])],
-                    temp=(j.get("current") or {}).get("temperature_2m"), unit="F" if f else "C")
+                    temp=(j.get("current") or {}).get("temperature_2m"), unit="F" if f else "C",
+                    code=(j.get("current") or {}).get("weather_code"))
     now = datetime.now()
     nxt_set = next((t for t in _SUN.get("set", []) if t > now), None)
     nxt_rise = next((t for t in _SUN.get("rise", []) if t > now), None)
@@ -66,6 +69,33 @@ def _sun(core):
 
 
 _SUN = {}
+
+
+def wx_kind(code):
+    """open-meteo's WMO weather code as what the scene should do: rain, snow or nothing."""
+    try:
+        c = int(code)
+    except (TypeError, ValueError):
+        return ""
+    if 71 <= c <= 77 or c in (85, 86):
+        return "snow"
+    if 51 <= c <= 67 or 80 <= c <= 82 or c >= 95:
+        return "rain"
+    return ""
+
+
+def world_light():
+    """Today's sunrise and sunset (ms, for the page's clock) and the weather, for ambient.js. Empty until known."""
+    out = {}
+    now = datetime.now()
+    for k in ("rise", "set"):
+        today = next((t for t in _SUN.get(k, []) if t.date() == now.date()), None)
+        if today:
+            out[k] = int(today.timestamp() * 1000)
+    w = wx_kind(_SUN.get("code"))
+    if w:
+        out["wx"] = w
+    return out
 
 
 def _hm(td):
@@ -130,7 +160,14 @@ def gather(core):
     ms = _latency()
     sig["net"] = f"{ms} ms" if ms is not None else "OFFLINE"
     out["signal"] = sig
+    out["all"] = world_light()
+    gh = {"days": f"{days:,}", "planted": datetime.fromtimestamp(born).strftime("%B %d").replace(" 0", " ")}
+    if _SUN.get("temp") is not None:
+        gh["temp"] = f"{round(_SUN['temp'])}°{_SUN.get('unit', '')}"
     apps = _top_apps()
+    for i, a in enumerate(apps[:3]):                       # plant tags: the things you tend most
+        gh[f"t{i + 1}"] = a.lower()[:14]
+    out["greenhouse"] = gh
     if len(apps) == 4:
         out["chart"] = {f"p{i + 1}": SHAPES[i].format(a) for i, a in enumerate(apps)}
     return out

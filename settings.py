@@ -277,11 +277,23 @@ FIELDS = [
     ("His desktop", "JARVIS_LIVING_DESKTOP", "His world as your desktop", "bool",
      "His world and his visualizer become your wallpaper on every monitor; desktop icons are hidden while he runs.", None),
     ("His desktop", "JUNO_DESK_SCENE", "Scene", "choice",
-     "Where he lives. A still picture: nothing moves but his voice ring, and only while you two are talking. "
-     "Changes straight away. Or say \"Jarvis, switch your desktop to the archive\".",
+     "Where he lives. Changes straight away. Or say \"Jarvis, switch your desktop to the greenhouse\".",
      [("bench", "Drafting bench (his blueprints at night)"), ("station", "Orbital station (above a planet)"),
       ("archive", "The archive (his private library)"), ("signal", "Listening post (a signals room)"),
-      ("chart", "Cartographer (a map of your digital island)")]),
+      ("chart", "Cartographer (a map of your digital island)"), ("greenhouse", "Greenhouse (a glasshouse in the rain)")]),
+    ("His desktop", "JARVIS_WORLD_MOTION", "Living scene", "bool",
+     "Small things move in his world: stars, dust in the light, rain on the glass, a ship on the map. The light "
+     "follows your real sunrise and sunset, and it rains or snows when it does where you are. Very light on the PC, "
+     "and it stops while a game is up. Off (or performance mode): a still picture.", None),
+    ("His desktop", "JARVIS_PRESENCE", "How he looks", "choice",
+     "The thing in the middle of his world that moves when you talk.",
+     [("dial", "Dial (a ring of ticks, like an instrument)"), ("orb", "Orb (a soft ball of light)")]),
+    ("His desktop", "JARVIS_SAVER", "Screensaver", "choice",
+     "After this long with no mouse or keyboard, his world fills the screen with a clock, your next event and the "
+     "weather. Any key, click or mouse move closes it. Not while a game, a video or anything fullscreen is up.",
+     [("0", "Off"), ("5", "5 minutes"), ("10", "10 minutes"), ("15", "15 minutes"), ("30", "30 minutes")]),
+    ("His desktop", "JARVIS_WORLD_LIGHTS", "Lights match his world", "bool",
+     "When you switch scenes, your RGB (OpenRGB, SignalRGB, iCUE...) and smart lights take that world's colour.", None),
     ("His desktop", "JUNO_PULLS", "Pull things up while he answers", "bool",
      "Ask about a stock, the weather, your day, your PC or anything he searches, and a live panel builds in beside him "
      "(the sources he read, a preview of a file he made...). \"Clear that\" puts them away, \"show me\" brings one to "
@@ -450,7 +462,7 @@ DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir",
             "JARVIS_TTS": "kokoro", "JUNO_ELEVENLABS_VOICE_ID": "EXAVITQu4vr4xnSDxMaL", "JUNO_LANGUAGE": "en",
             "JUNO_MIC": "default", "JUNO_MIC_FLOOR": "400", "JARVIS_VAD": "0.5", "JARVIS_PAUSE": "1.5",
             "JARVIS_SMART_PAUSE": "true", "JARVIS_ECHO_CANCEL": "true", "JARVIS_MUTE_HOTKEY": "ctrl+alt+m",
-            "JUNO_DESK_SCENE": "bench", "JUNO_DESK_CALM": "true", "JUNO_STOCK_ALERTS": "true", "JUNO_STOCK_ALERT_PCT": "4", "JUNO_STOCKS_BRIEFING": "true", "JARVIS_LEAN_TOOLS": "true", "JARVIS_PERFORMANCE": "auto", "JARVIS_POSTMATCH": "true", "JARVIS_RIOT_REGION": "na", "JARVIS_CLIP_WITH": "auto",
+            "JUNO_DESK_SCENE": "bench", "JUNO_DESK_CALM": "true", "JARVIS_WORLD_MOTION": "true", "JARVIS_PRESENCE": "dial", "JARVIS_SAVER": "0", "JARVIS_WORLD_LIGHTS": "false", "JUNO_STOCK_ALERTS": "true", "JUNO_STOCK_ALERT_PCT": "4", "JUNO_STOCKS_BRIEFING": "true", "JARVIS_LEAN_TOOLS": "true", "JARVIS_PERFORMANCE": "auto", "JARVIS_POSTMATCH": "true", "JARVIS_RIOT_REGION": "na", "JARVIS_CLIP_WITH": "auto",
             "JARVIS_SALES_RADAR": "true", "JARVIS_MONTH_REPORT": "true", "JARVIS_GUEST_MODE": "true", "JARVIS_BARGE_IN": "true", "JARVIS_EMOTION": "true", "JARVIS_BEDTIME": "off", "JARVIS_CLIP_HISTORY": "true", "JARVIS_SHOT_SEARCH": "true", "JARVIS_CRASH_REPORTS": "ask", "JARVIS_VOICE_ID": "true", "JARVIS_VOICE_ID_STRICT": "normal", "JARVIS_CONVO": "45",
             "JARVIS_PRIVATE": "false", "JARVIS_WHISPER": "auto", "JARVIS_WHISPER_FROM": "23", "JARVIS_WHISPER_TO": "7",
             "JARVIS_WHISPER_VOL": "35", "JARVIS_TRIGGERS": "true", "JARVIS_PLAY_BREAK": "180", "JARVIS_WELCOME_BACK": "20",

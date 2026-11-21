@@ -122,6 +122,13 @@ def _tour(m):
     return "Here's the tour again.", "Onboarding"
 
 
+def _saver(m):
+    if _DRY.on:
+        return HIT
+    import saver
+    return saver.tool("show"), "Screensaver"
+
+
 def _report(m):
     if _DRY.on:
         return HIT
@@ -440,6 +447,7 @@ RULES = [
     (r"^(?:clip (?:that|it|this)|save (?:that|the|a) clip|clip the last \w+(?: seconds| minutes)?|clip)$", _clip),
     (r"^(?:undo|undo that|undo it|take that back|put it back|reverse that|go back on that)$", _undo),
     (r"^(?:run|do|start|show me|redo)(?: the| your)? (?:first[- ]time )?(?:setup|tour|onboarding)(?: again)?$", _tour),
+    (r"^(?:start|show|open|put on)(?: the| your| my)? screen ?saver(?: now)?$", _saver),
     (r"^(?:send|file|submit|make)(?: a| the)? (?:crash|bug|problem) report$", _report),
     (r"^(?:run|do|start|check)(?: a| the| some| your| ur)? (?:self[- ]?)?(?:diagnostics?|self[- ]?checks?|system checks? on yourself)(?: checks?| tests?)?(?: on yourself| for yourself| please)?$", _diag),
     (r"^(?:open|launch|start|run|fire up|load up|boot up|pull up|bring up)(?: up)? (?:the |my )?(.+?)(?: app| application)?$", _open),

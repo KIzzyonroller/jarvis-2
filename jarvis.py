@@ -335,6 +335,11 @@ def run_gui(voice, start_hidden=False, show_hook=None):
         window = webview.create_window("J.U.N.O.", **kw)
     emitter.window = window
     bridge._win = window
+    try:
+        import saver
+        saver.start(core, webview)                 # his world as a screensaver (off until a time is picked in settings)
+    except Exception as e:
+        print(f"[saver] {e}")
     if mini:
         try:
             mini.create(webview)
@@ -359,6 +364,12 @@ def run_gui(voice, start_hidden=False, show_hook=None):
     def on_closing():
         emitter.close()     # stop talking to the window before it's torn down
         _exit_soon(6)       # whatever happens below, this process is gone in a few seconds (no Task Manager)
+        try:
+            import saver
+            if saver.SAVER:
+                saver.SAVER.stop()
+        except Exception:
+            pass
         for part in (desk, mini, music):
             if part:
                 try:
