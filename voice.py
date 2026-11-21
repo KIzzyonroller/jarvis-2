@@ -80,6 +80,17 @@ def clean_for_speech(text):
 
 # =================================================================== audio container
 GAIN = 1.0                 # playback volume multiplier; quiet.py lowers it for whisper mode
+DUCK = 1.0                 # core lowers this while you talk over him (glides, so no clicks)
+# His tone for the current answer (core.set_tone): a touch faster and brighter for good news, slower and softer
+# late at night or for bad news. Small on purpose: it should feel like mood, not a different voice.
+TONE = {"name": "neutral", "speed": 1.0, "pitch": 1.0, "gain": 1.0}
+TONES = {"neutral": (1.0, 1.0, 1.0), "upbeat": (1.06, 1.025, 1.05), "excited": (1.1, 1.04, 1.1),
+         "calm": (0.95, 0.99, 0.92), "soft": (0.92, 0.985, 0.8), "serious": (0.96, 0.98, 1.0)}
+
+
+def set_tone(name):
+    s, p, g = TONES.get(name, TONES["neutral"])
+    TONE.update(name=name if name in TONES else "neutral", speed=s, pitch=p, gain=g)
 
 class Audio:
     """Either PCM samples in memory, or an audio file on disk."""
@@ -553,6 +564,9 @@ class Speaker:
 
     def synth(self, text, persona=None):
         p = persona or self.persona
+        if TONE["speed"] != 1.0 or TONE["pitch"] != 1.0:           # how he feels this turn (core.set_tone)
+            p = {**p, "speed": float(p.get("speed") or 1.0) * TONE["speed"],
+                 "pitch": float(p.get("pitch") or 1.0) * TONE["pitch"]}
         short = len(text.split()) <= self.PHRASE_MAX_WORDS
         key = self._phrase_key(text, p) if short and self.engines else None
         if key:
@@ -623,8 +637,8 @@ class Speaker:
             print(f"[tts] envelope failed: {e}")
 
     def _play_pcm(self, pcm, sr):
-        if GAIN != 1.0:                                    # whisper mode (quiet.py): same voice, much softer
-            pcm = np.asarray(pcm, dtype=np.float32) * GAIN
+        if GAIN * TONE["gain"] != 1.0:                     # whisper mode (quiet.py) and his mood: same voice, softer/louder
+            pcm = np.clip(np.asarray(pcm, dtype=np.float32) * (GAIN * TONE["gain"]), -0.98, 0.98)
         if self._out is None and not self._out_failed:
             try:
                 self._out = _Output()
@@ -721,6 +735,11 @@ class _Output:
                 self.pos += len(chunk)
                 if self.pos >= len(self.buf):
                     self.buf = None
+        cur, goal = getattr(self, "_duck", 1.0), DUCK
+        if cur != goal or goal != 1.0:
+            nxt = cur + (goal - cur) * min(1.0, frames / (self.SR * 0.12))      # ~120 ms glide
+            out *= np.linspace(cur, nxt, frames, dtype=np.float32)
+            self._duck = nxt if abs(nxt - goal) > 0.01 else goal
         outdata[:, 0] = out
         dac = t.outputBufferDacTime or (t.currentTime + self.stream.latency)
         self.ref.write(dac, out, self.SR)

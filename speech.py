@@ -312,8 +312,12 @@ class Listener:
         self.ambient = 150.0
         self.chunk_s = config.CHUNK / config.SAMPLE_RATE
         self.prompt = ", ".join(config.LISTEN_NAMES) + "."   # nudges Whisper to spell the names right
+        if getattr(config, "BILINGUAL", False):               # mixed Spanish/English: show Whisper both in one breath
+            self.prompt += " Oye Jarvis, pon la playlist de gaming on Spotify. Hey Jarvis, ¿qué hora es? Thanks."
         # Priming the accurate pass with names you actually say makes Whisper spell them right
         self._base_vocab = ", ".join(config.LISTEN_NAMES) + ". " + config.WHISPER_VOCAB
+        if getattr(config, "BILINGUAL", False):
+            self._base_vocab += " Oye Jarvis, ¿me puedes poner música? Sí, play it. Gracias."
         self.muted = False
         self._mute_lock = threading.Lock()
 

@@ -92,6 +92,10 @@ QUESTION_RE = re.compile(r"^(?:hey |ok |okay |so |um |uh )*(what|what's|whats|wh
                          r"|\?$", re.I)
 SIMPLE_Q = re.compile(r"\b(time|date|what day|today's date|volume|battery|playing|this song|song is this|you there|you up|"
                       r"how are you|how's it going|you okay|you good|what's up|whats up|sup)\b", re.I)
+# Second opinions and "why did you say that": always the main model, never the quick one
+DEEP_HINTS = re.compile(r"\b(am i wrong|was i wrong|be honest|honestly|devil'?s advocate|other side|second opinion|"
+                        r"roast (my|this)|poke holes|why did you say|how do you know|where did (you get|that come)|"
+                        r"how did you (work|figure)|what'?s your (take|opinion))\b", re.I)
 KNOW_HINTS = re.compile(r"\b(stock|stocks|share price|market|ticker|crypto|bitcoin|earnings|invest|history|science|"
                         r"meaning|define|definition|who (is|was)|what (is|was|are|were) (a|an|the)|capital of|population|"
                         r"lore|rules|recommend|opinion|think about|better|best|worth it|difference)\b", re.I)
@@ -850,13 +854,20 @@ class Core:
             aimed = (awaiting_answer or self._hold or self._turn is not None or self._started_engaged(ended, audio)
                      or find_address(text)[0] or self._maybe_for_us(text))
             if aimed:
-                ok, sc = voiceid.is_owner(audio)
-                if not ok:
-                    print(f"[not your voice {sc:.2f}] {text}")
+                who, sc = voiceid.identify(audio)
+                if who is None:
+                    print(f"[not your voice {sc:.2f}] {text}" if sc is not None else f"[not your voice] {text}")
                     self.emit({"type": "heard", "text": text, "addressed": False})
                     return
-                if sc is not None:
+                if who != "owner":
+                    if awaiting_answer or self._turn is not None:
+                        print(f"[guest {who}: can't approve or interrupt] {text}")
+                        return
+                    print(f"[guest: {who} {sc:.2f}] {text}")
+                    self._guest_next = (who, time.time())
+                elif sc is not None:
                     print(f"[your voice {sc:.2f}]")
+                    self._guest_next = None
         if (audio is not None and self.listener and not refined and self.listener.careful_too_slow(len(audio) / 16000)):
             print("[voice] careful pass would be too slow on this PC; using the quick transcript")
             refined = True
@@ -900,6 +911,13 @@ class Core:
                 elif key and not rest:
                     self.events.put(("wake", None))
                 return
+            if turn["spoke"] and self._barge_in_ok(text, audio):
+                print(f"[barge-in] {text}")
+                before = turn["text_in"]
+                self.interrupt()
+                self.events.put(("text", ("voice", f"[They cut in while you were answering \"{before[:200]}\". "
+                                                    f"Stop that answer and respond to this instead:] {text}", ended)))
+                return
             if (not turn["spoke"] and turn["source"] == "voice"
                     and ended - turn["utt_end"] <= config.MERGE_SECONDS + 3):
                 # you paused mid-command and kept going: start over with the whole thing
@@ -921,6 +939,26 @@ class Core:
             self._hold_command(None, text, ended)
             return
         print(f"[heard, not addressed] {text}")
+
+    BARGE_CUES = re.compile(r"^(wait|hold on|hang on|no|nope|nah|actually|stop|sorry|not that|that's not|thats not|"
+                            r"i meant|i mean|forget (it|that)|never ?mind|um no|uh no|whoa|woah|scratch that|one sec)\b", re.I)
+
+    def _barge_in_ok(self, text, audio):
+        """Talking over him counts as cutting in when it sounds like it (\"wait, no...\"), or, once he knows your
+        voice, anything of three words or more in YOUR voice (other people and the TV can't cut him off)."""
+        if os.environ.get("JARVIS_BARGE_IN", "true").lower() == "false":
+            return False
+        words = _words(text)
+        if len(words) < 2:
+            return False
+        if self.BARGE_CUES.search(text.strip()):
+            return True
+        try:
+            import voiceid
+            return voiceid.on() and len(words) >= 3 and audio is not None and len(audio) / 16000 >= 1.2 \
+                and getattr(self, "_guest_next", None) is None
+        except Exception:
+            return False
 
     def _is_quick_cmd(self, text):
         k0, r0 = find_address(text)
@@ -1001,6 +1039,7 @@ class Core:
         """Mic says you started/stopped talking. While a command is on hold, starting to
         talk again pauses the countdown; stopping restarts it (plus time to transcribe)."""
         self._user_talking = active
+        self._duck(active)
         now = time.time()
         if not active:
             self._utt_pending_until = now + 3      # your sentence is being transcribed: don't talk over it yet
@@ -1017,6 +1056,25 @@ class Core:
                 self._arm_hold(config.MAX_RECORD_SECONDS + 3)   # safety net only
             else:
                 self._arm_hold(config.HOLD_SECONDS + 1.5)
+
+    def _duck(self, talking):
+        """You start talking while he's mid-sentence: he gets quieter straight away (like a person pausing to
+        listen), and comes back up if it turns out you weren't cutting in."""
+        import voice
+        if os.environ.get("JARVIS_BARGE_IN", "true").lower() == "false":
+            voice.DUCK = 1.0
+            return
+        if talking and self._voice_on and self._turn is not None:
+            stamp = time.time()
+            self._duck_at = stamp
+
+            def later():
+                if getattr(self, "_duck_at", 0) == stamp and self._user_talking and self._voice_on:
+                    voice.DUCK = 0.4
+            threading.Timer(0.35, later).start()          # a cough or his own echo is shorter than this
+        elif not talking:
+            self._duck_at = 0
+            threading.Timer(1.8, lambda: setattr(voice, "DUCK", 1.0) if not self._user_talking else None).start()
 
     def _release_hold(self):
         with self._hold_lock:
@@ -3219,6 +3277,39 @@ class Core:
         elif self.LOSS_RE.search(text):
             w.result("loss")
 
+    TONE_EXCITED = re.compile(r"\b(we won|i won|got the job|passed|i got in|got accepted|promotion|promoted|"
+                              r"engaged|let'?s go+|we did it|i did it|new record|first place|clutch|victory|gg ez)\b", re.I)
+    TONE_SOFT = re.compile(r"\b(died|passed away|funeral|i'?m sad|feel(ing)? (down|bad|awful|terrible|lonely)|"
+                           r"depressed|anxious|stressed|panic|broke up|breakup|lost my|rough day|bad day|i failed|"
+                           r"i'?m (scared|worried)|hurts?|sick)\b", re.I)
+    TONE_SERIOUS = re.compile(r"\b(emergency|urgent|serious|important|legal|lawyer|doctor|hospital|bank|"
+                              r"scam|hacked|virus|warning|error|broken)\b", re.I)
+
+    def _pick_tone(self, text):
+        """How he sounds this answer: a small change in pace and brightness, picked from what you said and the moment.
+        Settings > Voice: 'Emotion in his voice'."""
+        if os.environ.get("JARVIS_EMOTION", "true").lower() == "false":
+            return "neutral"
+        try:
+            import quiet
+            if quiet.STATE.get("on"):
+                return "soft"
+        except Exception:
+            pass
+        if self.TONE_SOFT.search(text or ""):
+            return "soft"
+        if self.TONE_EXCITED.search(text or ""):
+            return "excited"
+        if self.TONE_SERIOUS.search(text or ""):
+            return "serious"
+        vibe = getattr(self, "_vibe", None)
+        if vibe and time.time() - vibe[1] < 600 and vibe[0] == "heart":
+            return "upbeat"
+        h = datetime.now().hour
+        if h >= 23 or h < 6:
+            return "calm"
+        return "neutral"
+
     def _mood_note(self):
         """A light steer for his tone right now (never announced): the hour, how long you've been gone, your game."""
         if not config.MOODS:
@@ -3283,7 +3374,7 @@ class Core:
         do) go to the main model, which knows a lot more, unless it's one of the trivial ones (the time, the volume)."""
         if not config.FAST_MODEL or len(text.split()) > 14 or HEAVY_HINTS.search(text) or DETAIL_HINTS.search(text):
             return False
-        if KNOW_HINTS.search(text):
+        if KNOW_HINTS.search(text) or DEEP_HINTS.search(text):
             return False
         if QUESTION_RE.search(text.strip()) and not SIMPLE_Q.search(text):
             return False
@@ -3307,6 +3398,11 @@ class Core:
             if r in ("heart", "pout"):
                 self._vibe = (r, time.time())
             self._game_result(text)
+            try:
+                import voice as _v
+                _v.set_tone(self._pick_tone(text))
+            except Exception as e:
+                print(f"[tone] {e}")
             note = self._mood_note()
             try:
                 import quiet
@@ -3314,8 +3410,20 @@ class Core:
                 note = (note + "\n" + q).strip() if q else note
             except Exception:
                 pass
+            guest = getattr(self, "_guest_next", None)
+            if guest and source == "voice" and time.time() - guest[1] < 60:
+                note = (note + "\n" if note else "") + (
+                    f"(This is {guest[0]}, a guest you recognise by voice, not {config.ADDRESS_AS}. Be friendly and "
+                    f"helpful with questions, music, weather and fun stuff, but they can't change settings, touch files, "
+                    f"send messages, see {config.ADDRESS_AS}'s personal info (memories, calendar, messages), or approve "
+                    f"anything. If they ask for that, say {config.ADDRESS_AS} has to.)")
+                brain_guest = True
+            else:
+                brain_guest = False
             if note:
                 prompt = (prompt or text) + "\n" + note
+        else:
+            brain_guest = False
         detail = bool(DETAIL_HINTS.search(text))
         if max_words == "auto":
             max_words = None if detail else config.MAX_SPOKEN_WORDS
@@ -3382,8 +3490,17 @@ class Core:
             if quick:
                 print(f"[brain] quick model for {text[:50]!r}")
             tools._CTX.persona = getattr(brain, "persona_key", self.persona_key)
-            reply = brain.ask(prompt or text, on_text=on_text, on_event=on_event, cancel=turn["cancel"],
-                              allow_tools=allow_tools, quick=quick)
+            saved_allowed = brain.allowed
+            if brain_guest:
+                brain.allowed = set(tools.GUEST_TOOLS)
+                tools.GUEST["on"] = True
+            try:
+                reply = brain.ask(prompt or text, on_text=on_text, on_event=on_event, cancel=turn["cancel"],
+                                  allow_tools=allow_tools, quick=quick)
+            finally:
+                if brain_guest:
+                    brain.allowed = saved_allowed
+                    tools.GUEST["on"] = False
             if reply is not None and not turn["interrupted"]:
                 if not turn["text"].strip():
                     self.emit({"type": "reply_delta", "id": tid, "text": reply})

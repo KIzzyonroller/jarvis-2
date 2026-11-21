@@ -442,6 +442,12 @@ class Brain:
         self._done_calls, self._started, self._started_words = {}, {}, {}     # per request: see _guard
         self._model = (config.FAST_MODEL if quick and config.FAST_MODEL and not Brain.fast_broken else config.MODEL)
         self.trace = {"rounds": [], "tools": [], "tools_s": 0.0}
+        # "Why did you say that?": keep a receipt of how each answer was made (what was looked up, what each tool
+        # said, his own reasoning notes). The explain tool reads the PREVIOUS answer's receipt.
+        prev = getattr(self, "receipt", None)
+        if prev and (prev.get("steps") or prev.get("answer")):
+            self.last_receipt = prev
+        self.receipt = {"asked": text[:400], "model": self._model, "at": time.time(), "steps": [], "answer": ""}
         if self._notes:
             text = "[Meanwhile: " + " ".join(self._notes) + "]\n" + text
             self._notes = []
@@ -481,13 +487,19 @@ class Brain:
 
                 found, asked = [], ""
                 for b in resp.content:
+                    if b.type == "thinking" and getattr(b, "thinking", ""):
+                        self.receipt["steps"].append({"kind": "thought", "text": b.thinking[:700]})
                     if b.type == "server_tool_use":
+                        self.receipt["steps"].append({"kind": "search", "query": (b.input or {}).get("query", "")
+                                                      if isinstance(b.input, dict) else ""})
                         q = (b.input or {}).get("query", "") if isinstance(b.input, dict) else ""
                         asked = asked or q
                         on_event("tool_done", {"name": b.name, "args": b.input, "result": f"searched: {q}", "ok": True})
                         self.on_tool(b.name, b.input, "searching the web")
                     elif b.type == "web_search_tool_result" and isinstance(getattr(b, "content", None), list):
                         found += [{"url": getattr(r, "url", ""), "title": getattr(r, "title", "")} for r in b.content]
+                        self.receipt["steps"].append({"kind": "sources", "items": [
+                            f"{getattr(r, 'title', '')} ({getattr(r, 'url', '')})" for r in b.content][:6]})
                 if found and self.private:                     # the sources he read, up on the desktop
                     try:
                         import pulls
@@ -501,6 +513,13 @@ class Brain:
                     calls = [b for b in resp.content if b.type == "tool_use"]
                     tt = time.time()
                     results = self._run_tools(calls, on_event, cancel)
+                    for c, r in zip(calls, results):
+                        out = r.get("content") if isinstance(r, dict) else r
+                        if isinstance(out, list):
+                            out = " ".join(x.get("text", "[picture]") if isinstance(x, dict) else str(x) for x in out)
+                        self.receipt["steps"].append({"kind": "tool", "name": c.name,
+                                                      "args": json.dumps(c.input, default=str)[:300],
+                                                      "result": str(out)[:500]})
                     self.trace["tools"] += [b.name for b in calls]
                     self.trace["tools_s"] += time.time() - tt
                     self.history.append({"role": "user", "content": results})
@@ -511,6 +530,7 @@ class Brain:
 
                 if resp.stop_reason == "refusal":
                     return text_now or "I'm not going to do that one."
+                self.receipt["answer"] = (" ".join(spoken_along_the_way) + " " + text_now).strip()[:1500]
                 return text_now or " ".join(spoken_along_the_way) or "Done."
             return "I went round in circles on that one and gave up. Try asking differently."
         except Interrupted:

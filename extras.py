@@ -100,6 +100,55 @@ def jokes_note():
             "most; never explain it; then call jokes action used): " + "; ".join(f"[{j['id']}] {j['text']}" for j in items))
 
 
+# ================================================================== their slang and nicknames
+def _lingo_file():
+    return config.JARVIS_DIR / "lingo.json"
+
+
+def lingo():
+    try:
+        return json.loads(_lingo_file().read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def lingo_tool(action="list", term=None, meaning=None):
+    """Their words: 'the squad' = Leo, Ana and Max; 'my main' = Wraith in Apex; 'the spot' = the taco place."""
+    a = (action or "list").lower()
+    items = lingo()
+    if a == "add":
+        t = " ".join(str(term or "").lower().split())[:40]
+        m = " ".join(str(meaning or "").split())[:200]
+        if not t or not m:
+            return "Which word, and what does it mean to them?"
+        items[t] = {"means": m, "added": date.today().isoformat()}
+        _lingo_file().write_text(json.dumps(items, indent=1), encoding="utf-8")
+        try:
+            import tools
+            if len(t.split()) <= 4 and not t.isascii() or any(ch.isupper() for ch in (term or "")):
+                tools.learn_word(term)                # names: listen for the spelling too
+        except Exception:
+            pass
+        return f"Got it: \"{t}\" means {m}."
+    if a == "remove":
+        t = " ".join(str(term or "").lower().split())
+        if items.pop(t, None) is None:
+            return f"I don't have \"{t}\" saved."
+        _lingo_file().write_text(json.dumps(items, indent=1), encoding="utf-8")
+        return f"Forgot \"{t}\"."
+    if not items:
+        return "No slang or nicknames saved yet."
+    return "Their words: " + "; ".join(f"\"{k}\" = {v['means']}" for k, v in items.items())
+
+
+def lingo_note():
+    items = lingo()
+    if not items:
+        return ""
+    return ("\n\nTHEIR WORDS (their slang and nicknames; understand them, and use them back naturally when it fits): " +
+            "; ".join(f"\"{k}\" = {v['means']}" for k, v in list(items.items())[:60]))
+
+
 # ================================================================== ambient lines
 def _ambient_gap():
     if config.LITE:

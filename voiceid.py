@@ -33,7 +33,9 @@ MIN_SECS = 1.2
 _sess = None
 _lock = threading.Lock()
 _print = None
-ENROLL = {"on": False, "until": 0.0, "embs": [], "secs": 0.0, "done": None}
+ENROLL = {"on": False, "until": 0.0, "embs": [], "secs": 0.0, "done": None, "guest": None}
+GUESTS = "voice_guests.json"     # friends he recognises (guest mode): {name: voiceprint}
+_guests = None
 
 
 def _model_path():
@@ -163,8 +165,9 @@ def status():
 
 
 # ------------------------------------------------------------------ learning your voice
-def start_enroll(seconds=40, done=None):
-    ENROLL.update(on=True, until=time.time() + seconds, embs=[], secs=0.0, done=done)
+def start_enroll(seconds=40, done=None, guest=None):
+    """guest: a friend's name to learn THEIR voice (guest mode) instead of yours."""
+    ENROLL.update(on=True, until=time.time() + seconds, embs=[], secs=0.0, done=done, guest=(guest or None))
     threading.Thread(target=_session, daemon=True).start()           # load / download the model meanwhile
     t = threading.Timer(seconds + 1, finish_enroll)                  # stopped talking early: finish with what we have
     t.daemon = True
@@ -196,7 +199,18 @@ def finish_enroll():
     ENROLL["on"] = False
     embs = ENROLL["embs"]
     cb = ENROLL.get("done")
-    if len(embs) >= 3:
+    if len(embs) >= 3 and ENROLL.get("guest"):
+        name = ENROLL["guest"]
+        v = np.mean(np.stack(embs), axis=0)
+        mine = _load()
+        if mine is not None and float(np.dot(v / (np.linalg.norm(v) + 1e-9), mine)) >= threshold() + 0.1:
+            ok, msg = False, f"That sounded like you, not {name}. Have {name} do the talking and try again."
+        else:
+            g = guests()
+            g[name] = (v / (np.linalg.norm(v) + 1e-9)).round(6).tolist()
+            _save_guests(g)
+            ok, msg = True, f"Got it: I'll know {name}'s voice now. Guests can ask me things but can't change anything."
+    elif len(embs) >= 3:
         _save(np.mean(np.stack(embs), axis=0), len(embs))
         ok, msg = True, f"Got it: learned your voice from {ENROLL['secs']:.0f} seconds of speech."
     else:
@@ -207,6 +221,58 @@ def finish_enroll():
         except Exception:
             pass
     return True
+
+
+# ------------------------------------------------------------------ guests
+def guests():
+    global _guests
+    if _guests is None:
+        try:
+            _guests = json.loads((config.JARVIS_DIR / GUESTS).read_text(encoding="utf-8"))
+        except Exception:
+            _guests = {}
+    return dict(_guests)
+
+
+def _save_guests(g):
+    global _guests
+    _guests = dict(g)
+    (config.JARVIS_DIR / GUESTS).write_text(json.dumps(g), encoding="utf-8")
+
+
+def forget_guest(name):
+    g = guests()
+    hit = [k for k in g if k.lower() == (name or "").lower().strip()]
+    for k in hit:
+        g.pop(k)
+    _save_guests(g)
+    return f"Forgot {hit[0]}'s voice." if hit else f"I don't know a guest called {name}."
+
+
+def guest_mode():
+    import os
+    return os.environ.get("JARVIS_GUEST_MODE", "true").lower() != "false"
+
+
+def identify(audio):
+    """('owner' | a guest's name | None, score). Same leniency as is_owner: too short or no model -> 'owner'."""
+    ok, s = is_owner(audio)
+    if ok:
+        return "owner", s
+    if not guest_mode() or s is None:
+        return None, s
+    try:
+        e = embed(audio)
+    except Exception:
+        return None, s
+    best, bs = None, -1.0
+    for name, v in guests().items():
+        sc = float(np.dot(e, np.array(v, dtype=np.float32)))
+        if sc > bs:
+            best, bs = name, sc
+    if best and bs >= threshold() and bs > s + 0.05:
+        return best, bs
+    return None, s
 
 
 # ------------------------------------------------------------------ checking

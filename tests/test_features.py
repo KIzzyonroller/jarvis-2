@@ -209,3 +209,68 @@ def test_quiet_manual_strings():
     assert quiet.MANUAL["on"] is False
     quiet.set_manual("auto")
     assert quiet.MANUAL["on"] is None
+
+
+def test_guest_identify(monkeypatch, tmp_path):
+    """A friend's voice is recognised as a guest; a stranger is nobody; the owner is the owner."""
+    import voiceid
+    monkeypatch.setattr(config, "JARVIS_DIR", tmp_path)
+    rng = np.random.default_rng(1)
+    me, leo, stranger = (v / np.linalg.norm(v) for v in rng.normal(size=(3, 256)).astype(np.float32))
+    monkeypatch.setattr(voiceid, "_print", me)
+    monkeypatch.setattr(voiceid, "_guests", {"Leo": leo.tolist()})
+    monkeypatch.setenv("JARVIS_VOICE_ID", "true")
+    monkeypatch.setenv("JARVIS_GUEST_MODE", "true")
+    audio = np.zeros(16000 * 2, dtype=np.float32)
+    for vec, want in ((me, "owner"), (leo, "Leo"), (stranger, None)):
+        monkeypatch.setattr(voiceid, "embed", lambda a, v=vec: v)
+        monkeypatch.setattr(voiceid, "_save", lambda *a, **k: None)
+        assert voiceid.identify(audio)[0] == want
+
+
+def test_guests_cant_use_owner_tools():
+    import tools
+    tools.GUEST["on"] = True
+    try:
+        assert "Not for guests" in tools.run_tool("files", {"action": "list"})
+        assert tools._confirm("Delete everything") is False
+    finally:
+        tools.GUEST["on"] = False
+
+
+@pytest.mark.parametrize("text,ok", [("wait no I meant tomorrow", True), ("actually make it Spotify", True),
+                                     ("yeah", False), ("the weather is nice", False)])
+def test_barge_in_cues(text, ok, monkeypatch):
+    import core
+    monkeypatch.setenv("JARVIS_BARGE_IN", "true")
+    c = core.Core.__new__(core.Core) if hasattr(core, "Core") else None
+    if c is None:
+        pytest.skip("no Core class")
+    c._guest_next = None
+    import voiceid
+    monkeypatch.setattr(voiceid, "on", lambda: False)
+    assert c._barge_in_ok(text, None) is ok
+
+
+@pytest.mark.parametrize("text,tone", [("we won the tournament!", "excited"), ("my grandma passed away", "soft"),
+                                       ("my bank account got hacked", "serious")])
+def test_tone(text, tone, monkeypatch):
+    import core
+    c = core.Core.__new__(core.Core)
+    import quiet
+    monkeypatch.setitem(quiet.STATE, "on", False)
+    assert c._pick_tone(text) == tone
+
+
+def test_lingo_roundtrip():
+    import extras
+    assert "means" in extras.lingo_tool("add", "the squad", "Leo, Ana and Max")
+    assert "the squad" in extras.lingo_note()
+    assert "Forgot" in extras.lingo_tool("remove", "the squad")
+
+
+def test_bilingual_prompt_and_rule(monkeypatch):
+    import langs
+    monkeypatch.setattr(config, "LANGUAGE", "es-en")
+    monkeypatch.setattr(config, "LANGUAGES", True)
+    assert "Spanish and English" in langs.reply_rule()

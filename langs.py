@@ -77,6 +77,11 @@ def reply_rule():
     import config
     if not config.LANGUAGES:
         return ""
+    if config.LANGUAGE == "es-en":
+        return ("They speak Spanish and English and mix them, often in one sentence (Latin American Spanish). Answer "
+                "in the language they mostly used in THAT message; mixing a little the way they do is fine. Keep "
+                "names, games, apps and tech words in English. In Spanish use tú, natural Latin American phrasing, "
+                "and your same personality (no stiff textbook Spanish).")
     if config.LANGUAGE in NAMES:
         return f"Always reply in {NAMES[config.LANGUAGE]}, whatever language the user speaks."
     return "Reply in the language the user spoke or wrote in."

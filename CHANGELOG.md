@@ -3,6 +3,16 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.39
+
+- **Cut in like you would with a person.** Start talking while he's mid-answer and he gets quieter straight away. "Wait, no...", "actually...", "hold on" or "I meant..." stops him, and he answers the new thing, knowing what he was in the middle of. Once he knows your voice, anything you say over him counts; other people and the TV can't cut him off. A cough or his own echo doesn't trigger it.
+- **Guests.** "Learn my friend Leo's voice" (Leo talks for about 20 seconds). After that Leo can ask him things, play music, check scores and so on, but can't change settings, touch files, send messages, see your personal stuff or approve anything. Anyone he doesn't know is still ignored. "Forget Leo's voice" removes it.
+- **Emotion in his voice.** A little brighter and quicker for good news ("we won!"), slower and softer for bad news or late at night, steadier for serious things. Subtle on purpose: same voice, different mood.
+- **Spanish and English, mixed.** Settings > Languages > "Spanish and English, mixed". Talk in either, or both in one sentence; he answers in the language you mostly used, in natural Latin American Spanish, and his voice switches to match. He also catches "Jarvis" said with a Spanish accent ("Yarvis").
+- **Your slang.** Tell him once that "the squad" means you, Leo and Ana, or that "the spot" is the taco place, and he understands it from then on and uses it back.
+- **Second opinions.** "Am I wrong?", "be honest", "devil's advocate", "roast my plan": he makes the strongest honest case against you first, then gives his real verdict and how sure he is. No flattery, no fence-sitting.
+- **"Why did you say that?"** He keeps a receipt of how each answer was made (what he searched, which sources, what each tool returned, his own reasoning) and walks you through it, including which parts were his own judgment.
+
 ## 1.0.38
 
 - **Clipboard history.** "What did I copy ten minutes ago?", "put the link I copied before this one back". He remembers your last 60 copies while he's running (in memory only, gone when he closes). Passwords never get in: anything a password manager marks private, and anything that looks like a key or password, is skipped.

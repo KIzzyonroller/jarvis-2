@@ -104,7 +104,8 @@ WHISPER_DEVICE = os.environ.get("JARVIS_WHISPER_DEVICE", "auto").lower()   # aut
 # Anything but English switches hearing to Whisper's multilingual models, and his replies and voice follow.
 LANGUAGE = os.environ.get("JUNO_LANGUAGE", "en").lower()
 LANGUAGES = LANGUAGE != "en"
-HEAR_LANGUAGE = "en" if not LANGUAGES else (None if LANGUAGE == "auto" else LANGUAGE)
+HEAR_LANGUAGE = "en" if not LANGUAGES else (None if LANGUAGE in ("auto", "es-en") else LANGUAGE)
+BILINGUAL = LANGUAGE == "es-en"          # Spanish and English, mixed freely (per sentence, and inside one)
 if LANGUAGES and not os.environ.get("JARVIS_WHISPER_FAST"):
     WHISPER_FAST = "tiny"            # the English-only tiny model can't hear his name inside another language
 MEMORY_FILE_NAME = "memory.json"
@@ -417,7 +418,7 @@ LIVE_KEYS = {"JARVIS_MINI", "JUNO_FPS", "JUNO_CHAT_FIRST", "JUNO_CHAT_EVERY", "J
              "JUNO_STOCKS_BRIEFING", "JARVIS_LEAN_TOOLS", "JARVIS_FREE_CREATE", "JUNO_PULLS", "JUNO_GAME_BRIEFING",
              "JARVIS_CONVO", "JARVIS_PRIVATE", "JARVIS_VOICE_ID", "JARVIS_VOICE_ID_STRICT", "JARVIS_WHISPER",
              "JARVIS_WHISPER_FROM", "JARVIS_WHISPER_TO", "JARVIS_WHISPER_VOL", "JARVIS_TRIGGERS", "JARVIS_PLAY_BREAK",
-             "JARVIS_WELCOME_BACK", "JARVIS_AMBIENT", "JARVIS_LETTER", "JARVIS_PATCH_ALERTS", "JARVIS_CRASH_REPORTS", "JARVIS_BEDTIME", "JUNO_STOCKS_WEEKLY",
+             "JARVIS_WELCOME_BACK", "JARVIS_AMBIENT", "JARVIS_LETTER", "JARVIS_PATCH_ALERTS", "JARVIS_CRASH_REPORTS", "JARVIS_BEDTIME", "JARVIS_GUEST_MODE", "JARVIS_BARGE_IN", "JARVIS_EMOTION", "JUNO_STOCKS_WEEKLY",
              "JUNO_STOCK_EARNINGS"}
 WIDGET_KEYS = {"JUNO_DESK_WIDGETS", "JUNO_DESK_WIDGETS_WHERE", "JUNO_W_STATS", "JUNO_W_MUSIC", "JUNO_W_WEATHER",
                "JUNO_W_CALENDAR", "JUNO_W_NOTES", "JUNO_W_DISCORD", "JUNO_W_STOCKS", "JUNO_STOCKS"}

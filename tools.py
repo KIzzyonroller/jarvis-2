@@ -53,11 +53,18 @@ def set_confirm_handler(fn):
     _CONFIRM = fn
 
 
+# What a recognised guest (a friend whose voice he knows) may use: questions, music, fun. Nothing that changes
+# anything, reads the owner's personal stuff, or sends anything.
+GUEST = {"on": False}             # set by core for the length of a guest's turn (any thread)
+GUEST_TOOLS = {"calculate", "spotify", "youtube", "media_control", "set_volume", "stocks", "pull_up", "panels",
+               "recipe_card", "track", "browse", "web_search"}
+
+
 def _confirm(title, detail="", category=None):
     """Ask the user. category = a permissions.CATEGORIES key the user can set to 'always allow',
     or None for things that always ask (shutdown, emptying the bin, destructive commands)."""
-    if _CONFIRM is None:
-        return False
+    if _CONFIRM is None or GUEST["on"]:
+        return False                                     # guests can never approve anything
     try:
         return bool(_CONFIRM(title, detail, category))
     except TypeError:
@@ -3877,9 +3884,12 @@ TOOL_SPECS = [
            "remove": {"type": "array", "items": S}}, ["action"]),
     _spec("voice_id", "Only answering the owner's voice (checked on this PC). learn: start learning their voice (they "
                       "talk ~20 s; use when they say 'learn my voice'); forget; on / off; strictness (relaxed/normal/"
-                      "strict); status. Friends saying your name are ignored while it's on.",
-          {"action": {"type": "string", "enum": ["learn", "forget", "on", "off", "strictness", "status"]},
-           "strictness": S}, ["action"]),
+                      "strict); status. Friends saying your name are ignored while it's on, UNLESS they're guests: "
+                      "learn_guest (name: a friend; they talk ~20 s) lets that friend ask questions, play music and "
+                      "so on, but never change anything, see personal stuff or approve; forget_guest (name); guests.",
+          {"action": {"type": "string", "enum": ["learn", "forget", "on", "off", "strictness", "status", "learn_guest",
+                                                 "forget_guest", "guests"]},
+           "strictness": S, "name": S}, ["action"]),
     _spec("privacy", "private_on / private_off: private mode (speech recognition only on this PC, nothing to Groq; "
                      "Claude still answers). whisper_on / whisper_off / whisper_auto: talk quietly and briefly (auto = "
                      "late at night or while they're on a call). convo (minutes: how long after each answer they can "
@@ -3914,6 +3924,11 @@ TOOL_SPECS = [
                            "desktop about their week, from you."),
     _spec("play_stats", "How long they've played today (days=1) or over N days, per game, and the wins/losses they "
                         "told you about.", {"days": N}),
+    _spec("lingo", "Their own slang and nicknames, remembered for good. add (term, meaning: what it means to THEM, e.g. "
+                   "'the squad' = 'Leo, Ana and Max, their Valorant group'); remove (term); list.",
+          {"action": {"type": "string", "enum": ["add", "remove", "list"]}, "term": S, "meaning": S}, ["action"]),
+    _spec("explain", "How your PREVIOUS answer was made: the searches, the sources, what each tool returned, and your "
+                     "reasoning notes. Use when they ask 'why did you say that', 'how do you know', 'where did that come from'."),
     _spec("clipboard_history", "What they've copied since you started (text, and that a picture was copied; never "
                                "passwords). list (minutes: only the last N minutes), search (query), copy (put an older "
                                "one back on the clipboard: number 1 = the one before the current, or query to pick by "
@@ -4252,6 +4267,44 @@ def wind_down_tool(action="start", time=None):
     return winddown.tool(action, time)
 
 
+def lingo_tool(action="list", term=None, meaning=None):
+    import extras
+    return extras.lingo_tool(action, term, meaning)
+
+
+def explain_tool():
+    """How the previous answer was put together: what he looked up, what each tool returned, his reasoning notes."""
+    b = getattr(_VOICE_CORE, "brain", None) if _VOICE_CORE else None
+    r = getattr(b, "last_receipt", None) if b else None
+    if not r:
+        return "There's no earlier answer this session to explain (receipts start when I start)."
+    lines = [f"Previous request: {r['asked']}", f"Answered by: {r['model']}"]
+    shown = []
+    for st in r["steps"]:
+        k = st["kind"]
+        if k == "thought":
+            lines.append(f"Your reasoning notes: {st['text']}")
+        elif k == "search":
+            lines.append(f"Web search: {st['query']}")
+            shown.append({"time": "search", "text": st["query"]})
+        elif k == "sources":
+            lines.append("Sources read: " + "; ".join(st["items"]))
+        elif k == "tool":
+            lines.append(f"Tool {st['name']}({st['args']}) returned: {st['result']}")
+            shown.append({"time": st["name"], "text": st["result"][:120]})
+    if not r["steps"]:
+        lines.append("No tools or searches: that answer came from your own knowledge and judgment alone.")
+    lines.append(f"What you said: {r['answer']}")
+    try:
+        import pulls
+        pulls.pull("briefing", {"game": "How I got that", "friends": [], "queue": [s["time"] + ": " + s["text"] for s in shown][:8]
+                                or ["No lookups: my own knowledge and judgment."]}, id="receipt", title="Receipt", ttl=90, auto=False)
+    except Exception:
+        pass
+    return "\n".join(lines) + ("\n[Explain plainly which facts came from which lookup and which were your own judgment. "
+                               "If something was a guess, say so.]")
+
+
 def undo_tool(action="undo", steps=1):
     import undo
     return undo.listing() if (action or "").lower() == "list" else undo.undo(steps or 1)
@@ -4276,10 +4329,28 @@ def diagnostics_tool(action="run", fix=None):
 
 
 # =================================================================== 1.0.34: who he listens to, triggers, finder, life
-def voice_id_tool(action="status", strictness=None):
-    """Answers only your voice: learn it, forget it, check it, how strict."""
+def voice_id_tool(action="status", strictness=None, name=None):
+    """Answers only your voice: learn it, forget it, check it, how strict. Guests: friends he recognises."""
     import voiceid
     a = (action or "status").lower()
+    if a == "learn_guest":
+        if not voiceid.on():
+            return "Learn the owner's voice first (say 'learn my voice'); guest mode builds on that."
+        if not (name or "").strip():
+            return "What's their name?"
+        nm = name.strip().title()[:30]
+        core = _VOICE_CORE
+
+        def gdone(ok, msg):
+            core.events.put(("say", msg))
+        voiceid.start_enroll(seconds=60, done=gdone, guest=nm)
+        return (f"Listening for {nm} now: tell {nm} to talk normally for about 20 seconds (and you stay quiet). "
+                "Say exactly that, briefly.")
+    if a == "forget_guest":
+        return voiceid.forget_guest(name or "")
+    if a == "guests":
+        g = list(voiceid.guests())
+        return ("Guests I know: " + ", ".join(g) + ".") if g else "No guests learned yet."
     if a == "learn":
         if _VOICE_CORE is None:
             return "Not available."
@@ -4421,7 +4492,7 @@ FUNCS = {
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "stocks": stocks_tool, "desktop_scene": desktop_scene_tool,
-    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "undo": undo_tool, "clipboard_history": clipboard_history_tool,
+    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "undo": undo_tool, "lingo": lingo_tool, "explain": explain_tool, "clipboard_history": clipboard_history_tool,
     "screenshots": screenshots_tool, "duplicates": duplicates_tool, "calculate": calculate_tool, "price_watch": price_watch_tool,
     "wind_down": wind_down_tool, "crash_report": crash_report_tool, "voice_id": voice_id_tool, "privacy": privacy_tool, "triggers": triggers_tool,
     "find": find_tool, "recipe_card": recipe_card, "jokes": jokes_tool, "weekly_letter": letter_tool, "play_stats": play_stats, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
@@ -4562,6 +4633,8 @@ def _blocked_app(name, args):
 
 def run_tool(name, args):
     """Returns a string, or a list of content blocks (for images)."""
+    if GUEST["on"] and name not in GUEST_TOOLS:
+        return f"Not for guests: {name} needs the owner. Tell them politely."
     blocked = _blocked_app(name, args)
     if blocked:
         return blocked
