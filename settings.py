@@ -47,6 +47,14 @@ FIELDS = [
      "Things like a full drive, overheating or a download stuck. Never during games.", None),
 
     # ---------------------------------------------------------------- Conversation & personality
+    ("Starting up", "JARVIS_PERFORMANCE", "Performance mode", "choice",
+     "Lite makes him easier on a slower PC: a lighter speech model, the desktop at 15 frames a second with no effects, "
+     "no ambient lines. Auto picks lite on PCs with under 8 GB of RAM or 4 or fewer CPU threads.",
+     [("auto", "Auto"), ("full", "Full"), ("lite", "Lite")]),
+    ("Starting up", "JARVIS_CRASH_REPORTS", "Crash reports", "choice",
+     "When something breaks, the details are saved on this PC. With Ask, he offers (at most once a day) to open a "
+     "report on GitHub for you to check and send yourself. Nothing is ever sent automatically.",
+     [("ask", "Save them, and offer to send"), ("off", "Don't offer")]),
     ("Whisper mode", "JARVIS_WHISPER", "Whisper mode", "choice",
      "He talks quietly and keeps it short. Auto: between the hours below, and whenever a call app (Discord, Zoom, "
      "Teams, Meet...) is using your mic. Or say \"whisper mode on\".", [("auto", "Auto"), ("on", "Always"), ("off", "Never")]),
@@ -410,7 +418,7 @@ DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir",
             "JARVIS_TTS": "kokoro", "JUNO_ELEVENLABS_VOICE_ID": "EXAVITQu4vr4xnSDxMaL", "JUNO_LANGUAGE": "en",
             "JUNO_MIC": "default", "JUNO_MIC_FLOOR": "400", "JARVIS_VAD": "0.5", "JARVIS_PAUSE": "1.5",
             "JARVIS_SMART_PAUSE": "true", "JARVIS_ECHO_CANCEL": "true", "JARVIS_MUTE_HOTKEY": "ctrl+alt+m",
-            "JUNO_DESK_SCENE": "bench", "JUNO_DESK_CALM": "true", "JUNO_STOCK_ALERTS": "true", "JUNO_STOCK_ALERT_PCT": "4", "JUNO_STOCKS_BRIEFING": "true", "JARVIS_LEAN_TOOLS": "true", "JARVIS_VOICE_ID": "true", "JARVIS_VOICE_ID_STRICT": "normal", "JARVIS_CONVO": "45",
+            "JUNO_DESK_SCENE": "bench", "JUNO_DESK_CALM": "true", "JUNO_STOCK_ALERTS": "true", "JUNO_STOCK_ALERT_PCT": "4", "JUNO_STOCKS_BRIEFING": "true", "JARVIS_LEAN_TOOLS": "true", "JARVIS_PERFORMANCE": "auto", "JARVIS_CRASH_REPORTS": "ask", "JARVIS_VOICE_ID": "true", "JARVIS_VOICE_ID_STRICT": "normal", "JARVIS_CONVO": "45",
             "JARVIS_PRIVATE": "false", "JARVIS_WHISPER": "auto", "JARVIS_WHISPER_FROM": "23", "JARVIS_WHISPER_TO": "7",
             "JARVIS_WHISPER_VOL": "35", "JARVIS_TRIGGERS": "true", "JARVIS_PLAY_BREAK": "180", "JARVIS_WELCOME_BACK": "20",
             "JARVIS_AMBIENT": "rare", "JARVIS_LETTER": "true", "JARVIS_PATCH_ALERTS": "true", "JARVIS_FREE_CREATE": "personal", "JUNO_PULLS": "true", "JUNO_GAME_BRIEFING": "true", "JUNO_STOCKS_WEEKLY": "true", "JUNO_STOCK_EARNINGS": "true", "JUNO_W_STOCKS": "true", "JUNO_FPS": "30", "JUNO_DESK_VIZ": "both", "JUNO_GLASS_WHERE": "window", "JUNO_DESK_WIDGETS": "true",

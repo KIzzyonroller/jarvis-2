@@ -38,6 +38,14 @@ if (-not $SkipInstall) {
     if ($LASTEXITCODE) { throw "pip install failed" }
 }
 
+# 0. The test suite (tests\). A failing test stops the release, so a broken build never reaches anyone.
+#    Run it yourself any time:  python -m pytest tests -q
+$changelogTop = (Select-String -Path CHANGELOG.md -Pattern '^## (\d+\.\d+\.\d+)' | Select-Object -First 1).Matches[0].Groups[1].Value
+if ($changelogTop -ne $Version) { throw "You're releasing $Version but the newest CHANGELOG.md section is $changelogTop. Add a '## $Version' section first." }
+Set-Content -Path VERSION -Value $Version -NoNewline -Encoding ascii
+python -m pytest tests -q -p no:cacheprovider
+if ($LASTEXITCODE) { throw "Tests failed (see above). Nothing was released." }
+
 # 1. Bake in where updates come from
 if ($UpdateSource) { Set-Content -Path update_source.txt -Value $UpdateSource -NoNewline -Encoding utf8 }
 elseif (Test-Path update_source.txt) { Write-Host "Using existing update_source.txt: $(Get-Content update_source.txt)" }

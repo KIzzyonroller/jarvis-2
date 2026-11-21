@@ -257,6 +257,26 @@ body.booting #subs,body.booting #chips{display:none}
 #a-always{flex:1.5;color:var(--alarm);border-color:rgba(var(--argb),.45)} #a-always:hover{background:rgba(var(--argb),.1)}
 #a-yes{flex:1.2;background:var(--alarm);border-color:var(--alarm);color:#140a00;font-weight:600} #a-yes:hover{filter:brightness(1.1)}
 #ask .fine{margin-top:10px}
+#tour{margin-top:14px;width:min(620px,100%);padding:16px 18px 14px;border:1px solid rgba(var(--crgb),.45);
+  background:rgba(var(--vrgb),.92);box-shadow:0 0 70px rgba(var(--crgb),.12);animation:askIn .22s ease-out}
+#tour .head{font:var(--dispw) 10.5px var(--display);letter-spacing:.24em;color:var(--c);display:flex;justify-content:space-between}
+#tour h2{font:500 21px/1.3 var(--text);margin:10px 0 6px;color:var(--ink)}
+#tour .fine,#tour p.say{margin:0 0 12px;color:var(--dim);font-size:14px;line-height:1.5}
+#tour p.say b{color:var(--ink);font-weight:500}
+.t-dots{list-style:none;display:flex;gap:6px;margin:10px 0 0;padding:0}
+.t-dots li{flex:1;height:3px;background:rgba(var(--crgb),.18);transition:background .3s}
+.t-dots li.on{background:var(--c)}
+.t-meter{height:14px;border:1px solid rgba(var(--crgb),.3);margin:6px 0 4px;position:relative;overflow:hidden}
+.t-meter i{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,rgba(var(--crgb),.5),var(--c));transition:width .08s linear}
+.t-sel,.t-in{width:100%;height:40px;padding:0 10px;font:14px var(--text);color:var(--ink);background:rgba(var(--crgb),.05);border:1px solid rgba(var(--crgb),.25)}
+.t-sel:focus-visible,.t-in:focus-visible{border-color:var(--c);outline:none}
+.t-worlds{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0 4px}
+.t-worlds button{text-align:left;padding:10px 12px;border:1px solid rgba(var(--crgb),.25);background:rgba(var(--crgb),.04);color:var(--ink);cursor:pointer;font:500 14px var(--text)}
+.t-worlds button small{display:block;color:var(--dim);font-size:12px;margin-top:3px;font-weight:400}
+.t-worlds button[aria-pressed="true"]{border-color:var(--c);background:rgba(var(--crgb),.14)}
+#t-msg{min-height:1.3em;color:var(--you)}
+#tour .btns #t-skip{margin-right:auto;color:var(--dim)}
+#tour .btns .go{background:var(--c);color:#04121a;border-color:var(--c);font-weight:600}
 #keys{margin-top:14px;width:min(620px,100%);padding:16px 18px 14px;border:1px solid rgba(var(--crgb),.45);
   background:rgba(var(--vrgb),.9);box-shadow:0 0 70px rgba(var(--crgb),.1);animation:askIn .22s ease-out}
 #keys .head{font:var(--dispw) 10.5px var(--display);letter-spacing:.24em;color:var(--c)}
@@ -422,6 +442,8 @@ body.booting #subs,body.booting #chips{display:none}
 .set-list .row span{grid-column:1;font-size:12.5px;color:var(--dim);line-height:1.4}
 .set-list .row .sw,.set-list .row button.link{grid-row:1/3;grid-column:2}
 .faces{display:flex;flex-wrap:wrap;gap:6px}
+.fld .ctl button.ghost{height:34px;padding:0 14px;font-size:13.5px;border:1px solid rgba(var(--crgb),.3);color:var(--ink)}
+.fld .ctl button.ghost:hover{border-color:var(--c);background:rgba(var(--crgb),.08)}
 .faces button{height:34px;padding:0 14px;font-size:13.5px;border:1px solid rgba(var(--crgb),.18);color:var(--dim)}
 .faces button[aria-pressed=true]{color:var(--ink);border-color:var(--c);background:rgba(var(--crgb),.08)}
 @media (max-width:760px){.set-wrap{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
@@ -723,6 +745,13 @@ body.swap #stage{animation:swap .6s steps(6)}
     </div>
     <p class="fine" id="k-msg" role="status"></p>
     <div class="btns"><button id="k-later">Later</button><button id="k-save">Save and restart</button></div>
+  </section>
+  <section id="tour" hidden role="dialog" aria-labelledby="t-title">
+    <div class="head">First time <span id="t-step"></span></div>
+    <ol class="t-dots" id="t-dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
+    <div id="t-body"></div>
+    <p class="fine" id="t-msg" role="status"></p>
+    <div class="btns"><button id="t-skip">Skip the tour</button><button id="t-back">Back</button><button id="t-next" class="go">Next</button></div>
   </section>
 </main>
 
@@ -2053,6 +2082,8 @@ window.J = {
         break;
       }
       case "setup": showKeys(e); break;
+      case "onboard": tourOpen(e); break;
+      case "onboard_note": if (TOUR.on) $("#t-msg").textContent = e.text; else toast(e.text); break;
       case "settings": S.fields = e.fields || []; S.voices = e.voices || null; if (!$("#settings").hidden) renderSettings(); break;
       case "open_settings": openSettings(); if (e.page) { S.page = e.page; } break;
       case "desk_arrange": S.arrange = e; if (!$("#settings").hidden && S.page === "arrange" && !S.dragging) renderSettings(); break;
@@ -2154,6 +2185,64 @@ $("#k-save").onclick = () => {
   call("save_keys", a, g, b, u);
 };
 KEY_INPUTS.forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#k-save").click(); } if (e.key === "Escape") hideKeys(); }));
+
+// ============================================================ first-time tour (after the keys): mic, name, voice, world
+const TOUR = { on: false, i: 0, d: null, pick: {}, raf: 0 };
+const TOUR_STEPS = ["mic", "name", "voice", "world"];
+function tourOpen(e) {
+  TOUR.d = e; TOUR.on = true; TOUR.i = Math.max(0, TOUR_STEPS.indexOf(e.step || "mic"));
+  TOUR.pick = { mic: e.mic, name: e.address, world: e.scene };
+  $("#tour").hidden = false; document.body.classList.add("asking"); tourRender();
+}
+function tourClose() { TOUR.on = false; cancelAnimationFrame(TOUR.raf); $("#tour").hidden = true; if (!ask) document.body.classList.remove("asking"); }
+function tourMeter() {
+  const m = $("#t-meter i"); if (!m || !TOUR.on) return;
+  m.style.width = Math.min(100, micLevel * 160) + "%"; TOUR.raf = requestAnimationFrame(tourMeter);
+}
+function tourRender() {
+  const d = TOUR.d, step = TOUR_STEPS[TOUR.i], b = $("#t-body");
+  [...$("#t-dots").children].forEach((li, k) => li.classList.toggle("on", k <= TOUR.i));
+  $("#t-step").textContent = `${TOUR.i + 1} of ${TOUR_STEPS.length}`;
+  $("#t-msg").textContent = ""; $("#t-back").hidden = TOUR.i === 0;
+  $("#t-next").textContent = TOUR.i === TOUR_STEPS.length - 1 ? "Finish" : "Next";
+  cancelAnimationFrame(TOUR.raf);
+  if (step === "mic") {
+    b.innerHTML = `<h2 id="t-title">Can he hear you?</h2><p class="say">Say anything. The bar should jump when you talk. If it doesn't, pick your microphone below.</p>
+      <div class="t-meter" id="t-meter" aria-hidden="true"><i></i></div>
+      <label class="kf"><span>Microphone</span><select class="t-sel" id="t-mic">${(d.mics || []).map((m) => `<option value="${esc(m.v)}"${m.v === TOUR.pick.mic ? " selected" : ""}>${esc(m.label)}</option>`).join("")}</select></label>
+      ${d.listening ? "" : `<p class="say"><b>His microphone is off right now.</b> Pick one here; it switches on after the tour.</p>`}`;
+    $("#t-mic").onchange = (ev) => { TOUR.pick.mic = ev.target.value; $("#t-msg").textContent = "He'll switch to it after the tour."; };
+    tourMeter();
+  } else if (step === "name") {
+    b.innerHTML = `<h2 id="t-title">What should he call you?</h2><p class="say">Your name, a nickname, or something like "sir" or "boss". You can change it any time.</p>
+      <label class="kf"><span>He calls you</span><input class="t-in" id="t-name" maxlength="40" value="${esc(TOUR.pick.name || "")}" autocomplete="off"></label>`;
+    $("#t-name").oninput = (ev) => TOUR.pick.name = ev.target.value;
+    setTimeout(() => $("#t-name").focus(), 50);
+  } else if (step === "voice") {
+    b.innerHTML = `<h2 id="t-title">Teach him your voice</h2><p class="say">Then he only answers <b>you</b>, even when friends or a video say "Jarvis". It takes about 20 seconds of normal talking and stays on this PC.</p>
+      <div class="t-meter" id="t-meter" aria-hidden="true"><i></i></div>
+      <div class="btns" style="margin:4px 0 0"><button id="t-learn">${d.voice_learned ? "Learn it again" : "Start listening"}</button></div>
+      <p class="say" style="margin-top:10px">${d.voice_learned ? "Already learned." : "Optional. Skip it and he answers anyone who says his name."}</p>`;
+    $("#t-learn").onclick = () => { call("onboard", "voice"); $("#t-learn").disabled = true; $("#t-msg").textContent = "Listening. Read something out loud, or talk about your day."; };
+    tourMeter();
+  } else {
+    b.innerHTML = `<h2 id="t-title">Pick his world</h2><p class="say">This becomes your desktop, behind your icons. It switches straight away so you can look. Change it later by saying "switch to the archive".</p>
+      <div class="t-worlds" role="group" aria-label="Worlds">${(d.scenes || []).map((s) => `<button type="button" data-v="${s.v}" aria-pressed="${s.v === TOUR.pick.world}">${esc(s.name)}<small>${esc(s.about)}</small></button>`).join("")}</div>`;
+    b.querySelectorAll(".t-worlds button").forEach((btn) => btn.onclick = () => {
+      TOUR.pick.world = btn.dataset.v; b.querySelectorAll(".t-worlds button").forEach((x) => x.setAttribute("aria-pressed", String(x === btn)));
+      call("onboard", "world", btn.dataset.v);
+    });
+  }
+}
+$("#t-next").onclick = () => {
+  const step = TOUR_STEPS[TOUR.i];
+  if (step === "mic" && TOUR.pick.mic !== TOUR.d.mic) call("onboard", "mic", TOUR.pick.mic);
+  if (step === "name") { const n = (TOUR.pick.name || "").trim(); if (!n) { $("#t-msg").textContent = "Type a name, or go back and skip."; return; } if (n !== TOUR.d.address) call("onboard", "name", n); }
+  if (TOUR.i < TOUR_STEPS.length - 1) { TOUR.i++; tourRender(); return; }
+  call("onboard", "done"); tourClose(); toast("All set. Say \u201cJarvis\u201d any time.");
+};
+$("#t-back").onclick = () => { if (TOUR.i > 0) { TOUR.i--; tourRender(); } };
+$("#t-skip").onclick = () => { call("onboard", "skip"); tourClose(); };
 
 // ============================================================ studio: Blender and Unreal modes (keys never come back)
 const ST = { modes: [], open: false, form: null };
@@ -2475,9 +2564,14 @@ function arrangeSection() {
 }
 const EXTRAS = {
   arrange: () => arrangeSection(),
-  general: () => S.autostart && S.autostart.available ? [sec("Windows", "instant", mk("div", { class: "set-list" },
+  general: () => [...(S.autostart && S.autostart.available ? [sec("Windows", "instant", mk("div", { class: "set-list" },
     instSwitch("Start with Windows", "Starts quietly in the corner when you log in.", () => S.autostart.on,
-      (on) => { S.autostart.on = on; $("#auto-sw").setAttribute("aria-checked", String(on)); call("set_autostart", on); })))] : [],
+      (on) => { S.autostart.on = on; $("#auto-sw").setAttribute("aria-checked", String(on)); call("set_autostart", on); })))] : []),
+    sec("Help", null, mk("div", { class: "fld" }, mk("label", { text: "Something not working?" }),
+      mk("div", { class: "ctl" },
+        Object.assign(mk("button", { type: "button", class: "ghost", text: "Report a problem" }), { onclick: () => { call("report_problem", ""); toast("Opened a report in your browser. Check it, then press Submit."); } }),
+        Object.assign(mk("button", { type: "button", class: "ghost", text: "Run the first-time tour" }), { onclick: () => { closeSettings(true); call("onboard_view"); } })),
+      mk("p", { class: "help", text: "Report a problem opens a GitHub issue already filled in with what broke, cleaned of keys and names. Nothing is sent until you press Submit." })))],
   voice: () => S.voices ? [voiceSection()] : [],
   appearance: () => [sec("His window", "instant",
     mk("div", { class: "fld" }, mk("label", { text: "His look" }), mk("div", { class: "ctl faces" }, Object.keys(FACES).map((k) => {

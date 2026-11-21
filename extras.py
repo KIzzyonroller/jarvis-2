@@ -102,6 +102,8 @@ def jokes_note():
 
 # ================================================================== ambient lines
 def _ambient_gap():
+    if config.LITE:
+        return 0
     m = os.environ.get("JARVIS_AMBIENT", "rare").lower()
     return {"off": 0, "rare": 4 * 3600, "sometimes": 100 * 60}.get(m, 4 * 3600)
 

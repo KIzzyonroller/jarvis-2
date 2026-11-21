@@ -198,6 +198,16 @@ class Bridge:
     def whats_new(self):
         threading.Thread(target=self._core.whats_new, daemon=True).start()
 
+    def onboard(self, step, value=None):
+        threading.Thread(target=self._core.onboard_action, args=(str(step), value), daemon=True).start()
+
+    def onboard_view(self):
+        threading.Thread(target=self._core.onboard_view, daemon=True).start()
+
+    def report_problem(self, note=""):
+        import crashreport
+        threading.Thread(target=crashreport.tool, args=("send", str(note or "")), daemon=True).start()
+
     def settings_view(self):
         threading.Thread(target=self._core.emit_settings, daemon=True).start()
 
@@ -616,6 +626,13 @@ def main():
     if (args.startup or config.FROZEN or sys.stdout is None
             or (args.after_update and Path(sys.executable).name.lower() == "pythonw.exe")):
         _log_to_file()                         # no console window: keep a log file instead
+    try:
+        import crashreport
+        crashreport.install()                  # crashes in any thread get saved (Documents/Jarvis/crashes)
+    except Exception as e:
+        print(f"[crash] reports off: {e}")
+    if config.LITE:
+        print(f"[performance] lite mode ({'chosen' if config.PERF_SETTING == 'lite' else 'auto: this PC is on the lighter side'})")
     import autostart
     show_hook = {"fn": None}
     if not autostart.claim(lambda: show_hook["fn"] and show_hook["fn"](), wait=60 if args.after_update else 0):

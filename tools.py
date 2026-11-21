@@ -1637,11 +1637,21 @@ def write_file(path, content, mode="create"):
     if err:
         return err
     p.parent.mkdir(parents=True, exist_ok=True)
+    existed = p.exists()
+    backup = None
+    if existed and p.parent != config.JARVIS_DIR:
+        import undo
+        backup = undo.keep_copy(p)
     if mode == "append" and p.exists() and p.stat().st_size:
         if not p.read_text(encoding="utf-8", errors="replace").endswith("\n"):
             content = "\n" + content
     with open(p, "a" if mode == "append" else "w", encoding="utf-8") as f:
         f.write(content)
+    if p.parent != config.JARVIS_DIR:
+        if backup:
+            _undo("edit", f"changed {p.name}", path=str(p), backup=backup, vault=backup)
+        elif not existed:
+            _undo("new", f"made {p.name}", path=str(p), mtime=_mtime(p))
     if len(content) > 200 and p.parent != config.JARVIS_DIR:
         try:
             import pulls
@@ -1668,10 +1678,16 @@ def make_document(path, kind=None, spec=None, overwrite=False):
     err = _gate_write([p], f"{'Replace' if p.exists() else 'Create'} {p.name}", str(p), new=not p.exists())
     if err:
         return err
+    import undo
+    backup = undo.keep_copy(p) if p.exists() else None
     try:
         out = documents.make(kind, p, spec or {})
     except Exception as e:
         return f"Couldn't make it: {type(e).__name__}: {e}"
+    if backup:
+        _undo("edit", f"replaced {Path(out).name}", path=str(out), backup=backup, vault=backup)
+    else:
+        _undo("new", f"made {Path(out).name}", path=str(out), mtime=_mtime(out))
     try:
         import pulls
         pulls.file(out, kind, spec=spec or {})
@@ -1694,9 +1710,12 @@ def edit_file(path, find, replace, count=0):
     err = _gate_write([p], f"Edit {p.name}", f"{p}\nReplace: {find[:200]}\nWith: {str(replace)[:200]}")
     if err:
         return err
-    shutil.copy2(p, p.with_name(p.name + ".bak"))          # one undo step, next to it
+    import undo
+    backup = undo.keep_copy(p)
     p.write_text(text.replace(find, replace or "", int(count) if count else -1), encoding="utf-8")
-    return f"Edited {p.name}: {n if not count else min(n, int(count))} change(s). The old version is {p.name}.bak."
+    if backup:
+        _undo("edit", f"edited {p.name}", path=str(p), backup=backup, vault=backup)
+    return f"Edited {p.name}: {n if not count else min(n, int(count))} change(s). \"Undo that\" puts it back."
 
 
 def search_text(query, folder="documents", max_results=20):
@@ -1757,6 +1776,7 @@ def zip_files(path, destination=None):
             for fp in src.rglob("*"):
                 if fp.is_file() and not permissions.is_secret(fp):
                     z.write(fp, fp.relative_to(src.parent))
+    _undo("new", f"zipped into {dst.name}", path=str(dst), mtime=_mtime(dst))
     return f"Zipped to {dst} ({dst.stat().st_size // 1024} KB)."
 
 
@@ -1821,6 +1841,21 @@ def create_folder(path):
     return f"Created {p}."
 
 
+def _undo(kind, desc, **data):
+    try:
+        import undo
+        undo.record(kind, desc, **data)
+    except Exception as e:
+        print(f"[undo] {e}")
+
+
+def _mtime(p):
+    try:
+        return Path(p).stat().st_mtime
+    except OSError:
+        return None
+
+
 def _move_or_copy(src, dst, copy):
     s = _resolve(src, config.HOME)
     d = _resolve(dst, config.HOME)
@@ -1842,8 +1877,11 @@ def _move_or_copy(src, dst, copy):
     d.parent.mkdir(parents=True, exist_ok=True)
     if copy:
         (shutil.copytree if s.is_dir() else shutil.copy2)(s, d)
+        _undo("new", f"copied {s.name} to {d.parent.name}", path=str(d), mtime=_mtime(d))
     else:
         shutil.move(str(s), str(d))
+        _undo("move", f"{'renamed ' + s.name + ' to ' + d.name if s.parent == d.parent else 'moved ' + s.name + ' to ' + d.parent.name}",
+              src=str(s), dst=str(d))
     return f"{verb.rstrip('e')}ed {s.name} to {d}." if not copy else f"Copied {s.name} to {d}."
 
 
@@ -1877,7 +1915,10 @@ def delete_file(path):
     elif not _confirm(what, str(p), "delete"):
         return DENIED
     from send2trash import send2trash
+    import undo
+    vault = undo.keep_copy(p)
     send2trash(str(p))
+    _undo("delete", f"deleted {p.name}", path=str(p), vault=vault)
     return f"Moved {p.name} to the Recycle Bin."
 
 
@@ -3868,6 +3909,14 @@ TOOL_SPECS = [
                            "desktop about their week, from you."),
     _spec("play_stats", "How long they've played today (days=1) or over N days, per game, and the wins/losses they "
                         "told you about.", {"days": N}),
+    _spec("undo", "Take back YOUR last change(s): a file you moved, renamed, made, edited or deleted, or a setting you "
+                  "changed (his world, widgets, modes). action undo (steps: how many, default 1) or list (what can be "
+                  "undone). Say exactly what was put back; never claim to undo a message you sent or anything outside this list.",
+          {"action": {"type": "string", "enum": ["undo", "list"]}, "steps": N}, ["action"]),
+    _spec("crash_report", "Crash reports. send: open a GitHub issue in their browser, prefilled with the last crash and "
+                          "cleaned of keys and names, for them to check and submit (note: their own words about what "
+                          "happened). list: recent saved crashes. clear: delete them.",
+          {"action": {"type": "string", "enum": ["send", "list", "clear"]}, "note": S}, ["action"]),
     _spec("diagnostics", "Check every part of you (mic, speech, Claude key, internet, prices, live stream, scores, flights, "
                          "weather, Steam, lights, Discord bot, desktop, OCR, documents, disk, settings, voice ID) in ~10 s, "
                          "with a checklist on their desktop. run, fix (fix = an id from the results, or 'all'), errors "
@@ -4137,6 +4186,16 @@ TOOL_SPECS = [
 ]
 
 
+def undo_tool(action="undo", steps=1):
+    import undo
+    return undo.listing() if (action or "").lower() == "list" else undo.undo(steps or 1)
+
+
+def crash_report_tool(action="send", note=""):
+    import crashreport
+    return crashreport.tool(action, note or "")
+
+
 def diagnostics_tool(action="run", fix=None):
     import diagnostics
     if (action or "run") == "fix":
@@ -4162,6 +4221,7 @@ def voice_id_tool(action="status", strictness=None):
 
         def done(ok, msg):
             core.events.put(("say", msg))
+            core.emit({"type": "onboard_note", "text": msg})
             if ok:
                 core.set_widgets({"JARVIS_VOICE_ID": "true"})
         voiceid.start_enroll(seconds=60, done=done)
@@ -4295,7 +4355,7 @@ FUNCS = {
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "stocks": stocks_tool, "desktop_scene": desktop_scene_tool,
-    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "voice_id": voice_id_tool, "privacy": privacy_tool, "triggers": triggers_tool,
+    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "undo": undo_tool, "crash_report": crash_report_tool, "voice_id": voice_id_tool, "privacy": privacy_tool, "triggers": triggers_tool,
     "find": find_tool, "recipe_card": recipe_card, "jokes": jokes_tool, "weekly_letter": letter_tool, "play_stats": play_stats, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
     "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
@@ -4448,6 +4508,12 @@ def run_tool(name, args):
         return out if isinstance(out, list) else str(out)
     except Exception as e:
         _log_failure(name, e)
+        if not isinstance(e, (FileNotFoundError, PermissionError, TimeoutError, ConnectionError, ValueError)):
+            try:
+                import crashreport
+                crashreport.record(e, f"tool {name}", {"args": list((args or {}).keys())})
+            except Exception:
+                pass
         return (f"Tool {name} failed: {type(e).__name__}: {e}. [Self-repair: tell them in a few words what broke, and "
                 f"offer to run diagnostics (which can fix most things) if it looks like more than a one-off.]")
 

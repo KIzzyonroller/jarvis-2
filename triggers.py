@@ -160,6 +160,14 @@ def on_game(name):
     _app_started(name)
 
 
+_GENERIC = {"", "app", "game", "launcher", "client", "music", "desktop", "the", "player", "browser", "studio", "beta", "ptb"}
+
+
+def _rest_is_generic(rest):
+    """'spotify' started and the trigger says 'Spotify music': the leftover word is generic, so it counts."""
+    return rest in _GENERIC
+
+
 def _app_started(name):
     n = _norm(name)
     if not n:
@@ -169,7 +177,9 @@ def _app_started(name):
         if w["kind"] != "app":
             continue
         want = _norm(w["name"])
-        if want and (want in n or (len(n) >= 5 and n in want)) and time.time() - r.get("last", 0) > 120:
+        # "deadbydaylightwin64shipping" contains "deadbydaylight": yes. "steam" inside "steamvr": no (too short a part).
+        if want and (want in n or (len(n) >= 5 and n in want and _rest_is_generic(want.replace(n, "", 1)))) \
+                and time.time() - r.get("last", 0) > 120:
             _fire(r, f"{w['name']} just opened")
 
 

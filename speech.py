@@ -332,7 +332,9 @@ class Listener:
         self.accurate = None
         self.accurate_name = (config.WHISPER_ACCURATE if config.WHISPER_ACCURATE != "auto"
                               else ("large-v3-turbo" if self.device == "cuda"
-                                    else "small" if config.LANGUAGES else "distil-small.en"))
+                                    else "base" if config.LANGUAGES and config.LITE
+                                    else "small" if config.LANGUAGES
+                                    else "base.en" if config.LITE else "distil-small.en"))
         self._log = log
         threading.Thread(target=self._load_accurate, daemon=True, name="whisper-load").start()
         self.stream = _open_mic(sd, self._callback)

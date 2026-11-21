@@ -539,6 +539,13 @@ class Brain:
         except Exception as e:
             rollback()
             print(f"   [brain error] {type(e).__name__}: {e}")
-            return f"Something broke on my end: {type(e).__name__}. Details are in the console."
+            offer = ""
+            try:
+                import crashreport
+                if crashreport.record(e, "answering"):
+                    offer = crashreport.offer_line()
+            except Exception:
+                pass
+            return f"Something broke on my end: {type(e).__name__}.{offer}"
         finally:
             self._compact()

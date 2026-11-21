@@ -449,6 +449,8 @@ class Core:
             quiet.start()                        # whisper mode: late, or on a call
             import extras
             extras.start(self)                   # ambient lines, the weekly letter, inside jokes
+            import undo
+            undo.start(self)                     # "undo that"
             import triggers
             triggers.start(self)                 # "when I open DBD..." / "every weekday at 8..."
             import comeback
@@ -623,13 +625,20 @@ class Core:
         self._start_jobs()
         self._start_watchers()
         self._start_activity()
-        for old in (config.BASE_DIR / "creator.id", config.JARVIS_DIR / "voiceprint.json"):
+        for old in (config.BASE_DIR / "creator.id", config.JARVIS_DIR / "voiceprint.json"):   # voice ID uses voice_id.json
             try:                                # left over from removed features (owner PC, voice lock)
                 old.unlink()
             except OSError:
                 pass
         last_seen = self._state_flag("last_seen") or 0
+        first_time = not self._state_flag("onboarded") and not self._used_before()
+        if not self._state_flag("onboarded") and not first_time:
+            self._state_flag("onboarded", "skipped: existing install")     # people who already use him: no tour
         threading.Thread(target=self._wake_watch, daemon=True, name="wake-watch").start()
+        if first_time and not self.brain_error:
+            threading.Timer(2.5, self.onboard_view).start()
+            self._update_check()
+            return
         if not self.brain_error:
             if self._briefing_due():
                 self._brief_from = last_seen
@@ -2163,6 +2172,71 @@ class Core:
         else:
             self._log("VOICE DOWNLOAD FAILED  [STAND-IN VOICE FOR NOW, RETRIES NEXT START]")
 
+    # ================================================================ first-run tour (after the keys)
+    ONBOARD_SCENES = [("bench", "Home Bench", "a drafting table at night"), ("station", "Observation Ring", "a space station deck"),
+                      ("archive", "The Archive", "a library after hours"), ("signal", "Listening Post", "a radio room"),
+                      ("chart", "Chart of the Island", "a hand-drawn sea chart")]
+
+    def _used_before(self):
+        """Signs someone has already been using him (so an update doesn't push a 'first time' tour on them).
+        Not last_seen: that gets written even on a first start that had no key yet."""
+        if self._state_flag("briefed"):
+            return True
+        try:
+            if tools.memories():
+                return True
+        except Exception:
+            pass
+        try:
+            return bool(self.history and self.history.search("", days=3650, limit=3))
+        except Exception:
+            return False
+
+    def onboard_view(self, step="mic"):
+        """The first-time tour: microphone, what to call you, your voice, his world. Re-run: 'run setup again'."""
+        import speech
+        try:
+            mics = speech.mic_devices()
+        except Exception:
+            mics = [("default", "Windows default")]
+        try:
+            import voiceid
+            learned = bool(voiceid.status().get("enrolled")) if isinstance(voiceid.status(), dict) else False
+        except Exception:
+            learned = False
+        self.emit({"type": "onboard", "step": step, "mics": [{"v": v, "label": l} for v, l in mics],
+                   "mic": config.MIC_DEVICE, "address": config.ADDRESS_AS, "scene": config.DESK_SCENE,
+                   "scenes": [{"v": k, "name": n, "about": a} for k, n, a in self.ONBOARD_SCENES],
+                   "voice_learned": learned, "listening": self.listener is not None})
+
+    def onboard_action(self, step, value=None):
+        self._onboard = getattr(self, "_onboard", {"restart": False})
+        v = str(value or "").strip()
+        if step == "mic" and v and v != config.MIC_DEVICE:
+            settings.save({"JUNO_MIC": v})
+            os.environ["JUNO_MIC"] = v
+            self._onboard["restart"] = True                    # the mic is opened once, at start
+        elif step == "name" and v:
+            settings.save({"JARVIS_ADDRESS_AS": v[:40]})
+            os.environ["JARVIS_ADDRESS_AS"] = v[:40]
+            self._onboard["restart"] = True                    # baked into his personality prompt
+        elif step == "voice":
+            import tools
+            msg = tools.voice_id_tool("learn")
+            self.emit({"type": "onboard_note", "text": "Listening. Talk normally for about 20 seconds."})
+            print(f"[onboard] {msg[:80]}")
+        elif step == "world" and v:
+            self.set_widgets({"JUNO_DESK_SCENE": v})
+        elif step in ("done", "skip"):
+            self._state_flag("onboarded", datetime.now().isoformat(timespec="minutes"))
+            if self._onboard.get("restart"):
+                self.emit({"type": "onboard_note", "text": "Restarting so the new mic and name kick in..."})
+                time.sleep(1.2)
+                self._restart()
+                return
+            if step == "done":
+                self.events.put(("say", f"All set, {config.ADDRESS_AS}. Say my name whenever you need me. Try asking what I can do."))
+
     # ================================================================ API keys (first run, or changing them)
     def emit_key_status(self, reason=""):
         import experts
@@ -2332,8 +2406,17 @@ class Core:
                 except Exception:
                     pass
 
-    def set_widgets(self, changes):
+    def set_widgets(self, changes, record_undo=True):
         """Voice: desktop widgets on/off, which ones, where. changes = {setting key: value}."""
+        if record_undo:
+            before = {k: os.environ.get(k) for k in changes}
+            if any((before[k] or "") != str(v) for k, v in changes.items()):
+                try:
+                    import undo
+                    nice = ", ".join(k.replace("JUNO_", "").replace("JARVIS_", "").replace("_", " ").lower() for k in changes)
+                    undo.record("settings", f"changed {nice}", before=before)
+                except Exception as e:
+                    print(f"[undo] {e}")
         settings.save(changes)
         for k, v in changes.items():
             os.environ[k] = v

@@ -87,6 +87,28 @@ def _media(key, label):
     return f
 
 
+def _undo(m):
+    if _DRY.on:
+        return HIT
+    import undo
+    out = undo.undo(1)
+    return out, f"Undo: {out}"
+
+
+def _tour(m):
+    if _DRY.on:
+        return HIT
+    tools._VOICE_CORE.onboard_view()
+    return "Here's the tour again.", "Onboarding"
+
+
+def _report(m):
+    if _DRY.on:
+        return HIT
+    import crashreport
+    return crashreport.tool("send").split(".")[0] + ". Check it, then press Submit.", "Crash report"
+
+
 def _diag(m):
     if _DRY.on:
         return HIT
@@ -395,7 +417,10 @@ RULES = [
     (r"^(?:previous|last|go back(?: a)?|back)(?: (?:song|track|one))$|^previous$|^play the last song$|^go back a song$",
      _media("previous", "Previous")),
     (r"^(?:open|launch|start|run|pull up|bring up|show)(?: up)? (?:the |my )?glass(?: mode)?(?: tutorial| help)?$", _glass_open),
-    (r"^(?:run|do|start|check)(?: a| the| some| your| ur)? (?:self[- ]?)?(?:diagnostics?|self[- ]?checks?|system checks? on yourself)(?: on yourself| for yourself| please)?$", _diag),
+    (r"^(?:undo|undo that|undo it|take that back|put it back|reverse that|go back on that)$", _undo),
+    (r"^(?:run|do|start|show me|redo)(?: the| your)? (?:first[- ]time )?(?:setup|tour|onboarding)(?: again)?$", _tour),
+    (r"^(?:send|file|submit|make)(?: a| the)? (?:crash|bug|problem) report$", _report),
+    (r"^(?:run|do|start|check)(?: a| the| some| your| ur)? (?:self[- ]?)?(?:diagnostics?|self[- ]?checks?|system checks? on yourself)(?: checks?| tests?)?(?: on yourself| for yourself| please)?$", _diag),
     (r"^(?:open|launch|start|run|fire up|load up|boot up|pull up|bring up)(?: up)? (?:the |my )?(.+?)(?: app| application)?$", _open),
     (r"^(?:close|quit|exit|kill) (?:the |my )?(.+?)(?: app| application)?$", _close),
     (r"^(?:what(?:'s| is) the time|what time is it|time|what time is it right now|got the time)$", _time),

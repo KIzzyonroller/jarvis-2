@@ -216,9 +216,24 @@ KEEP_FOCUS_SECONDS = 12      # how long after launching he guards your focus aga
 MINI_HUD = os.environ.get("JARVIS_MINI", "true").lower() != "false"
 # The living desktop (livedesk.py): his world becomes the wallpaper while he runs, desktop icons hidden.
 LIVING_DESKTOP = os.environ.get("JARVIS_LIVING_DESKTOP", "true").lower() != "false"
+
+
+def _weak_pc():
+    """Under 8 GB of RAM or 4 or fewer CPU threads: lite mode helps a lot there."""
+    try:
+        import psutil
+        return psutil.virtual_memory().total < 7.5e9 or (psutil.cpu_count() or 8) <= 4
+    except Exception:
+        return False
+
+
+# Performance mode: full / lite / auto (lite on weak PCs). Lite: lighter speech model, desktop at 15 fps with no
+# effects, no ambient lines, fewer background checks. Everything still works, just with less polish.
+PERF_SETTING = os.environ.get("JARVIS_PERFORMANCE", "auto").lower()
+LITE = PERF_SETTING == "lite" or (PERF_SETTING == "auto" and _weak_pc())
 DESK_INTRO = False                 # the old screen-shattering intro is gone: the desktop is just there
 DESK_SCENE = os.environ.get("JUNO_DESK_SCENE", "bench").lower()   # bench / station / archive / signal / chart
-DESK_CALM = os.environ.get("JUNO_DESK_CALM", "true").lower() != "false"   # panels just appear, no effects
+DESK_CALM = os.environ.get("JUNO_DESK_CALM", "true").lower() != "false" or LITE   # panels just appear, no effects
 DESK_QUALITY = os.environ.get("JUNO_DESK_QUALITY", "medium").lower()   # low / medium / high: frame rate and detail
 DESK_VIZ = os.environ.get("JUNO_DESK_VIZ", "both").lower()             # both / corner / second / off
 # His music player (music.py): pops up while music plays. Spotify stays in the background.
@@ -226,6 +241,8 @@ MUSIC_PLAYER = os.environ.get("JUNO_MUSIC_PLAYER", "true").lower() != "false"
 # Frame rate for his animations (desktop and music player), all the time. Say "set your animations to 60 fps" to change it.
 try:
     ANIM_FPS = max(5, min(60, int(os.environ.get("JUNO_FPS", "30"))))
+    if LITE:
+        ANIM_FPS = min(ANIM_FPS, 15)
 except ValueError:
     ANIM_FPS = 30
 # Screen watching (screenwatch.py): a live view of the screen in memory while you talk to him, so he sees what you mean.
@@ -400,7 +417,7 @@ LIVE_KEYS = {"JARVIS_MINI", "JUNO_FPS", "JUNO_CHAT_FIRST", "JUNO_CHAT_EVERY", "J
              "JUNO_STOCKS_BRIEFING", "JARVIS_LEAN_TOOLS", "JARVIS_FREE_CREATE", "JUNO_PULLS", "JUNO_GAME_BRIEFING",
              "JARVIS_CONVO", "JARVIS_PRIVATE", "JARVIS_VOICE_ID", "JARVIS_VOICE_ID_STRICT", "JARVIS_WHISPER",
              "JARVIS_WHISPER_FROM", "JARVIS_WHISPER_TO", "JARVIS_WHISPER_VOL", "JARVIS_TRIGGERS", "JARVIS_PLAY_BREAK",
-             "JARVIS_WELCOME_BACK", "JARVIS_AMBIENT", "JARVIS_LETTER", "JARVIS_PATCH_ALERTS", "JUNO_STOCKS_WEEKLY",
+             "JARVIS_WELCOME_BACK", "JARVIS_AMBIENT", "JARVIS_LETTER", "JARVIS_PATCH_ALERTS", "JARVIS_CRASH_REPORTS", "JUNO_STOCKS_WEEKLY",
              "JUNO_STOCK_EARNINGS"}
 WIDGET_KEYS = {"JUNO_DESK_WIDGETS", "JUNO_DESK_WIDGETS_WHERE", "JUNO_W_STATS", "JUNO_W_MUSIC", "JUNO_W_WEATHER",
                "JUNO_W_CALENDAR", "JUNO_W_NOTES", "JUNO_W_DISCORD", "JUNO_W_STOCKS", "JUNO_STOCKS"}
@@ -454,7 +471,7 @@ def reload_live():
     global DESK_VIZ, DESK_SCENE, DESK_CALM
     DESK_VIZ = os.environ.get("JUNO_DESK_VIZ", "both").lower()
     DESK_SCENE = os.environ.get("JUNO_DESK_SCENE", "bench").lower()
-    DESK_CALM = os.environ.get("JUNO_DESK_CALM", "true").lower() != "false"
+    DESK_CALM = os.environ.get("JUNO_DESK_CALM", "true").lower() != "false" or LITE
     PHONE_NOTIFS, PHONE_SPEAK = on("JUNO_PHONE_NOTIFS"), os.environ.get("JUNO_PHONE_SPEAK", "false").lower() == "true"
     GLASS_WHERE = os.environ.get("JUNO_GLASS_WHERE", "window").lower()
     DESK_WIDGETS = on("JUNO_DESK_WIDGETS")
@@ -462,6 +479,8 @@ def reload_live():
     DESK_WIDGETS_WHERE = os.environ.get("JUNO_DESK_WIDGETS_WHERE", "right").lower()
     MINI_HUD = on("JARVIS_MINI")
     ANIM_FPS = _int_env("JUNO_FPS", 30, 5, 60)
+    if LITE:
+        ANIM_FPS = min(ANIM_FPS, 15)
     CHAT_FIRST, CHAT_MUSIC = on("JUNO_CHAT_FIRST"), on("JUNO_CHAT_MUSIC")
     CHAT_EVERY = os.environ.get("JUNO_CHAT_EVERY", "normal").lower()
     CHAT_MINUTES, CHAT_DWELL = _int_env("JUNO_CHAT_MINUTES", 40, 3, 600), _int_env("JUNO_CHAT_DWELL", 0, 0, 120)

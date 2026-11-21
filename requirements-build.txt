@@ -1,3 +1,4 @@
 # Only needed to BUILD the installer (build.ps1 / the GitHub workflow), not to run Jarvis.
 pyinstaller>=6.10
 velopack>=1.2,<2
+pytest>=8                 # the test suite build.ps1 runs before every release

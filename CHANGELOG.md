@@ -3,6 +3,16 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.37
+
+- **Fixed: learning your voice never stuck.** He saved your voiceprint to a file his own start-up clean-up deleted every time he launched. It now lives in its own file. Say "Jarvis, learn my voice" once more after updating and it stays learned.
+- **Fixed: triggers firing for the wrong app.** A trigger for "SteamVR" also fired when Steam opened. App names now have to really match.
+- **"Undo that."** He takes back his last change: a file he moved, renamed, made, edited or deleted (he keeps a copy before deleting anything under 200 MB), or a setting he changed by voice, like his world or a widget. "What can you undo?" lists the recent ones. It works after a restart too.
+- **First-time tour.** New installs get a short guided setup after the key: check the mic (with a live level bar), what he should call you, learning your voice, and picking his world. "Run the setup again", or Settings > General > Help, shows it any time.
+- **Crash reports, only if you want them.** When something breaks, the details are saved on your PC. "Send a crash report" (or Settings > General > Help > Report a problem) opens a GitHub issue in your browser, already filled in and cleaned of your keys, names and email, for you to check and submit yourself. Nothing is ever sent by itself.
+- **Performance mode.** Settings > General > Starting up: Lite uses a lighter speech model, runs the desktop at 15 frames a second with no effects, and skips the ambient lines. Auto turns it on for PCs with under 8 GB of RAM or 4 or fewer CPU threads.
+- **A test suite.** 60 automatic checks now run before every release (tests folder). If any fail, the release stops, so a bug like 1.0.34's "every request crashes" can't reach you again. It already caught the two bugs above.
+
 ## 1.0.36
 
 - **Fixed: "something broke on my end" on every request (KeyError: 'automation').** The new automation tools from 1.0.34 were missing from the list he uses to offer extra tools, so every question crashed before reaching Claude. Fixed, and that list can no longer crash on a group it doesn't know.

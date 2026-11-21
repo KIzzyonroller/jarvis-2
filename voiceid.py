@@ -26,7 +26,7 @@ MODEL_URLS = [
     "https://huggingface.co/openspeech/wespeaker-models/resolve/main/voxceleb_resnet34_LM.onnx",
     "https://huggingface.co/chengdongliang/wespeaker/resolve/main/voxceleb_resnet34_LM.onnx",
 ]
-PRINT = "voiceprint.json"
+PRINT = "voice_id.json"          # NOT voiceprint.json: core deletes that old file at every start
 STRICT = {"relaxed": 0.30, "normal": 0.40, "strict": 0.52}
 MIN_SECS = 1.2
 
