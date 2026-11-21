@@ -67,3 +67,10 @@ def test_inline_scripts_in_html_parse(tmp_path):
             if r.returncode:
                 bad.append(f"{p.name} script #{i}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else 'syntax error'}")
     assert not bad, "\n".join(bad)
+
+
+def test_build_inputs_are_in_the_repo():
+    """The installer build needs these. 1.0.41's first build failed because assets/jarvis.ico wasn't in the repo."""
+    missing = [p for p in ("assets/jarvis.ico", "app_main.py", "jarvis.spec", "VERSION", "CHANGELOG.md", "ui/index.html",
+                           "jarvis_blender_bridge.py") if not (ROOT / p).exists()]
+    assert not missing, ("Missing from the repo (commit them in GitHub Desktop): " + ", ".join(missing))

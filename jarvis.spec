@@ -46,7 +46,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="Jarvis",
-    icon="assets/jarvis.ico",
+    icon="assets/jarvis.ico" if os.path.exists("assets/jarvis.ico") else None,   # missing icon: build anyway (tests warn)
     console=False,            # a window app: no black console (the log goes to Documents\Jarvis\logs)
     upx=False,                # compressed exes trip antivirus far more often
 )
