@@ -3924,6 +3924,19 @@ TOOL_SPECS = [
                            "desktop about their week, from you."),
     _spec("play_stats", "How long they've played today (days=1) or over N days, per game, and the wins/losses they "
                         "told you about.", {"days": N}),
+    _spec("what_he_knows", "Everything you keep about them (memories, their words, jokes, birthdays, routines, "
+                           "triggers, voiceprints, history, activity, screenshots text...). Use for 'what do you know "
+                           "about me'. show=true opens Settings > What he knows where they can edit or delete any of it.",
+          {"show": B}),
+    _spec("timeline", "What they were doing on a past day: 'this day last year', 'last tuesday', 'march 3rd', '3 weeks "
+                      "ago'. Pieces together conversations, apps used, games, journal. when: as they said it.",
+          {"when": S}, ["when"]),
+    _spec("habits", "Habits you've noticed that could be automated. suggest (offer one now), list (what you've "
+                    "noticed), reset (forget which ones you've asked about).",
+          {"action": {"type": "string", "enum": ["suggest", "list", "reset"]}}),
+    _spec("plugins", "Their plugins (extra skills as .py files in Documents\\Jarvis\\plugins). list; enable (file: asks "
+                     "them with an approval card, loads after a restart); disable (file); folder (open it).",
+          {"action": {"type": "string", "enum": ["list", "enable", "disable", "folder"]}, "file": S}),
     _spec("lingo", "Their own slang and nicknames, remembered for good. add (term, meaning: what it means to THEM, e.g. "
                    "'the squad' = 'Leo, Ana and Max, their Valorant group'); remove (term); list.",
           {"action": {"type": "string", "enum": ["add", "remove", "list"]}, "term": S, "meaning": S}, ["action"]),
@@ -4305,6 +4318,38 @@ def explain_tool():
                                "If something was a guess, say so.]")
 
 
+def register_plugin(spec, fn):
+    """plugins.py hands each approved plugin tool here. Always offered (no group): there are only a few."""
+    if spec["name"] in FUNCS:
+        print(f"[plugins] {spec['name']} clashes with a built-in tool; skipped")
+        return
+    TOOL_SPECS.append(spec)
+    FUNCS[spec["name"]] = fn
+
+
+def plugins_tool(action="list", file=None):
+    import plugins
+    return plugins.tool(action, file, confirm=_confirm)
+
+
+def timeline_tool(when="this day last year"):
+    import timeline
+    return timeline.recall(_VOICE_CORE, when)
+
+
+def habits_tool(action="suggest"):
+    import patterns
+    return patterns.tool(action)
+
+
+def what_he_knows_tool(show=True):
+    import knows
+    if show and _VOICE_CORE is not None:
+        _VOICE_CORE.emit({"type": "open_settings", "page": "knows"})
+        _VOICE_CORE.knows_view()
+    return knows.summary(_VOICE_CORE)
+
+
 def undo_tool(action="undo", steps=1):
     import undo
     return undo.listing() if (action or "").lower() == "list" else undo.undo(steps or 1)
@@ -4492,7 +4537,8 @@ FUNCS = {
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "stocks": stocks_tool, "desktop_scene": desktop_scene_tool,
-    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "undo": undo_tool, "lingo": lingo_tool, "explain": explain_tool, "clipboard_history": clipboard_history_tool,
+    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "undo": undo_tool, "plugins": plugins_tool, "timeline": timeline_tool,
+    "habits": habits_tool, "what_he_knows": what_he_knows_tool, "lingo": lingo_tool, "explain": explain_tool, "clipboard_history": clipboard_history_tool,
     "screenshots": screenshots_tool, "duplicates": duplicates_tool, "calculate": calculate_tool, "price_watch": price_watch_tool,
     "wind_down": wind_down_tool, "crash_report": crash_report_tool, "voice_id": voice_id_tool, "privacy": privacy_tool, "triggers": triggers_tool,
     "find": find_tool, "recipe_card": recipe_card, "jokes": jokes_tool, "weekly_letter": letter_tool, "play_stats": play_stats, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
@@ -4522,11 +4568,11 @@ TOOL_GROUPS = {
     "calendar_email": ["calendar", "email"],
     "discord_phone": ["discord", "phone"],
     "games": ["game_mode", "steam", "play_stats"],
-    "automation": ["triggers", "voice_id", "privacy"],
+    "automation": ["triggers", "voice_id", "privacy", "habits", "plugins"],
     "stocks": ["stocks"],
     "desktop": ["glass", "desk_widgets", "desktop_scene", "frame_rate", "corner_widget", "rgb", "voice_settings",
                 "lights", "track"],
-    "life": ["wind_down", "price_watch", "journal", "birthdays", "goodnight", "changelog", "speed_report", "recipe_card", "jokes", "weekly_letter"],
+    "life": ["timeline", "wind_down", "price_watch", "journal", "birthdays", "goodnight", "changelog", "speed_report", "recipe_card", "jokes", "weekly_letter"],
     "studio": ["blender", "blender_expert", "unreal_expert"],
     "apps": [],              # the user's own connectors (MCP tools, names with "__")
 }
@@ -4550,11 +4596,12 @@ GROUP_HINTS = {
     "life": r"\b(journal|diary|birthday|birthdays|goodnight|good night|bed|changelog|what'?s new|patch notes for you|"
             r"speed report|how fast|cook|cooking|recipe|dinner|lunch|breakfast|eat|food|fridge|ingredients?|gift|gifts|"
             r"present|joke|jokes|funny|remember that|letter|bedtime|bed|sleep|wind down|winding down|price|prices|"
-            r"drops?|cheaper|sale|deal|alert me|watch)\b",
+            r"drops?|cheaper|sale|deal|alert me|watch|last year|ago|that day|last (monday|tuesday|wednesday|thursday|"
+            r"friday|saturday|sunday|week|month)|what was i doing|what did i do|remember when)\b",
     "automation": r"\b(when i (open|launch|start|get back|come back)|every (day|morning|night|weekday|weekend|monday|"
                   r"tuesday|wednesday|thursday|friday|saturday|sunday)|at \d|trigger|triggers|automat\w*|my voice|"
                   r"only (listen|answer)|private mode|privacy|whisper|quiet mode|conversation mode|"
-                  r"keep listening|stop listening to)\b",
+                  r"keep listening|stop listening to|habit|habits|plugin|plugins|routine|suggest)\b",
     "studio": r"\b(blender|unreal|3d|model|mesh|render|sculpt|ue5)\b",
 }
 
@@ -4589,9 +4636,9 @@ def more_tools_spec(loaded):
     desc = {"media": "Spotify, YouTube, Netflix, Apple Music", "computer": "clipboard history, screenshot search, duplicate finder, files, commands, PC doctor, power, displays, "
             "mouse, camera, screen text, screen history", "calendar_email": "calendar and email", "discord_phone":
             "Discord and phone notifications", "games": "game mode, Steam, play time", "stocks": "stocks and markets",
-            "automation": "triggers and schedules, voice ID, private / whisper / conversation modes",
+            "automation": "triggers and schedules, habits to automate, plugins, voice ID, private / whisper / conversation modes",
             "desktop": "glass mode, desktop widgets and scene, RGB and smart lights, his voice settings", "life":
-            "bedtime wind-down, price watching, journal, birthdays and gift ideas, goodnight, recipes, inside jokes, the weekly letter, his changelog, speed report", "studio": "Blender and Unreal",
+            "past days (timeline), bedtime wind-down, price watching, journal, birthdays and gift ideas, goodnight, recipes, inside jokes, the weekly letter, his changelog, speed report", "studio": "Blender and Unreal",
             "apps": "the user's connected apps"}
     return {"name": "more_tools", "description": "Load more of your tools when the ones you have can't do the job. "
             "Groups: " + "; ".join(f"{g} ({desc.get(g, g)})" for g in rest) + ". They're available from your next step on.",

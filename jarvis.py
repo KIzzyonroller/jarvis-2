@@ -198,6 +198,13 @@ class Bridge:
     def whats_new(self):
         threading.Thread(target=self._core.whats_new, daemon=True).start()
 
+    def knows_view(self):
+        threading.Thread(target=self._core.knows_view, daemon=True).start()
+
+    def knows_act(self, section, action, item=None, value=None):
+        threading.Thread(target=self._core.knows_act, args=(str(section), str(action), None if item is None else str(item),
+                                                            None if value is None else str(value)), daemon=True).start()
+
     def onboard(self, step, value=None):
         threading.Thread(target=self._core.onboard_action, args=(str(step), value), daemon=True).start()
 

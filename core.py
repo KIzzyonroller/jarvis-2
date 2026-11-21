@@ -463,12 +463,22 @@ class Core:
             pricewatch.start(self)               # "tell me when that GPU drops under $400"
             import winddown
             winddown.start(self)                 # half an hour before bedtime
+            import patterns
+            patterns.start(self)                 # notices habits and offers to automate them (once each)
             import triggers
             triggers.start(self)                 # "when I open DBD..." / "every weekday at 8..."
             import comeback
             comeback.start(self)                 # "where did I leave off" + "when I get back" triggers
         except Exception as e:
             print(f"[whisper] off: {e}")
+        try:
+            import plugins
+            n = plugins.load(tools.register_plugin)  # only the ones you've approved, unchanged since
+            if n:
+                self._log(f"PLUGINS  [{n} TOOL{'S' if n != 1 else ''}]")
+            plugins.start_hooks(self)
+        except Exception as e:
+            print(f"[plugins] {e}")
         try:
             import stocks
             stocks.start(self)                   # the watchlist widget and big-move heads-ups (every 5 minutes)
@@ -2257,6 +2267,24 @@ class Core:
             return bool(self.history and self.history.search("", days=3650, limit=3))
         except Exception:
             return False
+
+    # ================================================================ Settings > What he knows
+    def knows_view(self):
+        import knows
+        import plugins
+        try:
+            pl = plugins.listing()
+        except Exception as e:
+            pl = []
+            print(f"[plugins] {e}")
+        self.emit({"type": "knows", "sections": knows.sections(self), "plugins": pl})
+
+    def knows_act(self, section, action, item=None, value=None):
+        import knows
+        msg = knows.act(self, section, action, item, value)
+        if msg:
+            self.emit({"type": "toast", "text": msg})
+        self.knows_view()
 
     def onboard_view(self, step="mic"):
         """The first-time tour: microphone, what to call you, your voice, his world. Re-run: 'run setup again'."""

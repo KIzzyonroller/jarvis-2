@@ -3,6 +3,13 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.40
+
+- **See everything he knows about you.** Settings > What he knows (or "what do you know about me?") lists every single thing he keeps: memories, your words, inside jokes, birthdays, routines, triggers, price watches, voiceprints, and how much conversation history, activity memory, screenshot text and play time he has. Change or delete any item, or wipe a whole section. It all lives on your PC in Documents\Jarvis and is never sent anywhere.
+- **"What was I doing on this day last year?"** Also "last Tuesday", "March 3rd", "three weeks ago". He pieces the day together from what you talked about, which apps you used, games you played and your journal, and says plainly when he has nothing for that day instead of inventing it.
+- **He learns your habits and offers to automate them.** If you ask for the same thing at about the same time on 4+ days ("market and weather" around 8), or always ask for the same thing right after opening a game, he offers once to do it by himself. Yes makes it a trigger; no means he never asks about that one again. At most one offer a day, never mid-game.
+- **Plugins.** Drop a .py file in Documents\Jarvis\plugins to give him new skills (there's an example and a README in that folder). New plugins are off until you approve them, and a plugin that changes is switched off until you approve it again, because plugins are real code. A plugin that crashes can't take him down with it. Settings > What he knows > Plugins.
+
 ## 1.0.39
 
 - **Cut in like you would with a person.** Start talking while he's mid-answer and he gets quieter straight away. "Wait, no...", "actually...", "hold on" or "I meant..." stops him, and he answers the new thing, knowing what he was in the middle of. Once he knows your voice, anything you say over him counts; other people and the TV can't cut him off. A cough or his own echo doesn't trigger it.

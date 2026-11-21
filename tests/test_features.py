@@ -274,3 +274,61 @@ def test_bilingual_prompt_and_rule(monkeypatch):
     monkeypatch.setattr(config, "LANGUAGE", "es-en")
     monkeypatch.setattr(config, "LANGUAGES", True)
     assert "Spanish and English" in langs.reply_rule()
+
+
+@pytest.mark.parametrize("text,want", [
+    ("this day last year", "2025-11-21"), ("yesterday", "2026-11-20"), ("last tuesday", "2026-11-17"),
+    ("3 weeks ago", "2026-10-31"), ("march 3rd", "2026-03-03"), ("december 25", "2025-12-25"), ("2024-07-04", "2024-07-04"),
+])
+def test_timeline_dates(text, want):
+    from datetime import date
+    import timeline
+    assert timeline.parse_day(text, today=date(2026, 11, 21)).isoformat() == want
+
+
+def test_habit_needs_four_days_at_a_similar_time():
+    from datetime import datetime
+    import patterns
+    asks = [(datetime(2026, 11, d, 8, m).timestamp(), "market and weather") for d, m in ((16, 2), (17, 10), (18, 5), (19, 20), (20, 1))]
+    asks += [(datetime(2026, 11, 16, 15, 0).timestamp(), "open spotify")]
+    hs = patterns.time_habits(asks)
+    assert len(hs) == 1 and hs[0]["do"] == "market and weather" and hs[0]["at"] == "08:00" and hs[0]["days"] == "weekdays"
+    assert patterns.time_habits(asks[:3]) == []
+
+
+def test_plugins_need_approval_and_switch_off_when_changed(tmp_path, monkeypatch):
+    import plugins
+    monkeypatch.setattr(config, "JARVIS_DIR", tmp_path)
+    plugins.LOADED.clear()
+    d = plugins.folder()
+    assert (d / "example_coin_flip.py").exists()
+    got = {}
+    reg = lambda spec, fn: got.__setitem__(spec["name"], fn)
+    assert plugins.load(reg) == 0                                    # off until approved
+    assert "Turned on" in plugins.enable("example_coin_flip.py", lambda t, dd: True)
+    assert plugins.load(reg) == 2
+    assert got["plugin_example_coin_flip_flip"](times=3).count(",") == 2
+    (d / "example_coin_flip.py").write_text((d / "example_coin_flip.py").read_text() + "\n# changed\n")
+    got.clear()
+    assert plugins.load(reg) == 0                                    # changed: off again
+    assert "Left it off" in plugins.enable("example_coin_flip.py", lambda t, dd: False)
+
+
+def test_plugin_crash_is_contained(tmp_path, monkeypatch):
+    import plugins
+    monkeypatch.setattr(config, "JARVIS_DIR", tmp_path)
+    run = plugins._guard("bad.py", lambda **k: 1 / 0)
+    assert "failed" in run()
+
+
+def test_what_he_knows_lists_and_deletes(tmp_path, monkeypatch):
+    import knows
+    import tools
+    monkeypatch.setattr(config, "JARVIS_DIR", tmp_path)
+    tools.remember("likes black coffee")
+    secs = knows.sections(None)
+    mem = next(s for s in secs if s["id"] == "memory")
+    assert mem["items"] and "black coffee" in mem["items"][0]["text"]
+    knows.act(None, "memory", "delete", mem["items"][0]["id"])
+    assert not next(s for s in knows.sections(None) if s["id"] == "memory")["items"]
+    assert "Everything I keep" in knows.summary(None)
