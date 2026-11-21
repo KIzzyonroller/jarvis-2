@@ -168,7 +168,7 @@ window.DeskWidgets = (() => {
   function drawDiscord() {
     if (!W.on.includes("discord") || !W.discord.length) { show("discord", false); return; }
     const b = body("discord"); b.replaceChildren();
-    W.discord.slice(-4).reverse().forEach((m) => { const r = h("div", "dm"); r.append(h("b", null, (m.src === "Phone" ? "📱 " : "") + m.who + (m.channel ? " · #" + m.channel : "")), h("em", null, ago(m.at)), h("p", null, m.text)); b.append(r); });
+    W.discord.slice(-4).reverse().forEach((m) => { const r = h("div", "dm"); r.append(h("b", null, (m.src === "Phone" ? "📱 " : "") + m.who + (m.channel ? " · #" + String(m.channel).replace(/^#+/, "") : "")), h("em", null, ago(m.at)), h("p", null, m.text)); b.append(r); });
     side("discord", ""); show("discord", true);
   }
 

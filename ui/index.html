@@ -408,9 +408,25 @@ body.booting #subs,body.booting #chips{display:none}
 .set-sec:last-child{border-bottom:0}
 .set-sec h3{font:500 15px var(--text);color:var(--ink);margin-bottom:8px}
 .set-sec h3 small{font-size:12.5px;color:var(--dim);font-weight:400;margin-left:8px}
-.fld{display:grid;grid-template-columns:minmax(150px,210px) 1fr;gap:4px 14px;align-items:center;margin-bottom:10px}
-.fld>label{font-size:13.5px;color:var(--ink)}
-.fld .help{grid-column:2;font-size:12.5px;line-height:1.4;color:var(--dim)}
+.fld{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,340px);grid-template-areas:"lab ctl" "help ctl";gap:3px 28px;
+  align-items:center;padding:12px 14px;margin:0 -14px;border-radius:10px;transition:background-color .15s}
+.fld:hover{background:rgba(var(--crgb),.035)}
+.fld>label{grid-area:lab;font-size:14px;color:var(--ink);font-weight:500;align-self:end}
+.fld .help{grid-area:help;font-size:12.5px;line-height:1.45;color:var(--dim);max-width:60ch;align-self:start}
+.fld .help:empty{display:none}
+.fld .ctl{grid-area:ctl}
+.fld.f-bool .ctl{justify-content:flex-end}
+.fld .tag{font-size:10.5px;font-weight:400;color:var(--dim);border:1px solid rgba(var(--crgb),.2);border-radius:99px;padding:1px 7px;margin-left:8px;vertical-align:2px}
+.fld .reset{height:28px;padding:0 9px;font-size:12px;color:var(--dim);border-radius:6px;white-space:nowrap}
+.fld .reset:hover{color:var(--ink);background:rgba(var(--crgb),.08)}
+.set-side{display:flex;flex-direction:column;min-height:0;border-right:1px solid rgba(var(--crgb),.14)}
+.set-q{display:block;padding:12px 10px 4px}
+.set-q input{width:100%;height:36px;padding:0 12px;font:14px var(--text);color:var(--ink);background:rgba(var(--crgb),.06);
+  border:1px solid rgba(var(--crgb),.18);border-radius:8px;outline:none}
+.set-q input:focus-visible{border-color:var(--c)}
+.set-q input::placeholder{color:var(--dim)}
+.set-sec h3 .go-page{float:right;font-size:12.5px}
+@media (max-width:820px){.fld{grid-template-columns:1fr;grid-template-areas:"lab" "ctl" "help"}.fld.f-bool .ctl{justify-content:flex-start}}
 .fld .help.err{color:var(--alarm)}
 .fld .ctl{display:flex;gap:6px;align-items:center;min-width:0}
 .fld input[type=text],.fld input[type=password],.fld select{flex:1;min-width:0;height:36px;padding:0 10px;font:14px var(--text);color:var(--ink);
@@ -425,7 +441,7 @@ body.booting #subs,body.booting #chips{display:none}
 .fld .sw{grid-row:auto;grid-column:auto}
 .sheet.wide{width:min(1060px,calc(100vw - 32px));height:min(86vh,880px)}
 .set-wrap{flex:1;display:grid;grid-template-columns:232px minmax(0,1fr);min-height:0}
-.set-nav{border-right:1px solid rgba(var(--crgb),.14);padding:10px 8px;overflow:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin}
+.set-nav{flex:1;min-height:0;padding:6px 8px 10px;overflow:auto;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin}
 .set-nav button{text-align:left;padding:9px 12px 9px 14px;font-size:14px;color:var(--dim);border-left:2px solid transparent;line-height:1.25}
 .set-nav button small{display:block;font-size:11.5px;color:var(--dim);opacity:.8;margin-top:2px}
 .set-nav button:hover{color:var(--ink)}
@@ -779,7 +795,10 @@ body.swap #stage{animation:swap .6s steps(6)}
   <div class="sheet wide">
     <header><h2 id="set-title">Settings</h2><button id="set-x" aria-label="Close settings">×</button></header>
     <div class="set-wrap">
-      <nav class="set-nav" id="set-nav" aria-label="Settings pages"></nav>
+      <div class="set-side">
+        <label class="set-q"><span class="sr">Search settings</span><input id="set-q" type="search" placeholder="Search settings" autocomplete="off" spellcheck="false"></label>
+        <nav class="set-nav" id="set-nav" aria-label="Settings pages"></nav>
+      </div>
       <div class="body" id="set-body"></div>
     </div>
     <footer><p id="set-msg" role="status"></p><button id="set-cancel">Close</button><button class="go" id="set-save" disabled>Save and restart</button></footer>
@@ -2384,7 +2403,7 @@ function mk(tag, props, ...kids) {
 }
 function openSettings() {
   S.dirty = {}; S.clear.clear(); S.closeArmed = false;
-  $("#set-body").textContent = ""; $("#set-msg").textContent = "Loading...";
+  $("#set-body").textContent = ""; $("#set-msg").textContent = "Loading..."; $("#set-q").value = "";
   $("#settings").hidden = false; call("settings_view");
 }
 function closeSettings(force) {
@@ -2398,11 +2417,19 @@ function setDirty(row, key, value) {
   S.dirty[key] = value; S.closeArmed = false; row.classList.add("dirty");
   const f = S.fields.find((x) => x.key === key); const nb = f && [...$("#set-nav").children][PAGES.findIndex((p) => p.id === f.page)]; if (nb) nb.classList.add("dirty");
   const h = row.querySelector(".help"); if (h) { h.classList.remove("err"); h.textContent = h.dataset.help || ""; }
-  $("#set-save").disabled = false; $("#set-msg").textContent = "";
+  const rs = row.querySelector(".reset"); if (rs && f) rs.hidden = f.default == null || String(value) === String(f.default);
+  $("#set-save").disabled = false; $("#set-msg").textContent = ""; saveLabel();
+}
+// "Save" when everything you changed applies straight away, "Save and restart" when something needs a restart
+function saveLabel() {
+  const keys = [...Object.keys(S.dirty), ...S.clear];
+  const restart = keys.some((k) => { const f = S.fields.find((x) => x.key === k); return !f || !f.live; });
+  $("#set-save").textContent = keys.length && !restart ? "Save" : "Save and restart";
+  $("#set-save").title = restart ? "Some of what you changed only takes effect after he restarts (a few seconds)." : "";
 }
 function fieldRow(f) {
-  const id = "f-" + f.key, row = mk("div", { class: "fld", "data-key": f.key });
-  row.appendChild(mk("label", { for: id, text: f.label }));
+  const id = "f-" + f.key, row = mk("div", { class: "fld f-" + f.kind, "data-key": f.key });
+  row.appendChild(mk("label", { for: id }, f.label, f.live || f.kind === "secret" ? null : mk("span", { class: "tag", text: "restart", title: "Takes effect after he restarts" })));
   const ctl = mk("div", { class: "ctl" });
   if (f.kind === "secret") {
     const inp = mk("input", { id, type: "password", autocomplete: "new-password", spellcheck: "false",
@@ -2429,6 +2456,12 @@ function fieldRow(f) {
     const inp = mk("input", { id, type: "text", value: (f.key in S.dirty ? S.dirty[f.key] : f.value) || "", spellcheck: "false", class: /ID|HOST/.test(f.key) ? "mono" : "",
       inputmode: f.kind === "number" ? "decimal" : null });
     inp.addEventListener("input", () => setDirty(row, f.key, inp.value)); ctl.append(inp);
+  }
+  if (f.kind !== "secret" && f.default != null) {                       // back to how he came
+    const cur = f.key in S.dirty ? S.dirty[f.key] : f.value;
+    const rs = mk("button", { class: "reset", type: "button", text: "Default", title: "Put this back to how he came", hidden: String(cur) === String(f.default) });
+    rs.onclick = () => { setDirty(row, f.key, f.default); const fresh = fieldRow(f); row.replaceWith(fresh); fresh.classList.add("dirty"); };
+    ctl.append(rs);
   }
   row.appendChild(ctl);
   row.appendChild(mk("p", { class: "help", text: f.help || "", "data-help": f.help || "" }));
@@ -2462,8 +2495,25 @@ function voiceSection() {
   wrap.appendChild(slider("Pitch", "pitch", v.pitch, cur.pitch));
   return wrap;
 }
+function searchHits(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const text = (f) => [f.label, f.help, f.section, ...(f.options || []).map((o) => o.label)].join(" ").toLowerCase();
+  return S.fields.filter((f) => { const t = text(f); return words.every((w) => t.includes(w)); });
+}
+function renderSearch(q) {
+  const body = $("#set-body"); body.textContent = "";
+  const hits = searchHits(q);
+  body.appendChild(mk("div", { class: "set-page" }, mk("h3", { text: hits.length ? `${hits.length} result${hits.length === 1 ? "" : "s"}` : "Nothing found" }),
+    mk("p", { text: hits.length ? `Settings that mention “${q}”. Change them right here.` : "Try another word, or ask him: “Jarvis, turn off the screensaver” works too." })));
+  const byPage = {};
+  hits.slice(0, 60).forEach((f) => (byPage[f.page] = byPage[f.page] || []).push(f));
+  PAGES.filter((p) => byPage[p.id]).forEach((p) => body.appendChild(mk("section", { class: "set-sec" },
+    mk("h3", {}, p.label, mk("button", { type: "button", class: "link go-page", text: "Open page", onclick: () => { $("#set-q").value = ""; S.page = p.id; renderSettings(); } })),
+    byPage[p.id].map(fieldRow))));
+}
 function renderSettings() {
   if (!PAGES.some((p) => p.id === S.page)) S.page = "general";
+  const q = ($("#set-q").value || "").trim();
   const nav = $("#set-nav"); nav.textContent = "";
   const dirtyPages = new Set(S.fields.filter((f) => f.key in S.dirty || S.clear.has(f.key)).map((f) => f.page));
   PAGES.forEach((p) => {
@@ -2471,6 +2521,8 @@ function renderSettings() {
     b.onclick = () => { S.page = p.id; store.set("set-page", p.id); if (p.id === "arrange") call("arrange_view"); if (p.id === "knows") call("knows_view"); renderSettings(); $("#set-body").scrollTop = 0; };
     nav.appendChild(b);
   });
+  saveLabel();
+  if (q.length > 1) { nav.querySelectorAll("button").forEach((b) => b.removeAttribute("aria-current")); renderSearch(q); return; }
   const page = PAGES.find((p) => p.id === S.page), body = $("#set-body"); body.textContent = "";
   body.appendChild(mk("div", { class: "set-page" }, mk("h3", { text: page.label }), mk("p", { text: page.intro })));
   (EXTRAS[page.id] || (() => []))().forEach((n) => body.appendChild(n));
@@ -2646,6 +2698,11 @@ const EXTRAS = {
         : [mk("p", { class: "note", text: "None yet. Say “Jarvis, you can work in my Game Project folder”. He asks you to confirm first." })]))],
 };
 $("#set-x").onclick = () => closeSettings(); $("#set-cancel").onclick = () => closeSettings();
+{ let qt = 0; $("#set-q").addEventListener("input", () => { clearTimeout(qt); qt = setTimeout(() => { renderSettings(); $("#set-body").scrollTop = 0; }, 120); }); }
+$("#settings").addEventListener("keydown", (e) => {                     // Ctrl+F or / jumps to the search box
+  if ((e.ctrlKey && e.key.toLowerCase() === "f") || (e.key === "/" && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))) { e.preventDefault(); $("#set-q").focus(); $("#set-q").select(); }
+  else if (e.key === "Escape" && e.target === $("#set-q") && $("#set-q").value) { e.preventDefault(); e.stopPropagation(); $("#set-q").value = ""; renderSettings(); }
+});
 $("#set-save").onclick = () => {
   $("#set-save").disabled = true; $("#set-msg").textContent = S.dirty.ANTHROPIC_API_KEY ? "Checking the Claude key..." : "Saving...";
   call("save_settings", S.dirty, [...S.clear]);

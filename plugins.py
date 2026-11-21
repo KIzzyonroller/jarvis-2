@@ -23,7 +23,7 @@ Safety, because a plugin is real code that runs on your PC:
   * New plugins are OFF until you turn them on. Turning one on shows an approval card with its file and what it
     says it does.
   * If the file changes after you approved it, it's switched off again until you approve the new version.
-  * Only install plugins from people you trust, or ones you've read. Settings > What he can use > Plugins.
+  * Only install plugins from people you trust, or ones you've read. Settings > What he knows > Plugins.
   * A plugin that crashes is switched off and reported; it can't take him down with it.
 """
 import hashlib
@@ -41,7 +41,7 @@ ERRORS = {}
 _TYPES = {"string": "string", "str": "string", "integer": "integer", "int": "integer", "number": "number",
           "float": "number", "boolean": "boolean", "bool": "boolean"}
 EXAMPLE = '''"""
-An example Jarvis plugin. It's OFF until you turn it on in Settings > What he can use > Plugins.
+An example Jarvis plugin. It's OFF until you turn it on in Settings > What he knows > Plugins.
 Copy this file to make your own: TOOLS lists what Claude can call. See the README in this folder.
 """
 NAME = "Coin flip and dice"
@@ -70,7 +70,7 @@ TOOLS = [
 README = """Jarvis plugins
 ===============
 
-Put a .py file here and turn it on in Jarvis: Settings > What he can use > Plugins.
+Put a .py file here and turn it on in Jarvis: Settings > What he knows > Plugins.
 
 A plugin needs:
   NAME   a short name

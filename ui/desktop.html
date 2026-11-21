@@ -119,6 +119,29 @@ body.focusing #widgets-free{opacity:.15}
 .dm em{font-style:normal;font-size:10.5px;color:var(--dim)}
 .dm p{grid-column:1/-1;margin:0;font-size:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 @media (prefers-reduced-motion:reduce){.wd{animation:none}}
+/* 1.0.43: widgets wear the world they're on, like his pop-up panels do. A solid, blurred backing so the scene
+   never shows through the text; the header in the world's own type; no scanlines or glow on the quiet worlds. */
+.wd{--wr:4px;--wph:var(--display);background:var(--panel);border:1px solid var(--border);border-radius:var(--wr);
+  box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(14px) saturate(1.15);overflow:hidden}
+.wd::before{display:none}
+.wd .wh{height:34px;padding:0 14px;border-bottom:1px solid rgba(var(--crgb),.14);font:500 13px/1 var(--wph);letter-spacing:.02em;color:var(--c)}
+.wd .wh i{display:none}
+.wd .wh span{font-size:11.5px}
+.wd .wb{padding:12px 14px 14px;font-size:13px;line-height:1.45;font-variant-numeric:tabular-nums}
+body[data-style=sheet] .wd{--wr:2px;--wph:"IBM Plex Mono","Cascadia Mono",Consolas,monospace;
+  background:linear-gradient(var(--panel),var(--panel)),repeating-linear-gradient(0deg,transparent 0 31px,rgba(var(--crgb),.06) 31px 32px);
+  outline:1px solid rgba(var(--crgb),.18);outline-offset:3px}
+body[data-style=sheet] .wd .wh{text-transform:uppercase;letter-spacing:.12em;font-size:11.5px}
+body[data-style=module] .wd{--wr:0;--wph:"Chakra Petch","Bahnschrift",sans-serif;border-top:3px solid var(--c);
+  clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,0 100%)}
+body[data-style=module] .wd .wh{text-transform:uppercase;letter-spacing:.14em;font-size:12px}
+body[data-style=card] .wd{--wr:14px;--wph:"Cormorant Garamond",Georgia,serif}
+body[data-style=card] .wd .wh{font-size:19px;font-style:italic;font-weight:600;border-bottom:0;height:38px}
+body[data-style=scope] .wd{--wr:10px;--wph:"Cascadia Mono",Consolas,monospace;text-shadow:0 0 .4em rgba(var(--crgb),.3);
+  background:radial-gradient(120% 120% at 50% 20%,rgba(var(--crgb),.07),transparent 60%),var(--panel)}
+body[data-style=legend] .wd{--wr:3px;--wph:"Fraunces",Georgia,serif;outline:1px solid rgba(var(--crgb),.25);outline-offset:-6px}
+body[data-style=legend] .wd .wh{font-style:italic;font-size:16px}
+body.calm .wd{backdrop-filter:none}
 
 .hp{position:absolute;width:var(--w,270px);max-height:196px;overflow:hidden;color:var(--ink);
   background:linear-gradient(180deg,rgba(var(--crgb),.11),rgba(var(--vrgb),.82) 46%);

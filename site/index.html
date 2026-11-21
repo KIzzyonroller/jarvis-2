@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="en" data-world="station" class="boot">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<meta property="og:image" content="img/greenhouse-1.jpg">
+<title>Jarvis for Windows</title>
+<meta name="description" content="A voice assistant for your Windows PC that lives on your desktop, does real work, and only listens when you say his name. Free.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=Instrument+Sans:wdth,wght@75..100,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one site, six worlds. The world switcher re-themes every page to the scene Jarvis is living in.
+   Drafting-plate details (figure numbers, title blocks, dimension lines) are content, borrowed from his desktop. */
+:root{
+  --bg:#0b1622; --panel:#102233; --line:#24405a; --acc:#8cc4f0; --acc-rgb:140,196,240;
+  --ink:#eaf0ee; --mute:#93a4a6; --up:#2fd27a; --down:#ff4d5e; --warn:#f2b84b;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --ease:cubic-bezier(.2,.7,.1,1);
+  color-scheme:dark;
+}
+html[data-world="station"]{--bg:#070b16;--panel:#0e1526;--line:#22304a;--acc:#7fe0ff;--acc-rgb:127,224,255}
+html[data-world="archive"]{--bg:#140e09;--panel:#1f1610;--line:#3d2c1d;--acc:#e9b46a;--acc-rgb:233,180,106;--mute:#a89a88}
+html[data-world="signal"]{--bg:#07120d;--panel:#0d1c15;--line:#1f3a2c;--acc:#6ee69a;--acc-rgb:110,230,154;--mute:#8fa597}
+html[data-world="chart"]{--bg:#091616;--panel:#0f2322;--line:#234140;--acc:#d8c77a;--acc-rgb:216,199,122;--mute:#97a7a3}
+html[data-world="greenhouse"]{--bg:#060f0b;--panel:#0d1a14;--line:#1f3a2c;--acc:#ffc46b;--acc-rgb:255,196,107;--mute:#9fbfa9}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.6 var(--body);transition:background .8s var(--ease);
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  background-image:linear-gradient(rgba(var(--acc-rgb),.045) 1px,transparent 1px),linear-gradient(90deg,rgba(var(--acc-rgb),.045) 1px,transparent 1px);
+  background-size:48px 48px;mask-image:linear-gradient(#000,transparent 85%)}
+img{max-width:100%;display:block}
+a{color:var(--acc)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:2px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.02;font-weight:800}
+h1{font-size:clamp(46px,7.4vw,108px);font-stretch:112%;letter-spacing:-.025em}
+h2{font-size:clamp(34px,4.6vw,62px);font-stretch:108%;letter-spacing:-.02em}
+h3{font-size:22px;font-stretch:100%;font-weight:700;line-height:1.2}
+p{margin:0}
+.wrap{width:min(1240px,100% - 40px);margin-inline:auto;position:relative;z-index:1}
+.lede{font-size:clamp(18px,1.6vw,21px);color:var(--mute);max-width:56ch}
+.fig{font:500 12px/1.4 var(--mono);color:var(--mute);letter-spacing:.02em}
+.fig b{color:var(--acc);font-weight:500}
+section{padding:96px 0;position:relative}
+.sec-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:28px 48px;align-items:end;margin-bottom:48px}
+.sec-head .fig{grid-column:1/-1}
+@media (max-width:820px){.sec-head{grid-template-columns:1fr}}
+
+/* ------------------------------------------------ header */
+header{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);background:color-mix(in srgb,var(--bg) 78%,transparent);
+  border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);transition:background .8s}
+.bar{display:flex;align-items:center;gap:24px;height:66px}
+.mark{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font:900 21px/1 var(--display);font-stretch:125%;letter-spacing:.06em}
+.mark svg{width:28px;height:28px}
+nav{display:flex;gap:4px;margin-left:auto}
+nav a{color:var(--mute);text-decoration:none;font-size:15px;padding:8px 12px;border-radius:6px;transition:color .2s,background .2s}
+nav a:hover{color:var(--ink)}
+nav a[aria-current="page"]{color:var(--ink);background:rgba(var(--acc-rgb),.12)}
+.btn{display:inline-flex;align-items:center;gap:10px;font:700 16px/1 var(--body);text-decoration:none;border-radius:8px;padding:14px 20px;
+  border:1px solid transparent;cursor:pointer;transition:transform .2s var(--ease),background .3s,box-shadow .3s}
+.btn.primary{background:var(--acc);color:var(--bg);box-shadow:0 8px 30px -10px rgba(var(--acc-rgb),.7)}
+.btn.primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px -12px rgba(var(--acc-rgb),.9)}
+.btn.ghost{border-color:var(--line);color:var(--ink);background:transparent}
+.btn.ghost:hover{border-color:var(--acc)}
+.btn.small{padding:10px 14px;font-size:14px}
+.menu-btn{display:none;background:none;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:8px 10px;font:600 14px var(--body)}
+@media (max-width:1180px){
+  nav{position:absolute;top:66px;left:0;right:0;flex-direction:column;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 20px 18px;display:none}
+  nav.open{display:flex}
+  .menu-btn{display:block;margin-left:auto}
+  .bar .btn.small{display:none}
+}
+
+/* ------------------------------------------------ world switcher */
+.worlds{display:flex;gap:6px;align-items:center}
+.worlds button{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);cursor:pointer;padding:0;position:relative;transition:transform .2s}
+.worlds button::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--sw)}
+.worlds button[aria-pressed="true"]{border-color:var(--ink);transform:scale(1.15)}
+.worlds button:hover{transform:scale(1.15)}
+
+/* ------------------------------------------------ pages */
+.page{display:none}
+.page.on{display:block;animation:pagein .6s var(--ease)}
+@keyframes pagein{from{opacity:.0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ------------------------------------------------ hero */
+.hero{padding:72px 0 40px}
+.hero-grid{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.25fr);gap:56px;align-items:center}
+@media (max-width:1000px){.hero-grid{grid-template-columns:1fr}}
+.hero h1 .say{color:var(--acc);font-stretch:62%;font-weight:300;letter-spacing:-.01em}
+.hero .lede{margin:26px 0 34px}
+.ctas{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.ctas .fig{flex-basis:100%;margin-top:6px}
+
+.monitor{position:relative;border-radius:14px;padding:10px;background:linear-gradient(160deg,color-mix(in srgb,var(--panel) 90%,#fff 6%),var(--panel));
+  border:1px solid var(--line);box-shadow:0 40px 90px -30px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.02) inset}
+.screen{position:relative;aspect-ratio:16/9;border-radius:7px;overflow:hidden;background:#000}
+.screen img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:opacity 1.1s var(--ease),transform 6s linear}
+.screen img.ans{opacity:0}
+.screen.answering img.ans{opacity:1}
+.screen.answering img.idle{opacity:0}
+.say-bar{position:absolute;left:14px;right:14px;bottom:14px;display:flex;gap:12px;align-items:center;padding:10px 14px;border-radius:10px;
+  background:rgba(4,8,12,.72);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.08);font-size:14px;min-height:46px}
+.say-bar canvas{width:64px;height:26px;flex:none}
+.say-bar .who{font:500 11px var(--mono);color:var(--acc);flex:none;width:44px}
+.say-bar .txt{color:#e9eef0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.say-bar .txt::after{content:"";display:inline-block;width:2px;height:1em;background:var(--acc);margin-left:2px;vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.monitor .stand{width:22%;height:16px;margin:0 auto -26px;background:linear-gradient(var(--line),transparent);clip-path:polygon(18% 0,82% 0,100% 100%,0 100%)}
+.monitor .cap{position:absolute;right:16px;top:-28px}
+
+/* ------------------------------------------------ stats strip */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);border-block:1px solid var(--line)}
+.stats div{padding:24px 18px;border-right:1px solid var(--line)}
+.stats div:last-child{border-right:0}
+.stats b{display:block;font:800 clamp(30px,3.4vw,46px)/1 var(--display);font-stretch:80%;color:var(--ink);font-variant-numeric:tabular-nums}
+.stats span{font-size:14px;color:var(--mute);display:block;margin-top:6px;line-height:1.35}
+@media (max-width:900px){.stats{grid-template-columns:repeat(3,1fr)}.stats div:nth-child(3){border-right:0}.stats div:nth-child(-n+3){border-bottom:1px solid var(--line)}}
+@media (max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}.stats div{border-right:0!important;border-bottom:1px solid var(--line)}}
+
+/* ------------------------------------------------ pipeline infographic */
+.pipe{position:relative;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--panel) 60%,transparent);padding:28px}
+.pipe svg{width:100%;height:auto;display:block}
+.pipe .node rect{fill:var(--panel);stroke:var(--line)}
+.pipe .node.cloud rect{stroke-dasharray:5 4}
+.pipe .node.hot rect{stroke:var(--acc)}
+.pipe text{fill:var(--ink);font:600 15px var(--body)}
+.pipe text.sub{fill:var(--mute);font:400 12.5px var(--body)}
+.pipe text.k{fill:var(--acc);font:500 11px var(--mono)}
+.pipe path.wire{fill:none;stroke:var(--line);stroke-width:2}
+.pipe path.flow{fill:none;stroke:var(--acc);stroke-width:2;stroke-dasharray:6 12;animation:flow 1.6s linear infinite}
+.pipe path.drop{fill:none;stroke:var(--mute);stroke-width:1.5;stroke-dasharray:2 5}
+@keyframes flow{to{stroke-dashoffset:-36}}
+.pipe .zone{fill:rgba(var(--acc-rgb),.05);stroke:rgba(var(--acc-rgb),.35);stroke-dasharray:3 5}
+.legend{display:flex;flex-wrap:wrap;gap:18px 28px;margin-top:18px;font-size:14px;color:var(--mute)}
+.legend i{display:inline-block;width:26px;height:0;border-top:2px solid var(--acc);vertical-align:middle;margin-right:8px}
+.legend i.d{border-top:2px dashed var(--mute)}
+.legend i.z{height:12px;border:1px dashed rgba(var(--acc-rgb),.5);background:rgba(var(--acc-rgb),.06);border-top-style:dashed}
+
+/* ------------------------------------------------ highlight rows */
+.rows{display:flex;flex-direction:column;gap:96px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:56px;align-items:center}
+.row:nth-child(even) .copy{order:2}
+@media (max-width:900px){.row{grid-template-columns:1fr}.row:nth-child(even) .copy{order:0}}
+.copy h2{font-size:clamp(30px,3.4vw,46px);margin:12px 0 18px}
+.copy ul{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:10px}
+.copy li{padding-left:26px;position:relative;color:var(--ink)}
+.copy li::before{content:"";position:absolute;left:0;top:.62em;width:14px;height:1px;background:var(--acc)}
+.copy li span{color:var(--mute)}
+.shot{border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 70px -30px rgba(0,0,0,.8);position:relative}
+.shot img{width:100%}
+.shot .fig{position:absolute;left:12px;bottom:10px;background:rgba(0,0,0,.6);padding:4px 8px;border-radius:4px;color:#d9e2e2}
+
+/* live ticker card */
+.tick{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:22px;display:grid;gap:14px}
+.tick .top{display:flex;justify-content:space-between;align-items:baseline}
+.tick .sym{font:700 15px var(--body)}
+.tick .live{font:500 10px var(--mono);border:1px solid var(--down);color:var(--down);padding:2px 6px;border-radius:3px}
+.tick .px{font:300 54px/1 var(--display);font-stretch:70%;font-variant-numeric:tabular-nums;transition:color .4s}
+.tick .px.up{color:var(--up)}.tick .px.down{color:var(--down)}
+.tick .chg{font:500 14px var(--mono)}
+.tick canvas{width:100%;height:120px}
+.tape{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 14px;font:400 11.5px var(--mono);color:var(--mute);font-variant-numeric:tabular-nums}
+.tape .u{color:var(--up)}.tape .d{color:var(--down)}
+
+/* file cards */
+.files{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.file{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:16px;min-height:150px;display:flex;flex-direction:column;gap:10px;transition:transform .3s var(--ease),border-color .3s}
+.file:hover{transform:translateY(-4px);border-color:var(--acc)}
+.file .ext{font:600 11px var(--mono);color:var(--bg);background:var(--acc);border-radius:3px;padding:3px 6px;align-self:flex-start}
+.file b{font-size:15px;line-height:1.3}
+.file .lines{display:grid;gap:5px;margin-top:auto}
+.file .lines i{display:block;height:5px;border-radius:3px;background:var(--line)}
+.file .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:auto}
+.file .grid i{height:12px;background:var(--line);border-radius:1px}
+.file .grid i.h{background:rgba(var(--acc-rgb),.45)}
+.file .slide{margin-top:auto;aspect-ratio:16/9;border:1px solid var(--line);border-radius:4px;display:grid;place-items:center;font:700 13px var(--display);color:var(--mute)}
+
+/* trigger card */
+.trig{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.trig .say{padding:18px 20px;border-bottom:1px solid var(--line);font-size:18px}
+.trig .say q{quotes:"\201C" "\201D"}
+.trig ol{list-style:none;margin:0;padding:10px 20px 20px;display:grid;gap:0}
+.trig li{display:grid;grid-template-columns:22px 1fr auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px dashed var(--line);font-size:15px}
+.trig li:last-child{border-bottom:0}
+.trig li .dot{width:10px;height:10px;border-radius:50%;background:var(--line);justify-self:center;transition:background .3s,box-shadow .3s}
+.trig li.done .dot{background:var(--up);box-shadow:0 0 10px var(--up)}
+.trig li em{font:500 11px var(--mono);color:var(--mute);font-style:normal}
+
+/* ------------------------------------------------ day timeline infographic */
+.day{position:relative;border:1px solid var(--line);border-radius:14px;padding:34px 28px 26px;background:color-mix(in srgb,var(--panel) 55%,transparent);overflow-x:auto}
+.day-track{position:relative;min-width:980px;height:300px}
+.day-axis{position:absolute;left:0;right:0;top:150px;height:2px;background:var(--line)}
+.day-sun{position:absolute;top:150px;left:0;right:0;height:120px;transform:translateY(-100%)}
+.day-sun svg{width:100%;height:100%}
+.ev{position:absolute;width:150px;transform:translateX(-50%);font-size:13.5px;line-height:1.35}
+.ev::before{content:"";position:absolute;left:50%;width:1px;background:var(--line)}
+.ev.up{bottom:162px}.ev.up::before{top:100%;height:12px}
+.ev.dn{top:162px}.ev.dn::before{bottom:100%;height:12px}
+.ev b{display:block;font:500 11px var(--mono);color:var(--acc);margin-bottom:3px}
+.ev span{color:var(--mute)}
+.ev .pin{position:absolute;left:50%;width:11px;height:11px;border-radius:50%;background:var(--bg);border:2px solid var(--acc);transform:translateX(-50%)}
+.ev.up .pin{top:calc(100% + 6px)}.ev.dn .pin{bottom:calc(100% + 6px)}
+.hours{position:absolute;top:158px;left:0;right:0;font:400 10.5px var(--mono);color:var(--mute)}
+.hours span{position:absolute;transform:translateX(-50%)}
+
+/* ------------------------------------------------ worlds */
+.wtabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
+.wtabs button{font:600 15px var(--body);color:var(--mute);background:transparent;border:1px solid var(--line);padding:10px 16px;border-radius:999px;cursor:pointer;transition:all .25s}
+.wtabs button[aria-selected="true"]{color:var(--bg);background:var(--acc);border-color:var(--acc)}
+.compare{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;border:1px solid var(--line);user-select:none;touch-action:pan-y;cursor:ew-resize;background:#000}
+.compare img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.compare .after{clip-path:inset(0 0 0 var(--cut,50%))}
+.compare .handle{position:absolute;top:0;bottom:0;left:var(--cut,50%);width:2px;background:var(--acc);transform:translateX(-1px);box-shadow:0 0 18px rgba(var(--acc-rgb),.8)}
+.compare .handle::after{content:"\2194";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:42px;height:42px;border-radius:50%;
+  background:var(--acc);color:var(--bg);display:grid;place-items:center;font:700 18px var(--body)}
+.compare .tag{position:absolute;top:12px;font:500 11.5px var(--mono);background:rgba(0,0,0,.65);color:#e2e8e8;padding:5px 9px;border-radius:4px}
+.compare .tag.l{left:12px}.compare .tag.r{right:12px}
+.compare input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:ew-resize;margin:0}
+.wmeta{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;margin-top:26px}
+.wmeta h3{font-size:32px;font-stretch:110%;margin-bottom:10px}
+.wmeta dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:8px 18px;font-size:15px}
+.wmeta dt{color:var(--mute)}
+.wmeta dd{margin:0}
+@media (max-width:760px){.wmeta{grid-template-columns:1fr}}
+.thumbs{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:28px}
+.thumbs button{padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;background:none;position:relative;transition:transform .25s var(--ease),border-color .25s}
+.thumbs button:hover{transform:translateY(-3px)}
+.thumbs button[aria-pressed="true"]{border-color:var(--acc)}
+.thumbs span{position:absolute;left:8px;bottom:6px;font:600 12px var(--body);color:#fff;text-shadow:0 1px 6px #000}
+
+/* ------------------------------------------------ feature catalogue */
+.cat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+@media (max-width:980px){.cat{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:620px){.cat{grid-template-columns:1fr}}
+.cat article{background:var(--bg);padding:28px 26px;transition:background .3s}
+.cat article:hover{background:color-mix(in srgb,var(--panel) 70%,var(--bg))}
+.cat h3{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.cat h3 small{font:500 11px var(--mono);color:var(--acc)}
+.cat ul{margin:0;padding:0;list-style:none;display:grid;gap:11px;font-size:15.5px}
+.cat li b{font-weight:600}
+.cat li span{color:var(--mute)}
+
+/* diagnostics infographic */
+.diag{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:44px;align-items:center}
+@media (max-width:900px){.diag{grid-template-columns:1fr}}
+.ck{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:22px}
+.ck-sum{display:flex;gap:26px;margin-bottom:16px}
+.ck-sum b{font:300 46px/1 var(--display);font-stretch:70%;display:block}
+.ck-sum span{font-size:13px;color:var(--mute)}
+.ck-sum .p b{color:var(--up)}.ck-sum .w b{color:var(--warn)}.ck-sum .f b{color:var(--down)}
+.ck ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:7px 18px;font-size:14px}
+@media (max-width:520px){.ck ul{grid-template-columns:1fr}}
+.ck li{display:flex;gap:9px;align-items:center;opacity:.25;transition:opacity .35s}
+.ck li.in{opacity:1}
+.ck li i{width:8px;height:8px;border-radius:50%;background:var(--up);flex:none}
+.ck li.w i{background:var(--warn)}
+.ck li small{margin-left:auto;color:var(--mute);font:400 11px var(--mono)}
+
+/* ------------------------------------------------ pricing */
+.plans{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;max-width:980px}
+@media (max-width:760px){.plans{grid-template-columns:1fr}}
+.plan{border:1px solid var(--line);border-radius:16px;padding:34px 30px;background:var(--panel);display:flex;flex-direction:column;gap:18px;position:relative}
+.plan.sup{border-color:var(--acc);background:linear-gradient(170deg,rgba(var(--acc-rgb),.12),var(--panel) 45%)}
+.plan .name{font:700 15px var(--body);color:var(--mute)}
+.plan .price{display:flex;align-items:baseline;gap:8px}
+.plan .price b{font:800 76px/1 var(--display);font-stretch:75%;font-variant-numeric:tabular-nums}
+.plan .price span{color:var(--mute)}
+.plan ul{list-style:none;margin:0;padding:0;display:grid;gap:10px;font-size:15.5px}
+.plan li{display:grid;grid-template-columns:18px 1fr;gap:10px}
+.plan li::before{content:"";width:10px;height:6px;border-left:2px solid var(--acc);border-bottom:2px solid var(--acc);transform:rotate(-45deg);margin-top:.45em}
+.plan .btn{justify-content:center;margin-top:auto}
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:4px;gap:4px;margin-bottom:28px}
+.toggle button{font:600 14px var(--body);border:0;background:none;color:var(--mute);padding:8px 16px;border-radius:999px;cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--acc);color:var(--bg)}
+.note{font-size:14px;color:var(--mute)}
+.badge{position:absolute;top:-12px;right:22px;font:600 12px var(--body);background:var(--acc);color:var(--bg);padding:5px 10px;border-radius:999px}
+
+/* who you pay */
+.pay{border:1px solid var(--line);border-radius:14px;padding:28px;background:color-mix(in srgb,var(--panel) 55%,transparent)}
+.pay svg{width:100%;height:auto}
+.pay text{fill:var(--ink);font:600 15px var(--body)}
+.pay text.s{fill:var(--mute);font:400 12.5px var(--body)}
+.pay text.big{font:800 34px var(--display);font-stretch:80%}
+.pay rect{fill:var(--panel);stroke:var(--line)}
+.pay rect.you{stroke:var(--acc)}
+.pay path{fill:none;stroke:var(--line);stroke-width:2}
+.pay path.money{stroke:var(--acc);stroke-dasharray:4 8;animation:flow 1.8s linear infinite}
+
+/* table */
+.tbl{width:100%;border-collapse:collapse;font-size:15px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.tbl th,.tbl td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line)}
+.tbl th{font:600 13px var(--body);color:var(--mute);background:var(--panel)}
+.tbl td:not(:first-child),.tbl th:not(:first-child){text-align:center;width:160px}
+.tbl tr:last-child td{border-bottom:0}
+.y{color:var(--up);font-weight:700}.n{color:var(--mute)}
+
+/* faq */
+.faq{display:grid;gap:10px;max-width:880px}
+.faq details{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 20px}
+.faq summary{cursor:pointer;padding:18px 0;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:20px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";color:var(--acc);font:400 22px/1 var(--body);transition:transform .3s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{padding:0 0 20px;color:var(--mute);max-width:70ch}
+
+/* ------------------------------------------------ privacy */
+.ledger{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media (max-width:820px){.ledger{grid-template-columns:1fr}}
+.ledger > div{border:1px solid var(--line);border-radius:14px;padding:28px;background:var(--panel)}
+.ledger h3{font-size:26px;font-stretch:110%;margin-bottom:6px}
+.ledger .fig{margin-bottom:20px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:14px;border:1px solid var(--line);border-radius:999px;padding:7px 12px;background:var(--bg)}
+.chip.k{border-color:rgba(47,210,122,.5)}
+.chip.o{border-color:rgba(var(--acc-rgb),.6)}
+.chip small{color:var(--mute)}
+.never{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+@media (max-width:820px){.never{grid-template-columns:1fr}}
+.never div{border-top:2px solid var(--down);padding-top:16px}
+.never b{display:block;margin-bottom:6px}
+.never p{color:var(--mute);font-size:15px}
+.card-demo{border:1px solid var(--warn);border-radius:12px;background:var(--panel);padding:20px;max-width:420px;box-shadow:0 20px 60px -30px rgba(242,184,75,.5)}
+.card-demo .t{font:600 12px var(--mono);color:var(--warn)}
+.card-demo p{margin:10px 0 16px}
+.card-demo .row2{display:flex;gap:8px}
+
+/* ------------------------------------------------ setup */
+.steps{list-style:none;counter-reset:s;margin:0;padding:0;display:grid;gap:0;border-left:1px solid var(--line);margin-left:22px}
+.steps li{counter-increment:s;position:relative;padding:0 0 40px 46px}
+.steps li::before{content:counter(s);position:absolute;left:-23px;top:-4px;width:46px;height:46px;border-radius:50%;background:var(--bg);border:1px solid var(--acc);
+  display:grid;place-items:center;font:800 20px var(--display);color:var(--acc)}
+.steps h3{margin:4px 0 8px}
+.steps p{color:var(--mute);max-width:62ch}
+.kbd{font:500 13px var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px;color:var(--ink);background:var(--panel)}
+.req{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+@media (max-width:820px){.req{grid-template-columns:1fr 1fr}}
+.req div{background:var(--bg);padding:22px}
+.req b{display:block;font:700 18px var(--display);font-stretch:100%;margin-bottom:4px}
+.req span{color:var(--mute);font-size:14.5px}
+
+/* ------------------------------------------------ download / changelog */
+.dl{border:1px solid var(--acc);border-radius:18px;padding:48px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:30px;align-items:center;
+  background:radial-gradient(120% 140% at 100% 0,rgba(var(--acc-rgb),.18),transparent 55%),var(--panel)}
+@media (max-width:760px){.dl{grid-template-columns:1fr;padding:30px}}
+.log{display:grid;gap:0}
+.log article{display:grid;grid-template-columns:150px 1fr;gap:24px;padding:28px 0;border-top:1px solid var(--line)}
+@media (max-width:640px){.log article{grid-template-columns:1fr;gap:8px}}
+.log h3{font-size:30px;font-stretch:80%}
+.log ul{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px}
+
+/* ------------------------------------------------ cta band + footer */
+.band{border-block:1px solid var(--line);padding:80px 0;text-align:left;overflow:hidden}
+.band h2{max-width:16ch}
+.band .ctas{margin-top:30px}
+.band .wave{position:absolute;inset:0;width:100%;height:100%;opacity:.35;pointer-events:none}
+footer{padding:48px 0 60px;color:var(--mute);font-size:14px}
+.foot{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:30px}
+@media (max-width:760px){.foot{grid-template-columns:1fr 1fr}}
+.foot a{color:var(--mute);text-decoration:none;display:block;padding:3px 0}
+.foot a:hover{color:var(--ink)}
+.foot h4{margin:0 0 10px;color:var(--ink);font:600 14px var(--body)}
+.legal{margin-top:36px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;max-width:90ch}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;place-items:center;z-index:50;padding:20px}
+.modal.on{display:grid}
+.modal > div{background:var(--panel);border:1px solid var(--acc);border-radius:14px;padding:28px;max-width:440px}
+.modal h3{margin-bottom:10px}
+.modal p{color:var(--mute);margin-bottom:20px}
+
+/* ------------------------------------------------ polish */
+::selection{background:rgba(var(--acc-rgb),.35);color:#fff}
+html{scrollbar-color:var(--line) var(--bg)}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.06;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.glow{position:fixed;width:900px;height:900px;border-radius:50%;pointer-events:none;z-index:0;left:-300px;top:-380px;
+  background:radial-gradient(closest-side,rgba(var(--acc-rgb),.16),transparent);transition:background .8s}
+.glow.b{left:auto;right:-360px;top:40vh;background:radial-gradient(closest-side,rgba(var(--acc-rgb),.08),transparent)}
+nav a{position:relative}
+nav a::after{content:"";position:absolute;left:12px;right:12px;bottom:4px;height:1px;background:var(--acc);transform:scaleX(0);transform-origin:left;transition:transform .35s var(--ease)}
+nav a:hover::after{transform:scaleX(1)}
+.spot{position:relative;isolation:isolate}
+.spot::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;opacity:0;transition:opacity .3s;
+  background:radial-gradient(380px circle at var(--mx,50%) var(--my,50%),rgba(var(--acc-rgb),.13),transparent 60%)}
+.spot:hover::before{opacity:1}
+.hero-bg{position:absolute;inset:-40px 0 auto;height:820px;z-index:0;pointer-events:none;overflow:hidden;
+  mask-image:radial-gradient(70% 70% at 70% 40%,#000 10%,transparent 75%)}
+.hero-bg img{width:100%;height:100%;object-fit:cover;opacity:.18;filter:blur(2px) saturate(1.2);transform:scale(1.08);transition:opacity .8s}
+.hero{position:relative}
+.hero h1 .ln{display:block;overflow:hidden;padding-bottom:.04em}
+.hero h1 .ln > span{display:inline-block}
+@media (prefers-reduced-motion:no-preference){
+  .boot .hero h1 .ln > span{transform:translateY(105%)}
+  .hero h1 .ln > span{transition:transform 1.1s var(--ease)}
+  .hero h1 .ln:nth-child(2) > span{transition-delay:.12s}
+  .boot .monitor{transform:perspective(1400px) rotateY(-14deg) rotateX(6deg) translateY(30px) scale(.96);opacity:.0}
+}
+.monitor{transition:transform 1.2s var(--ease) .2s,opacity 1s .2s;transform-style:preserve-3d;will-change:transform}
+.ring{position:absolute;inset:-12%;z-index:-1;pointer-events:none}
+.ring canvas{width:100%;height:100%}
+.wipe{position:fixed;inset:0;z-index:70;pointer-events:none;background:var(--acc);transform:scaleY(0);transform-origin:bottom}
+.wipe.go{animation:wipe .7s var(--ease)}
+@keyframes wipe{0%{transform:scaleY(0);transform-origin:bottom}45%{transform:scaleY(1);transform-origin:bottom}55%{transform:scaleY(1);transform-origin:top}100%{transform:scaleY(0);transform-origin:top}}
+.marquee{overflow:hidden;border-block:1px solid var(--line);padding:16px 0;mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.marquee .track{display:flex;gap:14px;width:max-content;animation:marq 70s linear infinite}
+.marquee:hover .track{animation-play-state:paused}
+.marquee span{white-space:nowrap;border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:15px;color:var(--mute)}
+.marquee span b{color:var(--acc);font-weight:600}
+@keyframes marq{to{transform:translateX(-50%)}}
+
+/* ------------------------------------------------ try him console */
+.try{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--panel)}
+@media (max-width:900px){.try{grid-template-columns:1fr}}
+.try-l{padding:28px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:18px}
+@media (max-width:900px){.try-l{border-right:0;border-bottom:1px solid var(--line)}}
+.prompts{display:flex;flex-wrap:wrap;gap:8px}
+.prompts button{font:500 14.5px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:9px 14px;cursor:pointer;transition:border-color .2s,background .2s,transform .2s}
+.prompts button:hover{border-color:var(--acc);transform:translateY(-1px)}
+.prompts button[aria-pressed="true"]{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.convo{display:flex;flex-direction:column;gap:10px;min-height:150px;font-size:16px}
+.convo .u,.convo .j{max-width:92%;padding:11px 14px;border-radius:12px;line-height:1.45}
+.convo .u{align-self:flex-end;background:rgba(var(--acc-rgb),.14);border:1px solid rgba(var(--acc-rgb),.35)}
+.convo .j{align-self:flex-start;background:var(--bg);border:1px solid var(--line)}
+.convo .j small{display:block;font:500 11px var(--mono);color:var(--acc);margin-bottom:4px}
+.try-r{position:relative;min-height:420px;display:grid;place-items:center;padding:28px;
+  background:radial-gradient(80% 80% at 50% 40%,rgba(var(--acc-rgb),.08),transparent),repeating-linear-gradient(0deg,transparent 0 31px,rgba(var(--acc-rgb),.05) 31px 32px),repeating-linear-gradient(90deg,transparent 0 31px,rgba(var(--acc-rgb),.05) 31px 32px)}
+.try-r > .fig{position:absolute;left:18px;top:14px}
+.pv{width:min(460px,100%);border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--bg) 85%,transparent);padding:20px;
+  box-shadow:0 30px 70px -30px rgba(0,0,0,.9);animation:pvin .6s var(--ease)}
+@keyframes pvin{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+.pv .hd{display:flex;justify-content:space-between;align-items:center;font:600 13px var(--body);margin-bottom:12px}
+.pv .hd em{font:500 10px var(--mono);font-style:normal;border:1px solid var(--down);color:var(--down);padding:2px 6px;border-radius:3px}
+.pv .big{font:300 48px/1 var(--display);font-stretch:70%;font-variant-numeric:tabular-nums}
+.pv .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.pv .row3 div{font-size:12px;color:var(--mute)}.pv .row3 b{display:block;color:var(--ink);font:600 15px var(--body)}
+.pv ol,.pv ul{margin:8px 0 0;padding-left:18px;display:grid;gap:5px;font-size:14px}
+.pv .need{color:var(--warn)}
+.pv .bars{display:flex;align-items:flex-end;gap:5px;height:90px;margin-top:12px}
+.pv .bars i{flex:1;background:rgba(var(--acc-rgb),.55);border-radius:2px 2px 0 0;animation:grow .8s var(--ease) both}
+@keyframes grow{from{transform:scaleY(0);transform-origin:bottom}}
+.pv .file{min-height:0}
+.pv .doc{background:#f4f2ec;color:#222;border-radius:4px;padding:18px 20px;font:400 12.5px/1.5 Georgia,serif;margin-top:6px}
+.pv .doc h4{margin:0 0 8px;font:700 15px Georgia,serif}
+
+/* ------------------------------------------------ personalities */
+.moods{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+@media (max-width:1000px){.moods{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.moods{grid-template-columns:1fr}}
+.mood{border:1px solid var(--line);border-radius:12px;padding:20px;background:var(--panel);display:flex;flex-direction:column;gap:12px;cursor:pointer;text-align:left;color:var(--ink);font:inherit;transition:border-color .25s,transform .25s var(--ease)}
+.mood:hover{transform:translateY(-3px)}
+.mood[aria-pressed="true"]{border-color:var(--acc);background:linear-gradient(170deg,rgba(var(--acc-rgb),.14),var(--panel) 60%)}
+.mood b{font:800 22px var(--display);font-stretch:110%}
+.mood span{font-size:14px;color:var(--mute)}
+.mood q{font-size:15.5px;line-height:1.45;quotes:"\201C" "\201D";margin-top:auto}
+.moodq{margin-top:22px;font-size:clamp(20px,2.2vw,28px);line-height:1.35;max-width:46ch;min-height:2.8em}
+.moodq small{display:block;font:500 12px var(--mono);color:var(--mute);margin-bottom:8px}
+
+/* ------------------------------------------------ cost calculator */
+.calc{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:0;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+@media (max-width:900px){.calc{grid-template-columns:1fr}}
+.calc-l{padding:30px;background:var(--panel);display:grid;gap:26px;align-content:start}
+.calc label{display:flex;justify-content:space-between;font-weight:600;margin-bottom:10px}
+.calc label output{font:500 14px var(--mono);color:var(--acc)}
+.calc input[type=range]{width:100%;accent-color:var(--acc)}
+.calc-r{padding:30px;display:grid;gap:20px;align-content:start}
+.calc .total{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.calc .total b{font:800 clamp(56px,7vw,92px)/1 var(--display);font-stretch:72%;font-variant-numeric:tabular-nums;color:var(--acc)}
+.calc .total span{color:var(--mute)}
+.stack{display:flex;height:16px;border-radius:999px;overflow:hidden;background:var(--line)}
+.stack i{transition:width .5s var(--ease)}
+.stack i:nth-child(1){background:var(--acc)}.stack i:nth-child(2){background:rgba(var(--acc-rgb),.55)}.stack i:nth-child(3){background:rgba(var(--acc-rgb),.28)}.stack i:nth-child(4){background:var(--mute)}
+.breakdown{display:grid;gap:8px;font-size:14.5px}
+.breakdown div{display:grid;grid-template-columns:12px 1fr auto;gap:10px;align-items:center}
+.breakdown i{width:10px;height:10px;border-radius:2px}
+.breakdown span:last-child{font:500 13px var(--mono);font-variant-numeric:tabular-nums}
+.compare-bars{display:grid;gap:10px;margin-top:6px}
+.compare-bars div{display:grid;grid-template-columns:130px 1fr 70px;gap:12px;align-items:center;font-size:14px}
+.compare-bars em{display:block;height:10px;border-radius:5px;background:var(--line);font-style:normal;position:relative;overflow:hidden}
+.compare-bars em i{position:absolute;inset:0 auto 0 0;background:var(--acc);border-radius:5px;transition:width .5s var(--ease)}
+.compare-bars span:last-child{font:500 13px var(--mono);text-align:right}
+
+/* ------------------------------------------------ commands page */
+.cmd-tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:26px}
+.cmd-tools input{flex:1 1 320px;font:500 17px var(--body);color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.cmd-tools input:focus{outline:none;border-color:var(--acc)}
+.cmd-cats{display:flex;flex-wrap:wrap;gap:6px}
+.cmd-cats button{font:500 14px var(--body);color:var(--mute);background:none;border:1px solid var(--line);border-radius:999px;padding:8px 13px;cursor:pointer}
+.cmd-cats button[aria-pressed="true"]{color:var(--bg);background:var(--acc);border-color:var(--acc)}
+.cmds{columns:3 300px;column-gap:14px}
+.cmd{break-inside:avoid;margin-bottom:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:13px 14px;display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.cmd q{quotes:"\201C" "\201D";font-size:15.5px}
+.cmd small{display:block;color:var(--mute);font-size:12.5px;margin-top:3px}
+.cmd button{flex:none;font:500 11px var(--mono);color:var(--mute);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:4px 8px;cursor:pointer}
+.cmd button:hover{color:var(--acc);border-color:var(--acc)}
+.cmd-count{font:500 13px var(--mono);color:var(--mute)}
+
+/* ------------------------------------------------ spec sheet */
+.spec{border:1px solid var(--line);border-radius:4px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));font-size:14.5px;background:color-mix(in srgb,var(--panel) 60%,transparent)}
+@media (max-width:860px){.spec{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.spec div{padding:16px 18px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.spec div:nth-child(4n){border-right:0}
+.spec dt{font:500 11px var(--mono);color:var(--mute);margin-bottom:5px}
+.spec dd{margin:0;font-weight:600}
+.spec .tb{grid-column:1/-1;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font:500 12px var(--mono);color:var(--mute);border-right:0}
+
+/* ------------------------------------------------ roadmap */
+.votes{display:grid;gap:10px;max-width:900px}
+.vote{display:grid;grid-template-columns:1fr 220px 92px;gap:18px;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:16px 18px}
+@media (max-width:700px){.vote{grid-template-columns:1fr auto}.vote .meter{grid-column:1/-1;order:3}}
+.vote b{display:block}.vote span{color:var(--mute);font-size:14px}
+.vote .meter{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.vote .meter i{display:block;height:100%;background:var(--acc);transition:width .6s var(--ease)}
+.vote button{font:600 14px var(--body);border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:9px 0;cursor:pointer}
+.vote button[aria-pressed="true"]{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.toast{visibility:hidden;position:fixed;left:50%;bottom:24px;transform:translate(-50%,140%);background:var(--panel);border:1px solid var(--acc);border-radius:10px;padding:12px 18px;z-index:80;transition:transform .4s var(--ease);font-size:15px}
+.toast.on{transform:translate(-50%,0);visibility:visible}
+
+/* reveal: visible at rest; only a gentle lift when motion is allowed */
+@media (prefers-reduced-motion:no-preference){
+  .lift{transition:transform .9s var(--ease)}
+  .lift.pre{transform:translateY(22px)}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div><div class="glow b" aria-hidden="true"></div>
+<div class="wipe" id="wipe" aria-hidden="true"></div>
+<div class="toast" id="toast" role="status"></div>
+<header>
+  <div class="wrap bar">
+    <a class="mark" href="#home" aria-label="Jarvis home">
+      <img src="img/logo.svg" width="30" height="30" alt="" aria-hidden="true">
+      JARVIS
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menu</button>
+    <nav id="nav" aria-label="Pages">
+      <a href="#features">Features</a>
+      <a href="#worlds">Worlds</a>
+      <a href="#commands">Commands</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#setup">Setup</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#download">What's new</a>
+      <a href="docs/">Docs</a>
+    </nav>
+    <div class="worlds" role="group" aria-label="Pick his world">
+      <button data-w="bench" style="--sw:#8cc4f0" aria-pressed="true" title="Home Bench" aria-label="Home Bench"></button>
+      <button data-w="station" style="--sw:#7fe0ff" aria-pressed="false" title="Observation Ring" aria-label="Observation Ring"></button>
+      <button data-w="archive" style="--sw:#e9b46a" aria-pressed="false" title="The Archive" aria-label="The Archive"></button>
+      <button data-w="signal" style="--sw:#6ee69a" aria-pressed="false" title="Listening Post" aria-label="Listening Post"></button>
+      <button data-w="chart" style="--sw:#d8c77a" aria-pressed="false" title="Chart of the Island" aria-label="Chart of the Island"></button>
+      <button data-w="greenhouse" style="--sw:#ffc46b" aria-pressed="false" title="The Greenhouse" aria-label="The Greenhouse"></button>
+    </div>
+    <a class="btn primary small" href="#download">Download</a>
+  </div>
+</header>
+
+<main>
+<!-- =========================================================== HOME -->
+<div class="page" id="p-home" data-page="home">
+  <section class="hero">
+    <div class="hero-bg" aria-hidden="true"><img id="heroBg" src="img/station-1.jpg" alt=""></div>
+    <div class="wrap hero-grid">
+      <div>
+        <p class="fig"><b>fig. 1</b> &nbsp;voice assistant for Windows, rev. 1.0.43</p>
+        <h1 style="margin-top:18px"><span class="ln"><span>Say it.</span></span><span class="ln say"><span>He pulls it up.</span></span></h1>
+        <p class="lede">Jarvis lives on your desktop, answers when you say his name, and does the actual work: live prices, real Word and Excel files, your lights, your games, your week. Free, and your key never leaves your PC.</p>
+        <div class="ctas">
+          <a class="btn primary" href="#download">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.5 10 4.5v7H3zm8-1.2L21 3v8.5H11zM3 12.5h7v7l-7-1zm8 0h10V21l-10-1.4z"/></svg>
+            Download for Windows
+          </a>
+          <a class="btn ghost" href="#worlds">See his six worlds</a>
+          <p class="fig">Free forever &middot; Windows 10 and 11 &middot; bring your own Claude key</p>
+        </div>
+      </div>
+      <div class="monitor" id="monitor" aria-label="Jarvis on a desktop, answering a question">
+        <div class="ring" aria-hidden="true"><canvas id="ring" width="900" height="600"></canvas></div>
+        <span class="fig cap" id="heroCap">observation ring, deck 3</span>
+        <div class="screen" id="heroScreen">
+          <img class="idle" id="heroIdle" src="img/station-1.jpg" alt="The Observation Ring desktop scene at rest">
+          <img class="ans" id="heroAns" src="img/station-2.jpg" alt="The same scene with live stock, weather and flight panels pulled up">
+          <div class="say-bar"><canvas id="heroWave" width="128" height="52" aria-hidden="true"></canvas><span class="who" id="heroWho">you</span><span class="txt" id="heroTxt">Jarvis, how's Nvidia doing?</span></div>
+        </div>
+        <div class="stand"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="stats" aria-label="Jarvis in numbers">
+      <div><b data-count="63">63</b><span>things he can do, from Spotify to Steam</span></div>
+      <div><b data-count="5">5</b><span>living desktops, drawn at 4K</span></div>
+      <div><b data-count="21">21</b><span>self-checks when something breaks</span></div>
+      <div><b>0.3<small style="font-size:.5em">s</small></b><span>between live price ticks on screen</span></div>
+      <div><b data-count="0">0</b><span>words sent anywhere unless they're meant for him</span></div>
+      <div><b>$0</b><span>to download, forever</span></div>
+    </div>
+  </div>
+
+  <div class="marquee" style="margin-top:56px" aria-label="Things people say to him"><div class="track" id="marq"></div></div>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>fig. 2</b> &nbsp;try him</p>
+        <h2>Ask him something.</h2>
+        <p class="lede">Pick a line. This is what he says and what lands on your desktop while he says it. The real thing talks back.</p>
+      </div>
+      <div class="try spot">
+        <div class="try-l">
+          <div class="prompts" id="prompts" role="group" aria-label="Example requests"></div>
+          <div class="convo" id="convo" aria-live="polite"></div>
+        </div>
+        <div class="try-r"><span class="fig" id="pvCap">on your desktop</span><div id="pvBox"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>fig. 3</b> &nbsp;personality, five presets</p>
+        <h2>Same brain. Pick the attitude.</h2>
+        <p class="lede">He'll tell you when an idea is bad in all five. How he says it is up to you, plus how funny and how long-winded he gets.</p>
+      </div>
+      <div class="moods" id="moods"></div>
+      <p class="moodq" id="moodq" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>fig. 4</b> &nbsp;how one sentence travels</p>
+        <h2>He hears everything. He keeps almost all of it.</h2>
+        <p class="lede">Speech is turned into text on your own PC first. Only a sentence that starts with his name, or one he's waiting on, goes anywhere at all.</p>
+      </div>
+      <div class="pipe lift spot">
+        <svg viewBox="0 0 1180 330" role="img" aria-labelledby="pipeT">
+          <title id="pipeT">Speech is transcribed locally; only addressed sentences go to cloud speech recognition and then Claude; the answer comes back as his voice and a panel on your desktop.</title>
+          <rect class="zone" x="8" y="18" width="560" height="294" rx="12"/>
+          <text class="k" x="26" y="44">YOUR PC</text>
+          <g class="node"><rect x="30" y="120" width="140" height="78" rx="10"/><text x="48" y="153">Microphone</text><text class="sub" x="48" y="176">always on, never stored</text></g>
+          <g class="node hot"><rect x="215" y="120" width="160" height="78" rx="10"/><text x="233" y="153">Local speech</text><text class="sub" x="233" y="176">faster-whisper, on your PC</text></g>
+          <g class="node hot"><rect x="420" y="120" width="130" height="78" rx="10"/><text x="438" y="153">Name gate</text><text class="sub" x="438" y="176">"Jarvis, ..."?</text></g>
+          <g class="node"><rect x="420" y="236" width="130" height="58" rx="10"/><text x="438" y="262">Dropped</text><text class="sub" x="438" y="281">small talk, TV, friends</text></g>
+          <g class="node cloud"><rect x="620" y="56" width="170" height="78" rx="10"/><text x="638" y="89">Careful pass</text><text class="sub" x="638" y="112">Groq, skipped in private</text></g>
+          <g class="node cloud hot"><rect x="620" y="186" width="170" height="78" rx="10"/><text x="638" y="219">Claude</text><text class="sub" x="638" y="242">thinks, picks his tools</text></g>
+          <g class="node hot"><rect x="850" y="120" width="300" height="78" rx="10"/><text x="868" y="153">His voice + a live panel</text><text class="sub" x="868" y="176">spoken answer, chart on your desktop</text></g>
+          <path class="wire" d="M170 159H215M375 159H420M550 159C585 159 585 95 620 95M550 159C585 159 585 225 620 225M705 134V186M790 225C820 225 820 159 850 159"/>
+          <path class="flow" d="M170 159H215M375 159H420M550 159C585 159 585 95 620 95M705 134V186M790 225C820 225 820 159 850 159"/>
+          <path class="drop" d="M485 198V236"/>
+          <text class="k" x="600" y="320">CLOUD, ONLY WHEN SPOKEN TO</text>
+        </svg>
+        <div class="legend"><span><i></i>what happens when you say "Jarvis, ..."</span><span><i class="d"></i>everything else</span><span><i class="z"></i>never leaves your PC</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:20px">
+    <div class="wrap rows">
+      <div class="row lift">
+        <div class="copy">
+          <p class="fig"><b>fig. 5</b> &nbsp;live, actually live</p>
+          <h2>Ask about a stock and the chart is already ticking.</h2>
+          <p class="lede">Prices stream in green and red while he's still talking. Weather comes with moving radar, games with the live score, flights with a moving dot.</p>
+          <ul><li>Stocks and crypto <span>with an opinion, never advice</span></li><li>Weather radar, scores, flights, downloads</li><li>"Focus on that" makes it fill the screen</li></ul>
+        </div>
+        <div class="tick spot" aria-label="Example live price panel">
+          <div class="top"><span class="sym">NVIDIA &nbsp;<span class="fig">NVDA</span></span><span class="live">LIVE</span></div>
+          <div style="display:flex;gap:16px;align-items:baseline"><span class="px" id="px">196.42</span><span class="chg" id="chg" style="color:var(--up)">+4.61 +2.40%</span></div>
+          <canvas id="spark" width="760" height="240" aria-hidden="true"></canvas>
+          <div class="tape" id="tape"></div>
+          <p class="fig">example data, animated. in the app it's a real stream</p>
+        </div>
+      </div>
+
+      <div class="row lift">
+        <div class="copy">
+          <p class="fig"><b>fig. 6</b> &nbsp;real files, finished</p>
+          <h2>"Make me a budget spreadsheet." It's on your desktop.</h2>
+          <p class="lede">He writes actual Word documents, Excel sheets with working formulas, PowerPoint decks and PDFs. Then he opens it for you, and can read and edit the ones you already have.</p>
+          <ul><li>Word, Excel, PowerPoint, PDF</li><li>Finds any file by voice <span>"that PDF from my landlord"</span></li><li>Asks before touching anything outside your folders</li></ul>
+        </div>
+        <div class="files">
+          <div class="file"><span class="ext">DOCX</span><b>Cover letter, junior dev</b><div class="lines"><i style="width:90%"></i><i></i><i style="width:75%"></i><i style="width:84%"></i></div></div>
+          <div class="file"><span class="ext">XLSX</span><b>November budget</b><div class="grid"><i class="h"></i><i class="h"></i><i class="h"></i><i class="h"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+          <div class="file"><span class="ext">PPTX</span><b>Team pitch, 8 slides</b><div class="slide">Q4 plan</div></div>
+          <div class="file"><span class="ext">PDF</span><b>Lease summary</b><div class="lines"><i style="width:60%"></i><i></i><i style="width:88%"></i></div></div>
+        </div>
+      </div>
+
+      <div class="row lift">
+        <div class="copy">
+          <p class="fig"><b>fig. 7</b> &nbsp;triggers</p>
+          <h2>Tell him once. He handles it every time.</h2>
+          <p class="lede">Hook anything he can do to a game opening, a time of day, or you getting back to your desk. Plain English in, routine out.</p>
+          <ul><li>When an app or game launches</li><li>Every weekday at 8, or Sundays at 6</li><li>When you're back after a break</li></ul>
+        </div>
+        <div class="trig spot" aria-label="Example trigger running">
+          <div class="say"><q>When I open Dead by Daylight, turn the lights red, open Discord and play my DBD playlist.</q></div>
+          <ol id="trigList">
+            <li><span class="dot"></span>Dead by Daylight opened<em>trigger</em></li>
+            <li><span class="dot"></span>Lights to red<em>Hue</em></li>
+            <li><span class="dot"></span>Discord opened<em>apps</em></li>
+            <li><span class="dot"></span>DBD playlist playing<em>Spotify</em></li>
+            <li><span class="dot"></span>"Patch landed yesterday: killer changes"<em>Steam</em></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>fig. 8</b> &nbsp;a weekday, annotated</p>
+        <h2>A day with him around.</h2>
+        <p class="lede">Most of it you never ask for. He stays quiet mid-game and mid-call, and gets quieter after 11.</p>
+      </div>
+      <div class="day lift spot">
+        <div class="day-track" id="dayTrack">
+          <div class="day-sun"><svg viewBox="0 0 1000 120" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--acc)" stop-opacity=".22"/><stop offset="1" stop-color="var(--acc)" stop-opacity="0"/></linearGradient></defs><path d="M250 120 C 400 -10, 600 -10, 790 120Z" fill="url(#sg)"/><path d="M250 120 C 400 -10, 600 -10, 790 120" fill="none" stroke="var(--acc)" stroke-opacity=".5" stroke-dasharray="3 5"/></svg></div>
+          <div class="day-axis"></div>
+          <div class="hours" id="hours"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <canvas class="wave" id="bandWave" aria-hidden="true"></canvas>
+    <div class="wrap">
+      <h2>Six worlds. Pick the one he lives in.</h2>
+      <p class="lede" style="margin-top:18px">A drafting bench, a space station, a night library, a radio room, a hand-drawn sea chart. Each one is your actual wallpaper, behind your icons, and it shows your real stuff.</p>
+      <div class="ctas"><a class="btn primary" href="#worlds">Walk through the worlds</a><a class="btn ghost" href="#pricing">It's free. Here's how.</a></div>
+    </div>
+  </section>
+</div>
+
+<!-- =========================================================== FEATURES -->
+<div class="page" id="p-features" data-page="features">
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>sheet 2 of 6</b> &nbsp;full parts list</p>
+        <h1 style="font-size:clamp(44px,6vw,86px)">Everything he does.</h1>
+        <p class="lede">Grouped the way you'd use it. Every item here is in the current version, nothing promised.</p>
+      </div>
+      <div class="cat">
+        <article><h3>Hearing you <small>01</small></h3><ul>
+          <li><b>Wake word.</b> <span>"Jarvis" works mid-sentence, too.</span></li>
+          <li><b>Answers only your voice.</b> <span>Learns you in 20 seconds; friends get ignored.</span></li>
+          <li><b>Conversation mode.</b> <span>Keep talking after he answers, no name needed.</span></li>
+          <li><b>Whisper mode.</b> <span>Quiet and short at night or on a call.</span></li>
+          <li><b>Private mode.</b> <span>All speech recognition stays on your PC.</span></li>
+        </ul></article>
+        <article><h3>Your desktop <small>02</small></h3><ul>
+          <li><b>Five living scenes.</b> <span>Your wallpaper, 4K, showing your real data.</span></li>
+          <li><b>Live panels.</b> <span>Stocks, radar, scores, flights, downloads.</span></li>
+          <li><b>Focus.</b> <span>"Focus on that" fills the screen.</span></li>
+          <li><b>Widgets you place.</b> <span>Drag anywhere, either monitor.</span></li>
+          <li><b>"What's this?"</b> <span>Explains whatever window you're in.</span></li>
+        </ul></article>
+        <article><h3>Getting work done <small>03</small></h3><ul>
+          <li><b>Real files.</b> <span>Word, Excel with formulas, PowerPoint, PDF.</span></li>
+          <li><b>Instant file finder.</b> <span>Names and words inside documents.</span></li>
+          <li><b>Google, in tabs.</b> <span>"Open a bunch of tabs on building a PC."</span></li>
+          <li><b>Calendar and reminders.</b> <span>Timeline up on your desktop.</span></li>
+          <li><b>He just knows things.</b> <span>And searches when it might have changed.</span></li>
+        </ul></article>
+        <article><h3>Games <small>04</small></h3><ul>
+          <li><b>Pre-game briefing.</b> <span>Friends online, queues, the latest patch.</span></li>
+          <li><b>Patch heads-up.</b> <span>The gist while the game loads.</span></li>
+          <li><b>Play time.</b> <span>Hours per game, wins and losses you tell him.</span></li>
+          <li><b>Break nudges.</b> <span>Between matches, never mid-game.</span></li>
+          <li><b>Steam.</b> <span>Sales, wishlist, what to play next.</span></li>
+        </ul></article>
+        <article><h3>Your life <small>05</small></h3><ul>
+          <li><b>Triggers and schedules.</b> <span>"Every weekday at 8, market and weather."</span></li>
+          <li><b>Where did I leave off.</b> <span>A recap when you're back.</span></li>
+          <li><b>Birthdays and gift ideas.</b> <span>Built on what he knows about them.</span></li>
+          <li><b>Cooking.</b> <span>A recipe from what's in your fridge.</span></li>
+          <li><b>A Sunday letter.</b> <span>About your week, honest, on your desktop.</span></li>
+        </ul></article>
+        <article><h3>Your stuff <small>06</small></h3><ul>
+          <li><b>Lights.</b> <span>Philips Hue scenes and colors.</span></li>
+          <li><b>Music.</b> <span>Spotify playlists and controls.</span></li>
+          <li><b>Discord.</b> <span>Messages read out, his own bot.</span></li>
+          <li><b>Stocks.</b> <span>Watchlist, earnings eve, a paper portfolio.</span></li>
+          <li><b>PC health.</b> <span>Temps, disk, what's slowing you down.</span></li>
+        </ul></article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap diag">
+      <div>
+        <p class="fig"><b>fig. 9</b> &nbsp;self-diagnosis</p>
+        <h2 style="margin:12px 0 18px">"Run diagnostics." Then "fix it."</h2>
+        <p class="lede">He checks every part of himself in a few seconds: your mic, his voice, the live price feed, your lights, the Discord bot. Then he repairs what he can and tells you plainly what he can't.</p>
+      </div>
+      <div class="ck spot" id="ck" aria-label="Example diagnostics result">
+        <div class="ck-sum"><div class="p"><b id="ckP">0</b><span>fine</span></div><div class="w"><b id="ckW">0</b><span>worth a look</span></div><div class="f"><b>0</b><span>broken</span></div></div>
+        <ul id="ckList"></ul>
+      </div>
+    </div>
+  </section>
+  <section style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>fig. 10</b> &nbsp;under the hood</p>
+        <h2>The parts list.</h2>
+        <p class="lede">For the people who want to know what's actually running.</p>
+      </div>
+      <dl class="spec">
+        <div><dt>THINKING</dt><dd>Claude Sonnet 5.5</dd></div>
+        <div><dt>QUICK ANSWERS</dt><dd>Claude Haiku 5.5</dd></div>
+        <div><dt>HEARING</dt><dd>faster-whisper, on your PC</dd></div>
+        <div><dt>CAREFUL PASS</dt><dd>Groq Whisper v3 turbo, optional</dd></div>
+        <div><dt>HIS VOICE</dt><dd>Kokoro, local, British</dd></div>
+        <div><dt>VOICE ID</dt><dd>WeSpeaker, on your PC</dd></div>
+        <div><dt>DESKTOP</dt><dd>WebView2 behind your icons</dd></div>
+        <div><dt>FILE SEARCH</dt><dd>Windows Search index</dd></div>
+        <div><dt>LIVE PRICES</dt><dd>Yahoo Finance stream</dd></div>
+        <div><dt>SCORES / FLIGHTS</dt><dd>ESPN, adsb.lol</dd></div>
+        <div><dt>RADAR</dt><dd>RainViewer, Open-Meteo</dd></div>
+        <div><dt>UPDATES</dt><dd>Velopack, from GitHub</dd></div>
+        <div class="tb"><span>J.A.R.V.I.S. / parts list</span><span>drawn by J.</span><span>sheet 2a</span><span>scale 1:1</span></div>
+      </dl>
+    </div>
+  </section>
+</div>
+
+<!-- spec sheet appended to features -->
+<!-- =========================================================== WORLDS -->
+<div class="page" id="p-worlds" data-page="worlds">
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>sheet 3 of 6</b> &nbsp;scenes, idle and answering</p>
+        <h1 style="font-size:clamp(44px,6vw,86px)">Six worlds.</h1>
+        <p class="lede">Drag across the picture to see what changes when you ask him something. Picking a world here re-themes this whole site, like it does your desktop.</p>
+      </div>
+      <div class="wtabs" role="tablist" id="wtabs"></div>
+      <div class="compare" id="compare" style="--cut:50%">
+        <img id="cmpA" src="img/bench-1.jpg" alt="">
+        <img id="cmpB" class="after" src="img/bench-2.jpg" alt="">
+        <div class="handle"></div>
+        <span class="tag l">at rest</span><span class="tag r">answering</span>
+        <input type="range" id="cmpRange" min="0" max="100" value="50" aria-label="Compare at rest and answering">
+      </div>
+      <div class="wmeta">
+        <div><h3 id="wName">Home Bench</h3><p class="lede" id="wLore"></p></div>
+        <dl id="wFacts"></dl>
+      </div>
+      <div class="thumbs" id="thumbs"></div>
+    </div>
+  </section>
+</div>
+
+<!-- =========================================================== PRICING -->
+<div class="page" id="p-pricing" data-page="pricing">
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>sheet 4 of 6</b> &nbsp;pricing</p>
+        <h1 style="font-size:clamp(44px,6vw,86px)">Free. Actually.</h1>
+        <p class="lede">Every feature is in the free download. If you like him and want to keep him growing, there's a Supporter tier. It changes nothing about what he can do for you.</p>
+      </div>
+      <div class="toggle" role="group" aria-label="Billing period"><button id="bM" aria-pressed="true">Monthly</button><button id="bY" aria-pressed="false">Yearly, 2 months free</button></div>
+      <div class="plans">
+        <div class="plan spot">
+          <span class="name">Jarvis</span>
+          <div class="price"><b>$0</b><span>forever</span></div>
+          <p class="note">Everything he does, all five worlds, every update.</p>
+          <ul><li>All features, no limits from us</li><li>All five 4K worlds</li><li>Automatic updates</li><li>Runs on your own Claude key</li><li>Community help on Discord</li></ul>
+          <a class="btn ghost" href="#download">Download for Windows</a>
+        </div>
+        <div class="plan sup spot">
+          <span class="badge">Keeps him growing</span>
+          <span class="name">Supporter</span>
+          <div class="price"><b id="supP">$5</b><span id="supU">a month</span></div>
+          <p class="note">Same Jarvis. You fund what gets built next.</p>
+          <ul><li>Your name in his About page</li><li>A vote on the next features and worlds</li><li>Early looks at new worlds before release</li><li>Supporter role on the Discord</li><li>Cancel any time, keep everything</li></ul>
+          <button class="btn primary" id="supBtn" type="button">Become a supporter</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>fig. 10</b> &nbsp;who you pay</p>
+        <h2>The honest part: his brain costs money.</h2>
+        <p class="lede">He thinks with Claude, using your own key, billed by Anthropic for what you actually use. We never see your key or your bill. Set a monthly cap in Anthropic's console and he can't go past it.</p>
+      </div>
+      <div class="pay lift">
+        <svg viewBox="0 0 1180 260" role="img" aria-labelledby="payT">
+          <title id="payT">You pay Jarvis nothing. You pay Anthropic for Claude usage. Groq speech is optional and has a free tier.</title>
+          <rect class="you" x="20" y="90" width="210" height="90" rx="12"/><text x="42" y="128">You</text><text class="s" x="42" y="152">your PC, your keys</text>
+          <rect x="430" y="10" width="330" height="80" rx="12"/><text x="452" y="45">Jarvis</text><text class="s" x="452" y="68">the app, worlds, updates</text><text class="big" x="690" y="62" text-anchor="end">$0</text>
+          <rect x="430" y="110" width="330" height="80" rx="12"/><text x="452" y="145">Anthropic (Claude)</text><text class="s" x="452" y="168">usage-based, your cap</text><text class="big" x="740" y="162" text-anchor="end" style="font-size:22px">per use</text>
+          <rect x="430" y="210" width="330" height="44" rx="12"/><text x="452" y="238" class="s">Groq speech: optional, free tier</text>
+          <rect x="920" y="90" width="240" height="90" rx="12" style="stroke-dasharray:5 4"/><text x="942" y="128">Supporter</text><text class="s" x="942" y="152">optional, $5 a month</text>
+          <path d="M230 135C330 135 330 50 430 50"/><path class="money" d="M230 135C330 135 330 150 430 150"/><path d="M230 135C330 135 330 232 430 232"/><path d="M760 50C840 50 840 135 920 135" style="stroke-dasharray:3 5"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>fig. 11</b> &nbsp;cost estimator</p>
+        <h2>What will Claude cost you?</h2>
+        <p class="lede">Move the sliders to match how you'd use him. It uses Anthropic's current list prices; your real bill is in your Anthropic console.</p>
+      </div>
+      <div class="calc">
+        <div class="calc-l">
+          <div><label for="cQ">Things you ask him a day <output id="oQ">40</output></label><input type="range" id="cQ" min="5" max="200" step="5" value="40"></div>
+          <div><label for="cH">Of those, quick ones <output id="oH">50%</output></label><input type="range" id="cH" min="0" max="90" step="5" value="50"><p class="note" style="margin-top:8px">Quick: timers, volume, "what time is it". Handled by the cheap model or free on your PC.</p></div>
+          <div><label for="cS">Separate sessions a day <output id="oS">4</output></label><input type="range" id="cS" min="1" max="12" step="1" value="4"><p class="note" style="margin-top:8px">Each time you come back after 5+ minutes, his memory of the conversation is reloaded once.</p></div>
+          <div><label for="cG">Live panels and searches <output id="oG">Some</output></label><input type="range" id="cG" min="0" max="2" step="1" value="1"></div>
+        </div>
+        <div class="calc-r">
+          <div class="total"><b id="cTot">$3.10</b><span>estimated per month</span></div>
+          <div class="stack" id="cStack"><i></i><i></i><i></i><i></i></div>
+          <div class="breakdown" id="cBreak"></div>
+          <div class="compare-bars" id="cCmp"></div>
+          <p class="note">Estimate, not a quote. Rates: Sonnet 5.5 $2 in / $10 out, Haiku 5.5 $0.10 / $0.50 per million tokens, cached reads $0.10, web search 1&cent;. Typical sizes assumed: 7k cached prompt, 1.5k new tokens and 250 words back per real answer.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:20px">
+    <div class="wrap">
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>What you get</th><th>Jarvis</th><th>Supporter</th></tr></thead>
+          <tbody>
+            <tr><td>Every feature and tool</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><td>All five worlds at 4K</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><td>Automatic updates</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><td>Voice ID, private and whisper modes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><td>Name in the About page</td><td class="n">No</td><td class="y">Yes</td></tr>
+            <tr><td>Vote on the roadmap</td><td class="n">No</td><td class="y">Yes</td></tr>
+            <tr><td>Early looks at new worlds</td><td class="n">No</td><td class="y">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:20px">
+    <div class="wrap">
+      <h2 style="margin-bottom:28px">Questions</h2>
+      <div class="faq">
+        <details><summary>Why do I need a Claude key?</summary><p>That's his brain. Your key lives only in a settings file on your PC and talks straight to Anthropic. It means there's no middleman reading your requests, and no subscription to us for something you'd pay for anyway.</p></details>
+        <details><summary>How much will Claude cost me?</summary><p>It depends entirely on how much you talk to him. Simple things like "pause" or "volume 30" are handled on your PC and cost nothing. He shows his own usage in Settings, and you can set a hard monthly limit in your Anthropic account so a surprise bill can't happen.</p></details>
+        <details><summary>Is there a free trial of Supporter?</summary><p>There's nothing to trial. Supporter adds no features. It's a way to pay for development if you want to.</p></details>
+        <details><summary>Does he work on Mac or Linux?</summary><p>Not right now. He's built deep into Windows: the wallpaper layer, the mic, the file index, the game detection.</p></details>
+        <details><summary>Can I cancel Supporter?</summary><p>Any time, from the same place you signed up. Nothing in the app changes when you do.</p></details>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- =========================================================== COMMANDS -->
+<div class="page" id="p-commands" data-page="commands">
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>reference card</b> &nbsp;things to say</p>
+        <h1 style="font-size:clamp(44px,6vw,86px)">What to say.</h1>
+        <p class="lede">You don't have to learn any of these. He understands normal sentences. This is for ideas, and for the ones people don't think to try.</p>
+      </div>
+      <div class="cmd-tools">
+        <label for="cmdQ" class="fig" style="flex-basis:100%">search</label>
+        <input id="cmdQ" type="search" placeholder="Try &ldquo;lights&rdquo;, &ldquo;stock&rdquo;, &ldquo;game&rdquo;" autocomplete="off">
+        <span class="cmd-count" id="cmdN"></span>
+        <div class="cmd-cats" id="cmdCats" role="group" aria-label="Filter by topic" style="flex-basis:100%"></div>
+      </div>
+      <div class="cmds" id="cmds"></div>
+    </div>
+  </section>
+</div>
+
+<!-- =========================================================== ROADMAP -->
+<div class="page" id="p-roadmap" data-page="roadmap">
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>on the bench</b> &nbsp;ideas, not promises</p>
+        <h1 style="font-size:clamp(44px,6vw,86px)">What's next is up for a vote.</h1>
+        <p class="lede">These are ideas being sketched. Supporters vote, and the most wanted get built first. Your votes here are saved in your browser only, as a preview of how it works.</p>
+      </div>
+      <div class="votes" id="votes"></div>
+    </div>
+  </section>
+</div>
+
+<!-- =========================================================== PRIVACY -->
+<div class="page" id="p-privacy" data-page="privacy">
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>sheet 5 of 6</b> &nbsp;privacy ledger</p>
+        <h1 style="font-size:clamp(44px,6vw,86px)">What stays. What goes.</h1>
+        <p class="lede">An assistant that's always listening has to be boring about privacy. Here's the full list, no fine print.</p>
+      </div>
+      <div class="ledger">
+        <div>
+          <h3>Stays on your PC</h3><p class="fig">always, in every mode</p>
+          <div class="chips">
+            <span class="chip k">Raw microphone audio</span><span class="chip k">Everything not said to him</span><span class="chip k">Your voiceprint</span>
+            <span class="chip k">Your API keys</span><span class="chip k">Screen pictures <small>(memory only)</small></span><span class="chip k">Camera <small>(glass mode)</small></span>
+            <span class="chip k">Activity memory</span><span class="chip k">Your files</span><span class="chip k">Journal and memories</span><span class="chip k">Play time and triggers</span>
+          </div>
+        </div>
+        <div>
+          <h3>Leaves, only when you ask</h3><p class="fig">and only to the service doing the work</p>
+          <div class="chips">
+            <span class="chip o">Your request <small>to Claude</small></span><span class="chip o">Audio of that sentence <small>to Groq, off in private mode</small></span>
+            <span class="chip o">A search <small>to the web</small></span><span class="chip o">A ticker <small>to Yahoo Finance</small></span><span class="chip o">Your city <small>for weather</small></span>
+            <span class="chip o">Light commands <small>to your Hue bridge</small></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section style="padding-top:20px">
+    <div class="wrap diag">
+      <div>
+        <p class="fig"><b>fig. 11</b> &nbsp;approval cards</p>
+        <h2 style="margin:12px 0 18px">Anything risky waits for you.</h2>
+        <p class="lede">Deleting, sending, installing or touching anything outside your own folders puts a card on screen. Say "yes", "no", or "always" for that kind of thing. A friend's voice can't approve it.</p>
+      </div>
+      <div class="card-demo"><span class="t">NEEDS YOUR OK</span><p>Delete 214 files from Downloads older than 90 days (3.1 GB)? They go to the Recycle Bin.</p><div class="row2"><button class="btn primary small" type="button">Yes</button><button class="btn ghost small" type="button">No</button><button class="btn ghost small" type="button">Always for this</button></div></div>
+    </div>
+  </section>
+  <section style="padding-top:20px">
+    <div class="wrap">
+      <h2 style="margin-bottom:30px">Things he will never do.</h2>
+      <div class="never">
+        <div><b>Type your passwords.</b><p>Not into sites, not into apps, not for convenience.</p></div>
+        <div><b>Trade or move money.</b><p>He'll give you an opinion on a stock. He won't buy it.</p></div>
+        <div><b>Click inside your games.</b><p>He watches the scoreboard, not the controls.</p></div>
+        <div><b>Read your browser logins or secret files.</b><p>.ssh, password vaults, .env files are off limits.</p></div>
+        <div><b>Talk in a real actor's voice.</b><p>His voice is his own.</p></div>
+        <div><b>Keep listening after you mute him.</b><p>Muted means the mic is ignored entirely.</p></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- =========================================================== SETUP -->
+<div class="page" id="p-setup" data-page="setup">
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="fig"><b>sheet 6 of 6</b> &nbsp;assembly instructions</p>
+        <h1 style="font-size:clamp(44px,6vw,86px)">Five minutes to hello.</h1>
+        <p class="lede">No account with us. You need a Windows PC, a microphone, and a Claude key.</p>
+      </div>
+      <div class="req" style="margin-bottom:64px">
+        <div><b>Windows 10 or 11</b><span>64-bit</span></div>
+        <div><b>A microphone</b><span>headset, desk mic or webcam</span></div>
+        <div><b>A Claude API key</b><span>from console.anthropic.com</span></div>
+        <div><b>NVIDIA GPU</b><span>optional, makes hearing faster</span></div>
+      </div>
+      <ol class="steps">
+        <li><h3>Download and run Setup</h3><p>Grab the installer from the download page. It installs to your user folder, no admin needed, and updates itself from then on.</p></li>
+        <li><h3>Get your Claude key</h3><p>Make an account at console.anthropic.com, add a little credit, create a key, and set a monthly limit while you're there.</p></li>
+        <li><h3>Paste it in Settings, Keys</h3><p>He checks it straight away. Optional: a free Groq key makes him understand you faster and more accurately.</p></li>
+        <li><h3>Say "Jarvis, learn my voice"</h3><p>Talk normally for about 20 seconds. From then on, he only answers you.</p></li>
+        <li><h3>Pick his world</h3><p>Settings, Desktop. He takes over your wallpaper and your icons stay where they are. If you use Wallpaper Engine, close it first: only one of them can live behind your icons.</p></li>
+      </ol>
+      <p class="fig" style="margin-top:10px">stuck? say <span class="kbd">Jarvis, run diagnostics</span> and he'll tell you which part isn't working.</p>
+    </div>
+  </section>
+</div>
+
+<!-- =========================================================== DOWNLOAD / WHAT'S NEW -->
+<div class="page" id="p-download" data-page="download">
+  <section>
+    <div class="wrap">
+      <div class="dl">
+        <div>
+          <p class="fig"><b>latest</b> &nbsp;version 1.0.43</p>
+          <h1 style="font-size:clamp(40px,5.4vw,76px);margin:14px 0 16px">Get Jarvis.</h1>
+          <p class="lede">Windows 10 and 11. Free. Updates install themselves.</p>
+        </div>
+        <div class="ctas" style="flex-direction:column;align-items:stretch">
+          <a class="btn primary" href="https://github.com/KIzzyonroller/jarvis-2/releases/latest">Download Setup.exe</a>
+          <a class="btn ghost" href="#setup">Setup guide</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section style="padding-top:10px">
+    <div class="wrap">
+      <h2 style="margin-bottom:24px">What's new</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div><a class="mark" href="#home" style="margin-bottom:12px">JARVIS</a><p>A voice assistant that lives on your Windows desktop.</p></div>
+      <div><h4>Product</h4><a href="#features">Features</a><a href="#worlds">Worlds</a><a href="#commands">Commands</a><a href="#pricing">Pricing</a></div>
+      <div><h4>Help</h4><a href="#setup">Setup</a><a href="#privacy">Privacy</a><a href="#roadmap">Roadmap</a><a href="#download">What's new</a><a href="docs/">Docs</a></div>
+      <div><h4>Get it</h4><a href="https://github.com/KIzzyonroller/jarvis-2/releases/latest">Download</a><a href="#pricing">Support the project</a></div>
+    </div>
+    <p class="legal">Jarvis is an independent project. It is not affiliated with, endorsed by, or connected to Marvel, Disney, or any film. Claude is a product of Anthropic; you use it under your own Anthropic account. Market data is for information only and is not financial advice.</p>
+  </div>
+</footer>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mT">
+  <div><h3 id="mT">Supporter opens soon</h3><p>The Supporter tier isn't open yet. Jarvis is completely free in the meantime, so grab the download and enjoy him.</p><button class="btn primary" id="mClose" type="button">Got it</button></div>
+</div>
+
+<script>
+(() => {
+  // Set this to your Ko-fi / GitHub Sponsors / Stripe link when the tier opens.
+  const SUPPORT_URL = "";
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+  // ---------------------------------------------------------------- worlds
+  const WORLDS = {
+    bench:   {name: "Home Bench", cap: "j.a.r.v.i.s. home bench, sheet 1 of 2", lore: "A drafting table at night: his listening core drawn as a working blueprint, with a parts list, a revision log and coffee rings. The gears turn while he thinks.",
+              facts: [["Feels like", "Focused, technical, quiet"], ["Live details", "Version number, revision log, your top apps"], ["Panels", "Blueprint cards with title blocks"], ["Best for", "Work and building things"]],
+              q: "Jarvis, how's Nvidia doing?", a: "Up 2.4% today. Priced for perfection, but the numbers keep earning it."},
+    station: {name: "Observation Ring", cap: "observation ring, deck 3", lore: "A space station's viewing deck over the night side of a planet, aurora on the horizon. Panels slide in like station readouts; the moon shows tonight's real phase.",
+              facts: [["Feels like", "Big, calm, late at night"], ["Live details", "Real moon phase, sunset time, temperature"], ["Panels", "Glass readouts with live badges"], ["Best for", "Stocks, weather, flights"]],
+              q: "Jarvis, where's my sister's flight?", a: "UA1534, airborne at 34,000 feet. Landing in about forty minutes."},
+    archive: {name: "The Archive", cap: "the archive, after hours", lore: "A library after closing: lamplight, a ladder, a moon in the arched window. The catalogue counts your memories and routines, and the books are his notes on you.",
+              facts: [["Feels like", "Warm, cozy, slow"], ["Live details", "Memories kept, routines, cards on file"], ["Panels", "Catalogue cards and pages"], ["Best for", "Reading, writing, the Sunday letter"]],
+              q: "Jarvis, what did I want to read this month?", a: "Two books and that long article on sleep. The article's in your notes."},
+    signal:  {name: "Listening Post", cap: "listening post, ch1 voice", lore: "A radio room: a waterfall display of his voice channel, a patch bay, VU meters that move when he talks. Scores and downloads come in like intercepted signals.",
+              facts: [["Feels like", "Busy, alive, a bit secret"], ["Live details", "Network latency, your devices, his voice level"], ["Panels", "Signal readouts and meters"], ["Best for", "Games, scores, downloads"]],
+              q: "Jarvis, what's the score?", a: "Comunicaciones 2, Municipal 1. Seventy-eighth minute."},
+    chart:   {name: "Chart of the Island", cap: "a chart of the island", lore: "A hand-drawn sea chart of your week: Mount Inbox, Render Ridge, Patchnote Shoals. The dotted route is your day, and the compass points at what's next.",
+              facts: [["Feels like", "Playful, mapped out"], ["Live details", "Your calendar, places named after your apps"], ["Panels", "Survey cards and legends"], ["Best for", "Planning the day and week"]],
+              q: "Jarvis, what's my day look like?", a: "Two meetings, a dentist at four, and a clear evening."},
+    greenhouse: {name: "The Greenhouse", cap: "the greenhouse, raining", lore: "A glasshouse at night with rain running down the panes and warm bulbs overhead. The slate counts the days you've kept him, and the plant tags are named after the apps you tend most.",
+              facts: [["Feels like", "Quiet, patient, rainy"], ["Live details", "Days together, the temperature outside, your top apps"], ["Panels", "Soft cards with serif headings"], ["Best for", "Slow evenings, planning, reading"]],
+              q: "Jarvis, how often should I water a fern?", a: "When the top of the soil feels dry. Usually every few days indoors."}
+  };
+  const root = document.documentElement;
+  let world = "station";
+  try { world = localStorage.getItem("jarvis-world") || "station"; } catch (e) {}
+
+  function setWorld(w, from) {
+    if (!WORLDS[w]) return;
+    world = w;
+    root.dataset.world = w;
+    try { localStorage.setItem("jarvis-world", w); } catch (e) {}
+    $$(".worlds button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.w === w)));
+    // hero
+    $("#heroIdle").src = `img/${w}-1.jpg`; $("#heroAns").src = `img/${w}-2.jpg`;
+    $("#heroCap").textContent = WORLDS[w].cap;
+    $("#heroBg").src = `img/${w}-1.jpg`;
+    if (from !== "init" && !reduce) { const wp = $("#wipe"); wp.classList.remove("go"); void wp.offsetWidth; wp.classList.add("go"); }
+    // worlds page
+    $$("#wtabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.w === w)));
+    $$("#thumbs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.w === w)));
+    $("#cmpA").src = `img/${w}-1.jpg`; $("#cmpB").src = `img/${w}-2.jpg`;
+    $("#cmpA").alt = `${WORLDS[w].name} at rest`; $("#cmpB").alt = `${WORLDS[w].name} answering with live panels`;
+    $("#wName").textContent = WORLDS[w].name; $("#wLore").textContent = WORLDS[w].lore;
+    $("#wFacts").replaceChildren(...WORLDS[w].facts.flatMap(([k, v]) => { const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = k; dd.textContent = v; return [dt, dd]; }));
+    if (from !== "init") restartHero();
+  }
+  $$(".worlds button").forEach(b => b.addEventListener("click", () => setWorld(b.dataset.w)));
+  for (const [k, v] of Object.entries(WORLDS)) {
+    const t = document.createElement("button"); t.role = "tab"; t.dataset.w = k; t.textContent = v.name; t.addEventListener("click", () => setWorld(k)); $("#wtabs").append(t);
+    const th = document.createElement("button"); th.dataset.w = k; th.setAttribute("aria-label", v.name);
+    th.innerHTML = `<img src="img/${k}-1.jpg" alt="" loading="lazy"><span>${v.name}</span>`; th.addEventListener("click", () => setWorld(k)); $("#thumbs").append(th);
+  }
+
+  // compare slider
+  const cmp = $("#compare"), rng = $("#cmpRange");
+  rng.addEventListener("input", () => cmp.style.setProperty("--cut", rng.value + "%"));
+
+  // ---------------------------------------------------------------- routing
+  const PAGES = ["home", "features", "worlds", "commands", "pricing", "privacy", "setup", "roadmap", "download"];
+  function route() {
+    const h = location.hash.slice(1), p = PAGES.includes(h) ? h : "home";
+    $$(".page").forEach(el => el.classList.toggle("on", el.dataset.page === p));
+    $$("nav a").forEach(a => a.removeAttribute("aria-current"));
+    $$("nav a").forEach(a => { if (a.getAttribute("href") === "#" + p) a.setAttribute("aria-current", "page"); });
+    $("#nav").classList.remove("open"); $("#menuBtn").setAttribute("aria-expanded", "false");
+    if (PAGES.includes(h) || !h) scrollTo({top: 0, behavior: "instant"});
+    document.title = p === "home" ? "Jarvis for Windows" : `${p === "download" ? "What's new" : p[0].toUpperCase() + p.slice(1)} · Jarvis`;
+    if (p === "features") runDiag();
+    if (p === "commands") renderCmds();
+    observe();
+  }
+  addEventListener("hashchange", route);
+  $("#menuBtn").addEventListener("click", () => { const o = $("#nav").classList.toggle("open"); $("#menuBtn").setAttribute("aria-expanded", String(o)); });
+
+  // ---------------------------------------------------------------- reveal (visible at rest; lift only when motion allowed)
+  let io;
+  function observe() {
+    if (reduce || !("IntersectionObserver" in window)) return;
+    io = io || new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.remove("pre"); io.unobserve(e.target); } }), {rootMargin: "0px 0px -8% 0px"});
+    $$(".page.on .lift").forEach(el => { const r = el.getBoundingClientRect(); if (r.top > innerHeight) { el.classList.add("pre"); io.observe(el); } });
+  }
+
+  // ---------------------------------------------------------------- hero: the one orchestrated moment
+  const screen = $("#heroScreen"), txt = $("#heroTxt"), who = $("#heroWho");
+  let heroTimer = [], level = 0;
+  function clearHero() { heroTimer.forEach(clearTimeout); heroTimer = []; }
+  function type(el, s, speed, done) {
+    let i = 0; el.textContent = "";
+    const step = () => { el.textContent = s.slice(0, ++i); if (i < s.length) heroTimer.push(setTimeout(step, speed)); else done && done(); };
+    step();
+  }
+  function restartHero() {
+    clearHero();
+    const W = WORLDS[world];
+    if (reduce) { screen.classList.add("answering"); who.textContent = "jarvis"; txt.textContent = W.a; return; }
+    screen.classList.remove("answering"); who.textContent = "you"; level = 1;
+    heroTimer.push(setTimeout(() => type(txt, W.q, 42, () => {
+      level = .25;
+      heroTimer.push(setTimeout(() => {
+        screen.classList.add("answering"); who.textContent = "jarvis"; level = .8;
+        type(txt, W.a, 26, () => { level = .1; heroTimer.push(setTimeout(restartHero, 6000)); });
+      }, 700));
+    }), 900));
+  }
+  // voice waveform in the say bar
+  const wv = $("#heroWave"), wx = wv.getContext("2d");
+  let t0 = 0, lv = 0;
+  function wave(t) {
+    lv += (level - lv) * .08;
+    wx.clearRect(0, 0, wv.width, wv.height);
+    const acc = getComputedStyle(root).getPropertyValue("--acc").trim();
+    wx.strokeStyle = acc; wx.lineWidth = 2.5; wx.beginPath();
+    for (let x = 0; x <= wv.width; x += 2) {
+      const k = x / wv.width, env = Math.sin(Math.PI * k);
+      const y = wv.height / 2 + env * lv * 20 * Math.sin(x * .22 + t * .012) * Math.sin(x * .05 - t * .004);
+      x ? wx.lineTo(x, y) : wx.moveTo(x, y);
+    }
+    wx.stroke();
+    if (!reduce) requestAnimationFrame(wave);
+  }
+
+  // ---------------------------------------------------------------- live ticker (example data)
+  const px = $("#px"), chg = $("#chg"), sp = $("#spark"), sx = sp.getContext("2d"), tape = $("#tape");
+  const base = 191.81; let price = 196.42, pts = [];
+  for (let i = 0; i < 90; i++) pts.push(190 + i * .07 + Math.sin(i / 6) * 1.2 + Math.random() * .8);
+  pts.push(price);
+  const tapeRows = [];
+  function drawSpark() {
+    const w = sp.width, h = sp.height, mn = Math.min(...pts) - .5, mx = Math.max(...pts) + .5;
+    const X = i => i / (pts.length - 1) * w, Y = v => h - (v - mn) / (mx - mn) * (h - 16) - 8;
+    sx.clearRect(0, 0, w, h);
+    sx.strokeStyle = "rgba(255,255,255,.06)"; sx.lineWidth = 1;
+    for (let g = 1; g < 4; g++) { sx.beginPath(); sx.moveTo(0, h * g / 4); sx.lineTo(w, h * g / 4); sx.stroke(); }
+    const up = price >= base, col = up ? "#2fd27a" : "#ff4d5e";
+    const gr = sx.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, up ? "rgba(47,210,122,.28)" : "rgba(255,77,94,.28)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+    sx.beginPath(); pts.forEach((v, i) => i ? sx.lineTo(X(i), Y(v)) : sx.moveTo(X(i), Y(v)));
+    sx.lineTo(w, h); sx.lineTo(0, h); sx.closePath(); sx.fillStyle = gr; sx.fill();
+    sx.beginPath(); pts.forEach((v, i) => i ? sx.lineTo(X(i), Y(v)) : sx.moveTo(X(i), Y(v))); sx.strokeStyle = col; sx.lineWidth = 3; sx.stroke();
+    sx.beginPath(); sx.arc(X(pts.length - 1), Y(price), 7, 0, 7); sx.fillStyle = col; sx.fill();
+  }
+  function tick() {
+    const prev = price; price = +(price + (Math.random() - .47) * .32).toFixed(2);
+    pts.push(price); if (pts.length > 120) pts.shift();
+    const d = price - base, up = price >= prev;
+    px.textContent = price.toFixed(2); px.className = "px " + (up ? "up" : "down");
+    setTimeout(() => px.className = "px", 450);
+    chg.textContent = `${d >= 0 ? "+" : ""}${d.toFixed(2)} ${d >= 0 ? "+" : ""}${(d / base * 100).toFixed(2)}%`;
+    chg.style.color = d >= 0 ? "var(--up)" : "var(--down)";
+    const now = new Date(); tapeRows.unshift(`<span class="${up ? "u" : "d"}">${now.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"})} ${price.toFixed(2)} ${up ? "▲" : "▼"}</span>`);
+    tapeRows.length = Math.min(tapeRows.length, 6); tape.innerHTML = tapeRows.join("");
+    drawSpark();
+  }
+  drawSpark(); for (let i = 0; i < 6; i++) tick();
+
+  // ---------------------------------------------------------------- trigger run-through
+  function runTrig() {
+    const li = $$("#trigList li"); li.forEach(l => l.classList.remove("done"));
+    li.forEach((l, i) => setTimeout(() => l.classList.add("done"), 500 + i * 650));
+  }
+
+  // ---------------------------------------------------------------- day timeline (hours 6..24 across)
+  const EVENTS = [
+    [7.97, "up", "07:58", "Market and weather, because you asked him to every weekday."],
+    [9.1, "dn", "09:05", "Back at your desk: “you were in the budget sheet.”"],
+    [11.5, "up", "11:30", "“Find the PDF from my landlord.” Up in under a second."],
+    [13.2, "dn", "13:10", "Kai's birthday is in a week. Three gift ideas, from what he knows."],
+    [15.75, "up", "15:45", "NVDA moves 4%. One line, chart already ticking."],
+    [18.5, "dn", "18:30", "Dead by Daylight opens: red lights, Discord, playlist."],
+    [19.4, "up", "19:25", "Patch landed yesterday. The gist while it loads."],
+    [21.7, "dn", "21:40", "Three hours in. “Good moment for a break.”"],
+    [23.25, "up", "23:15", "Whisper mode. Quieter, shorter."]
+  ];
+  const H0 = 6, H1 = 24, pos = h => ((h - H0) / (H1 - H0) * 96 + 2) + "%";
+  for (const [h, side, t, text] of EVENTS) {
+    const d = document.createElement("div"); d.className = "ev " + side; d.style.left = pos(h);
+    d.innerHTML = `<b>${t}</b><span></span><i class="pin"></i>`; d.querySelector("span").textContent = text; $("#dayTrack").append(d);
+  }
+  for (let h = 6; h <= 24; h += 3) { const s = document.createElement("span"); s.style.left = pos(h); s.textContent = String(h % 24).padStart(2, "0") + ":00"; $("#hours").append(s); }
+
+  // ---------------------------------------------------------------- diagnostics run
+  const CHECKS = [["Microphone", "Yeti, hearing you"], ["Speech", "local, 0.4 s"], ["Claude", "key OK"], ["His voice", "playing"], ["Internet", "18 ms"], ["Live prices", "streaming"],
+    ["Scores", "ESPN OK"], ["Flights", "OK"], ["Weather", "OK"], ["Steam", "OK"], ["Lights", "bridge found"], ["Discord bot", "online"], ["Desktop", "Observation Ring"],
+    ["Screen reading", "Windows OCR"], ["Documents", "Word, Excel, PDF"], ["Disk", "212 GB free"], ["Settings", "valid"], ["Voice ID", "learned", "w"], ["File finder", "index, 40 ms"], ["Triggers", "3 set"], ["Updates", "1.0.43"]];
+  let diagRan = false;
+  function runDiag() {
+    const ul = $("#ckList");
+    if (!diagRan) ul.innerHTML = CHECKS.map(([n, d, w]) => `<li class="${w || ""}"><i></i>${n}<small>${d}</small></li>`).join("");
+    diagRan = true;
+    const li = $$("#ckList li"); let p = 0, w = 0;
+    if (reduce) { li.forEach(l => l.classList.add("in")); $("#ckP").textContent = 20; $("#ckW").textContent = 1; return; }
+    li.forEach(l => l.classList.remove("in")); $("#ckP").textContent = 0; $("#ckW").textContent = 0;
+    li.forEach((l, i) => setTimeout(() => { l.classList.add("in"); l.classList.contains("w") ? w++ : p++; $("#ckP").textContent = p; $("#ckW").textContent = w; }, 250 + i * 90));
+  }
+  // the list is filled once so it's visible at rest even before the run
+  runDiag(); $$("#ckList li").forEach(l => l.classList.add("in")); $("#ckP").textContent = 20; $("#ckW").textContent = 1;
+
+  // ---------------------------------------------------------------- changelog
+  const LOG = [
+    ["1.0.43", "Nov 2026", ["A new icon", "Search in settings", "Settings say when a restart is needed", "Back to default, per setting", "Widgets dressed for each world", "Docs", "This site, on GitHub Pages"]],
+    ["1.0.42", "Nov 2026", ["His world moves", "The greenhouse", "Light that follows your day", "Real rain and snow", "His orb", "Screensaver", "Lights that match his world"]],
+    ["1.0.41", "Nov 2026", ["Post-match stats", "Valorant matches", "Clip that", "Sales radar", "Monthly gaming report"]],
+    ["1.0.40", "Nov 2026", ["See everything he knows", "What was I doing on this day", "He learns your habits", "Plugins"]],
+    ["1.0.39", "Nov 2026", ["Cut in mid-answer", "Guests", "Emotion in his voice", "Spanish and English, mixed", "Your slang", "Second opinions", "Why did you say that?"]],
+    ["1.0.34", "Nov 2026", ["He checks himself", "Answers only your voice", "Conversation mode", "Private mode", "Whisper mode", "Triggers", "Play time", "Patch heads-up", "Instant file finder", "Where did I leave off", "What's this?", "Cooking", "Gift ideas", "Inside jokes", "Lines from his world", "A Sunday letter"]],
+    ["1.0.33", "Nov 2026", ["The corner widget can be closed"]],
+    ["1.0.30", "Nov 2026", ["Picking a microphone works again", "Google and tabs on request", "Arrange your widgets anywhere", "Closing him actually closes him", "He tells you when he can't hear you"]],
+    ["1.0.28", "Nov 2026", ["Just Jarvis now", "A new desktop, his world", "Stocks and your watchlist", "Paper portfolio", "All five scenes at 4K", "Live panels while he talks", "Actually live prices", "Focus", "Network sweep", "Pre-game briefing", "Trackers", "He makes real files"]]
+  ];
+  $("#log").innerHTML = LOG.map(([v, d, items]) => `<article><div><h3>${v}</h3><p class="fig">${d}</p></div><ul>${items.map(i => `<li class="chip">${i}</li>`).join("")}</ul></article>`).join("");
+
+  // ---------------------------------------------------------------- pricing
+  const setBill = y => { $("#bM").setAttribute("aria-pressed", String(!y)); $("#bY").setAttribute("aria-pressed", String(y)); $("#supP").textContent = y ? "$50" : "$5"; $("#supU").textContent = y ? "a year" : "a month"; };
+  $("#bM").addEventListener("click", () => setBill(false)); $("#bY").addEventListener("click", () => setBill(true));
+  $("#supBtn").addEventListener("click", () => { if (SUPPORT_URL) location.href = SUPPORT_URL; else { $("#modal").classList.add("on"); $("#mClose").focus(); } });
+  $("#mClose").addEventListener("click", () => $("#modal").classList.remove("on"));
+  $("#modal").addEventListener("click", e => { if (e.target.id === "modal") $("#modal").classList.remove("on"); });
+  addEventListener("keydown", e => { if (e.key === "Escape") $("#modal").classList.remove("on"); });
+
+  // ---------------------------------------------------------------- band waveform
+  const bw = $("#bandWave"), bx = bw.getContext("2d");
+  function band(t) {
+    const r = bw.getBoundingClientRect(); if (bw.width !== r.width * 2) { bw.width = r.width * 2; bw.height = r.height * 2; }
+    bx.clearRect(0, 0, bw.width, bw.height);
+    const acc = getComputedStyle(root).getPropertyValue("--acc-rgb").trim();
+    for (let k = 0; k < 5; k++) {
+      bx.beginPath(); bx.strokeStyle = `rgba(${acc},${.5 - k * .08})`; bx.lineWidth = 2;
+      for (let x = 0; x <= bw.width; x += 6) {
+        const y = bw.height * .62 + Math.sin(x * .004 + t * .0006 * (k + 1) + k) * (40 + k * 18) * Math.sin(x * .0012 + k);
+        x ? bx.lineTo(x, y) : bx.moveTo(x, y);
+      }
+      bx.stroke();
+    }
+    if (!reduce) requestAnimationFrame(band);
+  }
+
+  // ---------------------------------------------------------------- marquee
+  const SAYS = [["lights", "Jarvis, movie mode"], ["stocks", "how's my watchlist?"], ["files", "make me a budget spreadsheet"], ["games", "how long have I played today?"],
+    ["web", "open a bunch of tabs on building a PC"], ["music", "play something for focusing"], ["life", "what can I cook with eggs and rice?"], ["files", "find the PDF from my landlord"],
+    ["desk", "focus on that"], ["life", "remind me at 5 to call mom"], ["pc", "why is my PC slow?"], ["desk", "what's this?"], ["life", "gift ideas for Kai"], ["self", "run diagnostics"],
+    ["trig", "every weekday at 8, market and weather"], ["self", "learn my voice"], ["self", "whisper mode on"], ["games", "any patch for Dead by Daylight?"]];
+  $("#marq").innerHTML = [...SAYS, ...SAYS].map(([k, t]) => `<span><b>${k}</b> &nbsp;${t}</span>`).join("");
+
+  // ---------------------------------------------------------------- try him
+  const esc = t => t.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  const TRY = [
+    {q: "How's Nvidia doing?", a: "Up 2.4% on the day at 196.42. Priced for perfection, but the data-centre numbers keep earning it. Opinion, not advice.", cap: "panel: stock, live",
+     pv: () => `<div class="pv"><div class="hd">NVIDIA <em>LIVE</em></div><div class="big" style="color:var(--up)">196.42</div><div class="fig" style="color:var(--up);margin-top:6px">+4.61 +2.40%</div><div class="bars">${[30,34,31,40,38,45,50,47,58,55,64,70,66,78].map((h,i)=>`<i style="height:${h}%;animation-delay:${i*40}ms"></i>`).join("")}</div><div class="row3"><div>Day<b>189.90 - 197.20</b></div><div>52 wk<b>86.60 - 212.20</b></div><div>Market<b>open</b></div></div></div>`},
+    {q: "Will it rain tonight?", a: "Around nine, yes. Light, about an hour. Radar's up so you can watch it come in.", cap: "panel: weather radar",
+     pv: () => `<div class="pv"><div class="hd">Weather <span class="fig">tonight</span></div><div class="big">19&deg;</div><div class="bars">${[5,5,8,12,30,62,80,55,20,8,5,5].map((h,i)=>`<i style="height:${h}%;animation-delay:${i*40}ms"></i>`).join("")}</div><div class="row3"><div>18:00<b>dry</b></div><div>21:00<b>rain 70%</b></div><div>00:00<b>clearing</b></div></div></div>`},
+    {q: "What can I make with eggs, rice and spinach?", a: "Egg fried rice with spinach. Fifteen minutes, one pan. You only need soy sauce and an onion. Recipe's up.", cap: "panel: recipe",
+     pv: () => `<div class="pv"><div class="hd">Spinach egg fried rice <span class="fig">15 min &middot; serves 2</span></div><ul><li>2 cups cooked rice</li><li>3 eggs</li><li>2 handfuls spinach</li><li class="need">soy sauce (missing)</li><li class="need">1 onion (missing)</li></ul><ol><li>Scramble the eggs soft, set aside.</li><li>Fry onion, then rice, hot pan.</li><li>Spinach in, wilt, eggs back, soy.</li></ol></div>`},
+    {q: "Write a cover letter for the junior dev job", a: "Done. One page, on your desktop as a Word file. I leaned on the Discord bot you built. Want me to open it?", cap: "panel: file preview",
+     pv: () => `<div class="pv"><div class="hd">Cover letter.docx <span class="fig">Desktop</span></div><div class="doc"><h4>Dear hiring team,</h4>I'm applying for the Junior Developer role. Over the last year I built and shipped a Windows voice assistant used daily, with a live data pipeline, a Discord bot and auto-updates...</div></div>`},
+    {q: "When I open Valorant, go dark and start my playlist", a: "Set. When Valorant opens: lights off except the desk strip, and your gaming playlist. Say “pause the Valorant one” to stop it.", cap: "trigger saved",
+     pv: () => `<div class="pv"><div class="hd">Trigger <span class="fig">when an app opens</span></div><ol><li>Valorant opens</li><li>Lights: off, desk strip on</li><li>Spotify: gaming playlist</li></ol><p class="fig" style="margin-top:12px">3 triggers set &middot; saved on your PC</p></div>`},
+    {q: "How long have I played today?", a: "Three hours ten. Most of it Dead by Daylight. You told me 4 wins, 3 losses. Honestly, good time for a break.", cap: "panel: play time",
+     pv: () => `<div class="pv"><div class="hd">Today <span class="fig">play time</span></div><div class="big">3h 10m</div><div class="row3"><div>DBD<b>2h 25m</b></div><div>Valorant<b>45m</b></div><div>Record<b>4W 3L</b></div></div></div>`}
+  ];
+  let tryBusy = 0;
+  function tryIt(i) {
+    const T = TRY[i], c = $("#convo"), my = ++tryBusy;
+    $$("#prompts button").forEach((b, k) => b.setAttribute("aria-pressed", String(k === i)));
+    c.innerHTML = `<div class="u">Jarvis, ${esc(T.q.charAt(0).toLowerCase() + T.q.slice(1))}</div>`;
+    const j = document.createElement("div"); j.className = "j"; j.innerHTML = `<small>jarvis</small><span></span>`; 
+    setTimeout(() => {
+      if (my !== tryBusy) return;
+      c.append(j); $("#pvBox").innerHTML = T.pv(); $("#pvCap").textContent = T.cap;
+      const sp = j.querySelector("span");
+      if (reduce) { sp.textContent = T.a; return; }
+      let n = 0; const step = () => { if (my !== tryBusy) return; sp.textContent = T.a.slice(0, ++n); if (n < T.a.length) setTimeout(step, 16); }; step();
+    }, reduce ? 0 : 450);
+  }
+  TRY.forEach((t, i) => { const b = document.createElement("button"); b.type = "button"; b.textContent = t.q; b.addEventListener("click", () => tryIt(i)); $("#prompts").append(b); });
+  tryIt(0);
+
+  // ---------------------------------------------------------------- personalities
+  const MOODS = [["classic", "Classic", "Dry, calm, a little sardonic", "Your 3pm is moved. I'd suggest not booking the dentist on a Friday again, but I've suggested that before."],
+    ["warm", "Warm", "The loyal old family butler", "All sorted, the 3pm's moved to Monday. Go get some lunch, you've earned it."],
+    ["sharp", "Sharp", "Teasing, unimpressed, on your side", "Moved. Third time this month. The dentist is starting to think you're avoiding them. You are."],
+    ["focused", "Focused", "Businesslike, no fluff", "Moved to Monday, 3pm. Reminder set."],
+    ["theatrical", "Theatrical", "A showman who still gets it done", "Behold: your Friday, liberated. The dentist will receive you Monday at three. Applause optional."]];
+  function setMood(k) {
+    $$("#moods .mood").forEach(m => m.setAttribute("aria-pressed", String(m.dataset.k === k)));
+    const m = MOODS.find(x => x[0] === k); $("#moodq").innerHTML = `<small>“Jarvis, move my dentist appointment.”</small>${esc(m[3])}`;
+  }
+  for (const [k, n, d, q] of MOODS) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "mood"; b.dataset.k = k;
+    b.innerHTML = `<b>${n}</b><span>${d}</span>`; b.addEventListener("click", () => setMood(k)); b.addEventListener("mouseenter", () => setMood(k)); $("#moods").append(b);
+  }
+  setMood("classic");
+
+  // ---------------------------------------------------------------- cost estimator
+  const RATE = {sIn: 2, sOut: 10, sCacheR: .10, sCacheW: 2.5, hIn: .10, hOut: .50, search: .01};
+  function calc() {
+    const Q = +$("#cQ").value, H = +$("#cH").value / 100, S = +$("#cS").value, G = +$("#cG").value;
+    $("#oQ").textContent = Q; $("#oH").textContent = Math.round(H * 100) + "%"; $("#oS").textContent = S; $("#oG").textContent = ["None", "Some", "Lots"][G];
+    const real = Q * (1 - H), quick = Q * H;
+    const perReal = (7000 * RATE.sCacheR + 1500 * RATE.sIn) / 1e6 * 1.4 + 330 * RATE.sOut / 1e6;
+    const perQuick = (2500 * RATE.hIn + 60 * RATE.hOut) / 1e6;
+    const perSearch = RATE.search + 3000 * RATE.sIn / 1e6;
+    const parts = [["Real answers", real * perReal * 30], ["Memory reloads", S * 7000 * RATE.sCacheW / 1e6 * 30], ["Searches and live lookups", real * [0, .1, .3][G] * perSearch * 30], ["Quick answers", quick * perQuick * 30]];
+    const tot = parts.reduce((a, p) => a + p[1], 0);
+    $("#cTot").textContent = "$" + tot.toFixed(2);
+    $$("#cStack i").forEach((el, i) => el.style.width = (parts[i][1] / tot * 100) + "%");
+    $("#cBreak").innerHTML = parts.map(([n, v], i) => `<div><i style="background:${["var(--acc)", "rgba(var(--acc-rgb),.55)", "rgba(var(--acc-rgb),.28)", "var(--mute)"][i]}"></i><span>${n}</span><span>$${v.toFixed(2)}</span></div>`).join("");
+    const rows = [["Per real answer", perReal], ["Per quick answer", perQuick], ["Per day", tot / 30]], mx = Math.max(...rows.map(r => r[1]));
+    $("#cCmp").innerHTML = rows.map(([n, v]) => `<div><span>${n}</span><em><i style="width:${Math.max(2, v / mx * 100)}%"></i></em><span>${v < .01 ? (v * 100).toFixed(2) + "¢" : "$" + v.toFixed(2)}</span></div>`).join("");
+  }
+  ["cQ", "cH", "cS", "cG"].forEach(id => $("#" + id).addEventListener("input", calc)); calc();
+
+  // ---------------------------------------------------------------- commands
+  const CMDS = [
+    ["Basics", "Jarvis, what time is it?", ""], ["Basics", "Never mind", "cancels what he's doing"], ["Basics", "Mute", "stops listening entirely"], ["Basics", "Louder / quieter", "his voice volume"],
+    ["Basics", "Talk shorter", "or longer, funnier, more serious"], ["Basics", "What can you do?", ""],
+    ["Desktop", "Focus on that", "fills the screen with the last panel"], ["Desktop", "Clear the desktop", "puts every panel away"], ["Desktop", "Switch to the archive", "changes his world"],
+    ["Desktop", "Move the weather to the top left", ""], ["Desktop", "Put the stocks on my second monitor", ""], ["Desktop", "Hide the messages widget", ""], ["Desktop", "What's this?", "explains the window in front"],
+    ["Stocks", "How's my watchlist?", ""], ["Stocks", "Compare AMD and Nvidia this year", ""], ["Stocks", "Bull and bear case for Tesla", "opinions, never advice"], ["Stocks", "Paper buy 10 shares of Apple", "pretend portfolio"],
+    ["Stocks", "When's Nvidia's earnings?", ""], ["Stocks", "Add Microsoft to my watchlist", ""],
+    ["Files", "Make me a budget spreadsheet", "real Excel with formulas"], ["Files", "Turn my notes into a 6-slide deck", ""], ["Files", "Find the PDF from my landlord", "instant, by name or contents"],
+    ["Files", "Open number two", "after a search"], ["Files", "Summarize this Word file", ""], ["Files", "Zip my Downloads screenshots", "asks first"],
+    ["Web", "Google the best budget gaming mouse", "opens in your browser"], ["Web", "Open a bunch of tabs on building a PC", "up to 15"], ["Web", "Pull up pictures of Lake Atitlán", ""], ["Web", "Who won the game last night?", ""],
+    ["Games", "How long have I played today?", ""], ["Games", "We lost again", "he keeps your W/L"], ["Games", "Any patch for Dead by Daylight?", ""], ["Games", "What should I play next?", "from your Steam library"],
+    ["Games", "Which friends are online?", ""], ["Games", "Track the score", "live on your desktop"],
+    ["Home", "Movie mode", "a lighting scene"], ["Home", "Turn the lights red", ""], ["Home", "Play my DBD playlist", ""], ["Home", "Skip this song", ""], ["Home", "Who's on my network?", "network map"],
+    ["Life", "Remind me at 5 to call mom", ""], ["Life", "What's my day look like?", "calendar timeline"], ["Life", "Kai's birthday is March 3", ""], ["Life", "Gift ideas for Kai", ""],
+    ["Life", "What can I cook with eggs and rice?", ""], ["Life", "Write in my journal: good day", ""], ["Life", "Write my weekly letter", "normally Sunday by himself"],
+    ["Automation", "When I open Dead by Daylight, turn the lights red", ""], ["Automation", "Every weekday at 8, tell me the market and the weather", ""], ["Automation", "When I get back, tell me what I missed on Discord", ""],
+    ["Automation", "What triggers do I have?", ""], ["Automation", "Pause the Valorant one", ""],
+    ["Him", "Learn my voice", "about 20 seconds"], ["Him", "Private mode on", "speech stays on your PC"], ["Him", "Whisper mode on", ""], ["Him", "Run diagnostics", ""], ["Him", "Fix it", "after diagnostics"],
+    ["Him", "Remember that I'm allergic to peanuts", ""], ["Him", "What do you know about me?", ""], ["PC", "Why is my PC slow?", ""], ["PC", "Clean up my Downloads", "asks first"], ["PC", "How hot is my GPU?", ""]
+  ];
+  const CATS = ["All", ...new Set(CMDS.map(c => c[0]))]; let cmdCat = "All", cmdsBuilt = false;
+  function renderCmds() {
+    if (!cmdsBuilt) {
+      cmdsBuilt = true;
+      CATS.forEach(c => { const b = document.createElement("button"); b.type = "button"; b.textContent = c; b.setAttribute("aria-pressed", String(c === "All")); b.addEventListener("click", () => { cmdCat = c; $$("#cmdCats button").forEach(x => x.setAttribute("aria-pressed", String(x.textContent === c))); renderCmds(); }); $("#cmdCats").append(b); });
+      $("#cmdQ").addEventListener("input", renderCmds);
+    }
+    const q = $("#cmdQ").value.trim().toLowerCase();
+    const list = CMDS.filter(([c, t, n]) => (cmdCat === "All" || c === cmdCat) && (!q || (c + " " + t + " " + n).toLowerCase().includes(q)));
+    $("#cmdN").textContent = `${list.length} of ${CMDS.length}`;
+    $("#cmds").innerHTML = list.length ? list.map(([c, t, n]) => `<div class="cmd"><div><q>${esc(t)}</q><small>${esc(c)}${n ? " &middot; " + esc(n) : ""}</small></div><button type="button" data-t="${esc(t)}">copy</button></div>`).join("")
+      : `<p class="lede">Nothing matches that. Try one word, like “lights” or “file”. Or just ask him: he understands normal sentences.</p>`;
+  }
+  $("#cmds").addEventListener("click", async e => {
+    const b = e.target.closest("button[data-t]"); if (!b) return;
+    try { await navigator.clipboard.writeText(b.dataset.t); toast("Copied. Say it with “Jarvis,” in front."); } catch (err) { toast("Couldn't copy here. Select the text instead."); }
+  });
+  function toast(t) { const el = $("#toast"); el.textContent = t; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 2200); }
+
+  // ---------------------------------------------------------------- roadmap votes (local preview only)
+  const IDEAS = [["A sixth world: the greenhouse", "Plants that grow with your streaks, rain on the glass when it rains outside.", 64],
+    ["Phone companion", "Ask him from your phone and see his panels there.", 81], ["Email triage", "Reads your inbox, drafts replies, never sends without you.", 58],
+    ["Home Assistant support", "Every smart device, not just Hue.", 47], ["Custom wake word", "Call him whatever you like.", 52],
+    ["Twitch and YouTube chat reader", "Reads chat out while you stream, filters the junk.", 39], ["Multi-language conversations", "Switch languages mid-sentence.", 33]];
+  let myVotes = {}; try { myVotes = JSON.parse(localStorage.getItem("jarvis-votes") || "{}"); } catch (e) {}
+  function renderVotes() {
+    const mx = Math.max(...IDEAS.map(([n, , v]) => v + (myVotes[n] ? 1 : 0)));
+    $("#votes").innerHTML = IDEAS.map(([n, d, v]) => { const on = !!myVotes[n], tot = v + (on ? 1 : 0);
+      return `<div class="vote"><div><b>${esc(n)}</b><span>${esc(d)}</span></div><div class="meter" aria-hidden="true"><i style="width:${tot / mx * 100}%"></i></div><button type="button" data-n="${esc(n)}" aria-pressed="${on}">${on ? "Voted" : "Vote"} ${tot}</button></div>`; }).join("");
+  }
+  $("#votes").addEventListener("click", e => { const b = e.target.closest("button[data-n]"); if (!b) return; const n = b.dataset.n; myVotes[n] = !myVotes[n]; try { localStorage.setItem("jarvis-votes", JSON.stringify(myVotes)); } catch (err) {} renderVotes(); });
+  renderVotes();
+
+  // ---------------------------------------------------------------- spotlight + monitor tilt + ring
+  document.addEventListener("pointermove", e => {
+    const el = e.target.closest && e.target.closest(".spot"); if (!el) return;
+    const r = el.getBoundingClientRect(); el.style.setProperty("--mx", (e.clientX - r.left) + "px"); el.style.setProperty("--my", (e.clientY - r.top) + "px");
+  });
+  const mon = $("#monitor");
+  if (!reduce && matchMedia("(pointer:fine)").matches) {
+    $(".hero").addEventListener("pointermove", e => { const r = mon.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+      mon.style.transform = `perspective(1400px) rotateY(${x * 6}deg) rotateX(${-y * 5}deg)`; });
+    $(".hero").addEventListener("pointerleave", () => mon.style.transform = "");
+  }
+  const rc = $("#ring"), rx = rc.getContext("2d");
+  function ring(t) {
+    const w = rc.width, h = rc.height, cx = w / 2, cy = h / 2, acc = getComputedStyle(root).getPropertyValue("--acc-rgb").trim();
+    rx.clearRect(0, 0, w, h);
+    for (let k = 0; k < 3; k++) {
+      const R = 250 + k * 34, a0 = t * .00012 * (k % 2 ? -1 : 1) * (k + 1);
+      rx.strokeStyle = `rgba(${acc},${.22 - k * .06})`; rx.lineWidth = 1.5; rx.setLineDash(k === 1 ? [2, 10] : [60, 18, 8, 18]);
+      rx.beginPath(); rx.ellipse(cx, cy, R * 1.45, R, 0, a0, a0 + Math.PI * 2); rx.stroke();
+    }
+    rx.setLineDash([]);
+    if (!reduce) requestAnimationFrame(ring);
+  }
+
+  // ---------------------------------------------------------------- boot
+  setWorld(world, "init");
+  route();
+  wave(0); band(0); ring(0);
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("boot")));
+  restartHero();
+  if (!reduce) { setInterval(tick, 1100); runTrig(); setInterval(runTrig, 6500); }
+  else $$("#trigList li").forEach(l => l.classList.add("done"));
+})();
+</script>
+</body>
+</html>

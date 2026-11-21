@@ -488,7 +488,9 @@ def view():
     out = []
     for section, key, label, kind, help_, options in FIELDS:
         f = {"section": section, "key": key, "label": label, "kind": kind, "help": help_,
-             "page": PAGES.get(section, "apps")}
+             "page": PAGES.get(section, "apps"), "live": key in config.LIVE_KEYS}
+        if kind != "secret" and key in DEFAULTS:
+            f["default"] = DEFAULTS[key]
         if kind == "secret":
             v = _current(key)
             f["saved"] = bool(v) and "paste-yours" not in v

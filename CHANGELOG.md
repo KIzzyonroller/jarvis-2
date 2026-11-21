@@ -3,6 +3,17 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.43
+
+- **A new icon.** His dial: the ring of ticks you see on the desktop, with the amber arc it shows while he's thinking. A simpler version for the tiny sizes so it stays crisp in the taskbar and tray.
+- **Search your settings.** Press Ctrl+F (or /) in Settings and type: every setting that mentions it shows up, and you can change it right there.
+- **Settings say when a restart is needed.** Only the ones that actually need it are marked, and the button just says "Save" when nothing does.
+- **Back to default.** Changed something and regret it? "Default" next to a setting puts it back to how he came.
+- **Widgets dressed for each world.** The desktop widgets now match his pop-up panels: blueprint type on the bench, serif cards in the archive and greenhouse, and so on. They also have a solid backing now, so the scene behind them never makes them hard to read.
+- **Docs.** A proper guide: installing, talking to him, instant commands, his desktop, settings, costs, privacy, guests, gaming, plugins, updates and what to do when something's wrong.
+- **The website is live on GitHub Pages,** with the greenhouse, the new icon and the docs.
+- Fixed: the plugin help pointed to a settings page that doesn't exist (it's Settings > What he knows > Plugins). A Discord channel no longer shows as "##channel" on the Messages widget.
+
 ## 1.0.42
 
 - **His world moves now.** Small things live in each scene: stars twinkle and the odd shooting star crosses the station window, dust drifts through the archive's moonlight while the desk lamp breathes, the listening post's waterfall scrolls, glints catch the sea on the chart while a little ship works along the route. It runs at 10 frames a second, stops completely while a game or anything fullscreen is up, and is off in performance mode. Settings > His desktop > Living scene turns it off if you'd rather have a still picture.
