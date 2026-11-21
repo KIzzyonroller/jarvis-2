@@ -128,3 +128,84 @@ def test_crash_report_link_is_prefilled_and_short():
         crashreport.record(e, "answering")
     url = crashreport.issue_url()
     assert url.startswith(crashreport.REPO + "/issues/new?") and "KeyError" in url and len(url) <= 7800
+
+
+@pytest.mark.parametrize("text,want", [
+    ("what's 15% of 240", "36"), ("convert 5 miles to km", "8.047"), ("350 fahrenheit in celsius", "176.7"),
+    ("what is 2 to the power of 10", "1,024"), ("square root of 144", "12"), ("12 is what percent of 48", "25%"),
+    ("200 grams of flour in cups", "1.6"), ("how many cups in a liter", "4.227"),
+])
+def test_calc(text, want):
+    import calc
+    r = calc.answer(text, offline=True)
+    assert r and want in r[0], r
+
+
+@pytest.mark.parametrize("text", ["what's the capital of france", "what time is it", "what's up"])
+def test_calc_leaves_questions_alone(text):
+    import calc
+    assert calc.answer(text, offline=True) is None
+
+
+def test_calc_rejects_code():
+    import calc
+    assert calc.arithmetic("__import__('os').system('x')") is None
+    assert calc.arithmetic("9**9**9") is None
+
+
+def test_clipboard_history_skips_secrets():
+    import cliphist
+    cliphist.ITEMS.clear()
+    cliphist.add_text("sk-ant-api03-abcdefghijklmnop")
+    cliphist.add_text("Tr0ub4dor&3xQ9!zK")
+    cliphist.add_text("https://example.com/some/long/link?x=1")
+    cliphist.add_text("meet at 5 at the usual place")
+    texts = [i["text"] for i in cliphist.ITEMS]
+    assert texts == ["https://example.com/some/long/link?x=1", "meet at 5 at the usual place"]
+
+
+def test_duplicates_found_and_keeper_is_sensible(tmp_path, monkeypatch):
+    import dupes
+    monkeypatch.setattr(dupes, "MIN_SIZE", 10)
+    a = tmp_path / "Pictures" / "cat.jpg"
+    b = tmp_path / "Downloads" / "cat (1).jpg"
+    c = tmp_path / "Downloads" / "other.bin"
+    for p in (a, b, c):
+        p.parent.mkdir(parents=True, exist_ok=True)
+    a.write_bytes(b"x" * 5000)
+    b.write_bytes(b"x" * 5000)
+    c.write_bytes(b"y" * 5000)
+    groups, wasted = dupes.scan(str(tmp_path), seconds=10)
+    assert len(groups) == 1 and groups[0]["keep"] == str(a) and groups[0]["extra"] == [str(b)] and wasted == 5000
+
+
+def test_bedtime_maths():
+    from datetime import datetime
+    import winddown
+    assert winddown._bed_dt(datetime(2026, 1, 1, 22, 0), (0, 30)) == datetime(2026, 1, 2, 0, 30)
+    assert winddown._bed_dt(datetime(2026, 1, 2, 0, 10), (23, 0)) == datetime(2026, 1, 1, 23, 0)
+    assert winddown._night_key(datetime(2026, 1, 2, 0, 10)) == winddown._night_key(datetime(2026, 1, 1, 22, 0))
+
+
+def test_price_from_structured_data(monkeypatch):
+    import io
+    import pricewatch
+    html = b'<html><title>GPU</title><script type="application/ld+json">{"@type":"Product","name":"RTX 5070",' \
+           b'"offers":{"@type":"Offer","price":"549.99","priceCurrency":"USD"}}</script></html>'
+
+    class R(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+    monkeypatch.setattr(pricewatch.urllib.request, "urlopen", lambda *a, **k: R(html))
+    assert pricewatch.page_price("https://shop.example/gpu") == (549.99, "USD", "RTX 5070")
+
+
+def test_quiet_manual_strings():
+    import quiet
+    quiet.set_manual("off")
+    assert quiet.MANUAL["on"] is False
+    quiet.set_manual("auto")
+    assert quiet.MANUAL["on"] is None

@@ -80,8 +80,10 @@ def on_call():
 def check():
     mode, a, b, vol = _settings()
     why = ""
+    if MANUAL["on"] is not None and time.time() - MANUAL.get("since", 0) > 6 * 3600 and datetime.now().hour == b:
+        MANUAL["on"] = None                              # a manual "on" from last night ends in the morning
     if MANUAL["on"] is not None:
-        on = MANUAL["on"]
+        on = bool(MANUAL["on"])
         why = "you asked"
     elif mode == "on":
         on, why = True, "always on"
@@ -110,7 +112,11 @@ def note():
 
 
 def set_manual(on):
+    """True / "on" = force on, False / "off" = force off, None / "auto" = back to automatic."""
+    if isinstance(on, str):
+        on = {"on": True, "off": False}.get(on.lower())      # "auto" and anything else -> None
     MANUAL["on"] = on
+    MANUAL["since"] = time.time()
     check()
     return STATE
 

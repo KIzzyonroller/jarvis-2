@@ -451,6 +451,14 @@ class Core:
             extras.start(self)                   # ambient lines, the weekly letter, inside jokes
             import undo
             undo.start(self)                     # "undo that"
+            import cliphist
+            cliphist.start()                     # "what did I copy ten minutes ago?" (memory only, never passwords)
+            import shotsearch
+            shotsearch.start(self)               # reads screenshots' text a few at a time, for searching
+            import pricewatch
+            pricewatch.start(self)               # "tell me when that GPU drops under $400"
+            import winddown
+            winddown.start(self)                 # half an hour before bedtime
             import triggers
             triggers.start(self)                 # "when I open DBD..." / "every weekday at 8..."
             import comeback

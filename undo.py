@@ -156,6 +156,20 @@ def _reverse(item):
         p.parent.mkdir(parents=True, exist_ok=True)
         (shutil.copytree if Path(vault).is_dir() else shutil.copy2)(vault, p)
         return f"Undone: {p.name} is back in {p.parent}. (The other copy is still in the Recycle Bin.)"
+    if k == "dupes":
+        back, gone = 0, []
+        for f in d.get("files", []):
+            p, keep = Path(f["path"]), f.get("keep")
+            if p.exists():
+                continue
+            if keep and Path(keep).exists():
+                p.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(keep, p)
+                back += 1
+            else:
+                gone.append(p.name)
+        return (f"Undone: put {back} duplicate{'s' if back != 1 else ''} back." +
+                (f" {len(gone)} were look-alike photos with no exact copy left; those are in the Recycle Bin." if gone else ""))
     if k == "settings":
         before = d.get("before") or {}
         if CORE is None:

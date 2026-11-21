@@ -47,6 +47,15 @@ FIELDS = [
      "Things like a full drive, overheating or a download stuck. Never during games.", None),
 
     # ---------------------------------------------------------------- Conversation & personality
+    ("Check-ins", "JARVIS_BEDTIME", "Bedtime (wind-down)", "choice",
+     "Half an hour before, he says what's first tomorrow, goes quiet (whisper mode) and slowly dims and warms the "
+     "lights. At bedtime he offers goodnight once. Or say \"my bedtime is 11:30\".", [('off', 'Off'), ('20:00', '8:00 pm'), ('20:30', '8:30 pm'), ('21:00', '9:00 pm'), ('21:30', '9:30 pm'), ('22:00', '10:00 pm'), ('22:30', '10:30 pm'), ('23:00', '11:00 pm'), ('23:30', '11:30 pm'), ('00:00', '12:00 am'), ('00:30', '12:30 am'), ('01:00', '1:00 am'), ('01:30', '1:30 am'), ('02:00', '2:00 am'), ('02:30', '2:30 am'), ('03:00', '3:00 am'), ('03:30', '3:30 am')]),
+    ("What he can use", "JARVIS_CLIP_HISTORY", "Clipboard history", "bool",
+     "Remember what you copy (in memory only, gone when he closes) so you can ask for something you copied earlier. "
+     "Passwords and anything a password manager marks private are never kept.", None),
+    ("What he can use", "JARVIS_SHOT_SEARCH", "Search my screenshots", "bool",
+     "He reads the text in your screenshots on this PC, a few at a time, so you can find them by what was on screen. "
+     "Only the words are kept, in Documents\\Jarvis.", None),
     ("Starting up", "JARVIS_PERFORMANCE", "Performance mode", "choice",
      "Lite makes him easier on a slower PC: a lighter speech model, the desktop at 15 frames a second with no effects, "
      "no ambient lines. Auto picks lite on PCs with under 8 GB of RAM or 4 or fewer CPU threads.",
@@ -418,7 +427,7 @@ DEFAULTS = {"JARVIS_DAILY_BUDGET": "5", "JARVIS_ADDRESS_AS": "sir",
             "JARVIS_TTS": "kokoro", "JUNO_ELEVENLABS_VOICE_ID": "EXAVITQu4vr4xnSDxMaL", "JUNO_LANGUAGE": "en",
             "JUNO_MIC": "default", "JUNO_MIC_FLOOR": "400", "JARVIS_VAD": "0.5", "JARVIS_PAUSE": "1.5",
             "JARVIS_SMART_PAUSE": "true", "JARVIS_ECHO_CANCEL": "true", "JARVIS_MUTE_HOTKEY": "ctrl+alt+m",
-            "JUNO_DESK_SCENE": "bench", "JUNO_DESK_CALM": "true", "JUNO_STOCK_ALERTS": "true", "JUNO_STOCK_ALERT_PCT": "4", "JUNO_STOCKS_BRIEFING": "true", "JARVIS_LEAN_TOOLS": "true", "JARVIS_PERFORMANCE": "auto", "JARVIS_CRASH_REPORTS": "ask", "JARVIS_VOICE_ID": "true", "JARVIS_VOICE_ID_STRICT": "normal", "JARVIS_CONVO": "45",
+            "JUNO_DESK_SCENE": "bench", "JUNO_DESK_CALM": "true", "JUNO_STOCK_ALERTS": "true", "JUNO_STOCK_ALERT_PCT": "4", "JUNO_STOCKS_BRIEFING": "true", "JARVIS_LEAN_TOOLS": "true", "JARVIS_PERFORMANCE": "auto", "JARVIS_BEDTIME": "off", "JARVIS_CLIP_HISTORY": "true", "JARVIS_SHOT_SEARCH": "true", "JARVIS_CRASH_REPORTS": "ask", "JARVIS_VOICE_ID": "true", "JARVIS_VOICE_ID_STRICT": "normal", "JARVIS_CONVO": "45",
             "JARVIS_PRIVATE": "false", "JARVIS_WHISPER": "auto", "JARVIS_WHISPER_FROM": "23", "JARVIS_WHISPER_TO": "7",
             "JARVIS_WHISPER_VOL": "35", "JARVIS_TRIGGERS": "true", "JARVIS_PLAY_BREAK": "180", "JARVIS_WELCOME_BACK": "20",
             "JARVIS_AMBIENT": "rare", "JARVIS_LETTER": "true", "JARVIS_PATCH_ALERTS": "true", "JARVIS_FREE_CREATE": "personal", "JUNO_PULLS": "true", "JUNO_GAME_BRIEFING": "true", "JUNO_STOCKS_WEEKLY": "true", "JUNO_STOCK_EARNINGS": "true", "JUNO_W_STOCKS": "true", "JUNO_FPS": "30", "JUNO_DESK_VIZ": "both", "JUNO_GLASS_WHERE": "window", "JUNO_DESK_WIDGETS": "true",

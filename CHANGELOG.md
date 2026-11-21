@@ -3,6 +3,16 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.38
+
+- **Clipboard history.** "What did I copy ten minutes ago?", "put the link I copied before this one back". He remembers your last 60 copies while he's running (in memory only, gone when he closes). Passwords never get in: anything a password manager marks private, and anything that looks like a key or password, is skipped.
+- **Search your screenshots by what was on them.** "Find the screenshot with the error message", "the one with the Amazon receipt". He reads the text in your screenshots on this PC (Windows' own text recognition), a few at a time when you're not busy, and shows matches with thumbnails. Only the words are saved, never the pictures.
+- **Duplicate finder.** "Find duplicate files" checks Downloads, Desktop, Documents, Pictures, Videos, Music and OneDrive for exact copies (by content, not name) and photos that look the same, and shows how much space they waste. "Clean them up" sends the extra copies to the Recycle Bin after one approval; the copy in the best place is kept. "Undo that" puts them all back.
+- **Maths and conversions, instantly.** "What's 15% of 240", "18 percent tip on 64.50", "5 miles in km", "350 fahrenheit in celsius", "200 grams of flour in cups", "100 dollars in quetzales" (live exchange rates). Answered on your PC in a blink, with the working on your desktop.
+- **Price watcher.** "Tell me when that GPU drops under $400", "watch Elden Ring for a sale", "tell me if Bitcoin goes over 120k". Works with most store pages (Best Buy, Newegg, Walmart, B&H; Amazon usually blocks it, and he says so), Steam games, stocks and crypto. He tells you once, with a little price history on your desktop.
+- **Wind-down.** Set a bedtime ("my bedtime is 11:30"). Half an hour before, he tells you the first thing tomorrow and the weather, goes into whisper mode, and slowly dims and warms your lights. At bedtime, one offer to say goodnight. Never mid-game or mid-call.
+- **Fixed: "whisper mode off" didn't turn it off.**
+
 ## 1.0.37
 
 - **Fixed: learning your voice never stuck.** He saved your voiceprint to a file his own start-up clean-up deleted every time he launched. It now lives in its own file. Say "Jarvis, learn my voice" once more after updating and it stays learned.

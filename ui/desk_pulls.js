@@ -14,7 +14,8 @@ window.DeskPulls = (() => {
   const DEFAULT_WHERE = { pc: "right", network: "right", briefing: "right", weather: "right" };
   const TITLES = { stock: "Market", weather: "Weather", calendar: "Today", sources: "Sources", pc: "Your PC", file: "Made",
                    network: "Network", briefing: "Briefing", tracker: "Tracking", checklist: "Diagnostics", files: "Found",
-                   recipe: "Recipe" };
+                   recipe: "Recipe", clips: "Clipboard", shots: "Screenshots", dupes: "Duplicates", calc: "Worked out",
+                   price: "Price alert" };
   const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ------------------------------------------------------------------ little builders
@@ -394,6 +395,74 @@ window.DeskPulls = (() => {
     foot(el, "\u201cOpen number two\u201d");
   }
 
+  // ------------------------------------------------------------------ clipboard history
+  function renderClips(el, d) {
+    const b = body(el); b.replaceChildren();
+    const ol = h("ol", "clips");
+    for (const r of (d.rows || []).slice(0, 10)) { const li = h("li"); li.append(h("em", null, r.when), h("span", null, r.text)); ol.append(li); }
+    b.append(ol);
+    el.querySelector(".pls").textContent = (d.rows || []).length + " recent";
+    foot(el, "\u201cCopy the second one back\u201d \u00b7 passwords are never kept");
+  }
+
+  // ------------------------------------------------------------------ screenshot search
+  function renderShots(el, d) {
+    const b = body(el); b.replaceChildren();
+    if (d.query) b.append(h("div", "q", "\u201c" + d.query + "\u201d"));
+    const g = h("div", "shots");
+    (d.rows || []).slice(0, 6).forEach((r, i) => {
+      const c = h("figure");
+      if (r.thumb) { const im = new Image(); im.src = r.thumb; im.alt = ""; c.append(im); }
+      const cap = h("figcaption"); cap.append(h("b", null, (i + 1) + ". " + r.name), h("span", null, r.when), h("i", null, r.snip || ""));
+      c.append(cap); g.append(c);
+    });
+    b.append(g);
+    el.querySelector(".pls").textContent = (d.rows || []).length + " found";
+    foot(el, "\u201cOpen number one\u201d");
+  }
+
+  // ------------------------------------------------------------------ duplicate finder
+  function renderDupes(el, d) {
+    const b = body(el); b.replaceChildren();
+    const top = h("div", "dp-top"); top.append(h("b", null, d.wasted || "0"), h("span", null, `wasted by ${d.files || 0} extra copies in ${d.groups || 0} groups`));
+    b.append(top);
+    const ol = h("ol", "dupes");
+    for (const r of (d.rows || []).slice(0, 8)) {
+      const li = h("li"); li.append(h("b", null, r.name), h("em", null, "\u00d7" + r.copies), h("span", null, r.size), h("i", null, (r.where || []).join("  \u00b7  ")));
+      ol.append(li);
+    }
+    b.append(ol);
+    el.querySelector(".pls").textContent = d.similar ? `+${d.similar} look-alike photos` : "exact copies";
+    foot(el, "\u201cClean them up\u201d sends the extras to the Recycle Bin \u00b7 undo works");
+  }
+
+  // ------------------------------------------------------------------ calculator / converter
+  function renderCalc(el, d) {
+    const b = body(el); b.replaceChildren();
+    b.append(h("div", "cl-q", d.q || ""), h("div", "cl-a", d.a || ""), h("div", "cl-w", d.work || ""));
+    el.querySelector(".pls").textContent = "";
+    foot(el, "");
+  }
+
+  // ------------------------------------------------------------------ price alert
+  function renderPrice(el, d) {
+    const b = body(el); b.replaceChildren();
+    b.append(h("div", "pr-l", d.label || ""));
+    const big = h("div", "pr-p up", (d.price != null ? Number(d.price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "") + " " + (d.cur || ""));
+    b.append(big);
+    const pts = (d.history || []).map((x) => x[1]);
+    if (pts.length > 1) {
+      const w = 320, hh = 70, mn = Math.min(...pts), mx = Math.max(...pts), sp = (mx - mn) || 1;
+      const path = pts.map((v, i) => `${i ? "L" : "M"}${(i / (pts.length - 1) * w).toFixed(1)},${(hh - 6 - (v - mn) / sp * (hh - 12)).toFixed(1)}`).join("");
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", `0 0 ${w} ${hh}`); svg.setAttribute("class", "pr-spark");
+      svg.innerHTML = `<path d="${path}" fill="none" stroke="currentColor" stroke-width="2"/>`;
+      b.append(svg);
+    }
+    el.querySelector(".pls").textContent = d.goal ? "your line: " + d.goal : "on sale";
+    foot(el, "Stopped watching \u00b7 \u201ckeep watching\u201d to re-arm");
+  }
+
   // ------------------------------------------------------------------ recipe from what you've got
   function renderRecipe(el, d) {
     const b = body(el); b.replaceChildren();
@@ -461,7 +530,8 @@ window.DeskPulls = (() => {
 
   const RENDER = { stock: renderStock, weather: renderWeather, calendar: renderCalendar, sources: renderSources, pc: renderPC,
                    file: renderFile, network: renderNetwork, briefing: renderBriefing, tracker: renderTracker,
-                   checklist: renderChecklist, files: renderFiles, recipe: renderRecipe };
+                   checklist: renderChecklist, files: renderFiles, recipe: renderRecipe, clips: renderClips, shots: renderShots,
+                   dupes: renderDupes, calc: renderCalc, price: renderPrice };
 
   // ------------------------------------------------------------------ placement
   function geom() {

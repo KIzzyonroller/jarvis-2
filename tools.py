@@ -896,6 +896,11 @@ def _paste(text):
         old = pyperclip.paste()
     except Exception:
         old = None
+    try:
+        import cliphist
+        cliphist.ignore_for(2.5)        # his own paste isn't something you copied
+    except Exception:
+        pass
     pyperclip.copy(text)
     time.sleep(0.05)
     try:
@@ -3909,6 +3914,35 @@ TOOL_SPECS = [
                            "desktop about their week, from you."),
     _spec("play_stats", "How long they've played today (days=1) or over N days, per game, and the wins/losses they "
                         "told you about.", {"days": N}),
+    _spec("clipboard_history", "What they've copied since you started (text, and that a picture was copied; never "
+                               "passwords). list (minutes: only the last N minutes), search (query), copy (put an older "
+                               "one back on the clipboard: number 1 = the one before the current, or query to pick by "
+                               "words), clear.",
+          {"action": {"type": "string", "enum": ["list", "search", "copy", "clear"]}, "query": S, "minutes": N, "number": N},
+          ["action"]),
+    _spec("screenshots", "Search their screenshots by the text that was in them (read on this PC). search (query: words "
+                         "that were on screen, e.g. 'error 0x80070005', 'amazon receipt'); status; reindex. Results go up "
+                         "with thumbnails; open one with the open tool and its path.",
+          {"action": {"type": "string", "enum": ["search", "status", "reindex"]}, "query": S}, ["action"]),
+    _spec("duplicates", "Duplicate files across Downloads, Desktop, Documents, Pictures, Videos, Music, OneDrive (exact "
+                        "copies by content, plus photos that look the same). find (folder optional): report + panel. "
+                        "clean: extra copies to the Recycle Bin after one approval (undo works). similar=true also "
+                        "removes the look-alike photos (only if they explicitly said so).",
+          {"action": {"type": "string", "enum": ["find", "clean"]}, "folder": S, "similar": B}, ["action"]),
+    _spec("calculate", "Exact maths and conversions on this PC, shown on the desktop: arithmetic, percentages and tips, "
+                       "units (length, weight, volume, temperature, speed, data, time), cooking (200 grams of flour in "
+                       "cups), currency (live rates). Use instead of doing sums in your head. expression: as they said it.",
+          {"expression": S}, ["expression"]),
+    _spec("price_watch", "Watch a price and tell them when it crosses a line. add: kind url (a product page link: find "
+                         "one with web search if they didn't give it; Best Buy, Newegg, Walmart, B&H work, Amazon "
+                         "usually doesn't), steam (game name; no price = any sale), stock (symbol or name, also crypto); "
+                         "below / above = the price. list, check (now), remove (id or words), rearm.",
+          {"action": {"type": "string", "enum": ["add", "list", "check", "remove", "rearm"]},
+           "kind": {"type": "string", "enum": ["url", "steam", "stock"]}, "target": S, "below": N, "above": N,
+           "label": S, "id": S}, ["action"]),
+    _spec("wind_down", "Before bed. set (time: their bedtime like 23:30, or off): half an hour before, a quiet line about "
+                       "tomorrow, whisper mode, lights slowly dim. start: do it now. skip: not tonight. status.",
+          {"action": {"type": "string", "enum": ["set", "start", "skip", "status"]}, "time": S}, ["action"]),
     _spec("undo", "Take back YOUR last change(s): a file you moved, renamed, made, edited or deleted, or a setting you "
                   "changed (his world, widgets, modes). action undo (steps: how many, default 1) or list (what can be "
                   "undone). Say exactly what was put back; never claim to undo a message you sent or anything outside this list.",
@@ -4186,6 +4220,38 @@ TOOL_SPECS = [
 ]
 
 
+def clipboard_history_tool(action="list", query=None, minutes=None, number=None):
+    import cliphist
+    return cliphist.tool(action, query, minutes, number)
+
+
+def screenshots_tool(action="search", query=None):
+    import shotsearch
+    return shotsearch.tool(action, query)
+
+
+def duplicates_tool(action="find", folder=None, similar=False):
+    import dupes
+    if (action or "find").lower() == "clean":
+        return dupes.clean(lambda t, d: _confirm(t, d), include_similar=bool(similar))
+    return dupes.report(_resolve(folder, config.HOME) if folder else None)
+
+
+def calculate_tool(expression=""):
+    import calc
+    return calc.tool(expression)
+
+
+def price_watch_tool(action="list", kind=None, target=None, below=None, above=None, label=None, id=None):
+    import pricewatch
+    return pricewatch.tool(action, kind, target, below, above, label, id)
+
+
+def wind_down_tool(action="start", time=None):
+    import winddown
+    return winddown.tool(action, time)
+
+
 def undo_tool(action="undo", steps=1):
     import undo
     return undo.listing() if (action or "").lower() == "list" else undo.undo(steps or 1)
@@ -4355,7 +4421,9 @@ FUNCS = {
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "stocks": stocks_tool, "desktop_scene": desktop_scene_tool,
-    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "undo": undo_tool, "crash_report": crash_report_tool, "voice_id": voice_id_tool, "privacy": privacy_tool, "triggers": triggers_tool,
+    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "undo": undo_tool, "clipboard_history": clipboard_history_tool,
+    "screenshots": screenshots_tool, "duplicates": duplicates_tool, "calculate": calculate_tool, "price_watch": price_watch_tool,
+    "wind_down": wind_down_tool, "crash_report": crash_report_tool, "voice_id": voice_id_tool, "privacy": privacy_tool, "triggers": triggers_tool,
     "find": find_tool, "recipe_card": recipe_card, "jokes": jokes_tool, "weekly_letter": letter_tool, "play_stats": play_stats, "birthdays": birthdays_tool, "goodnight": goodnight_tool, "corner_widget": corner_widget_tool, "history": history_tool, "background": background_tool,
     "watch": watch_tool, "activity": activity_tool, "glass": glass_tool,
 }
@@ -4378,7 +4446,7 @@ def set_connectors(c):
 # Anything not listed in a group is core. Settings > Answering > "Load tools as needed" turns this off.
 TOOL_GROUPS = {
     "media": ["spotify", "youtube", "netflix", "apple_music"],
-    "computer": ["files", "run_command", "mouse", "display", "system_power", "pc_doctor", "file_butler", "screen_text",
+    "computer": ["clipboard_history", "screenshots", "duplicates", "files", "run_command", "mouse", "display", "system_power", "pc_doctor", "file_butler", "screen_text",
                  "look_at_camera", "watch", "activity", "close_app"],
     "calendar_email": ["calendar", "email"],
     "discord_phone": ["discord", "phone"],
@@ -4387,7 +4455,7 @@ TOOL_GROUPS = {
     "stocks": ["stocks"],
     "desktop": ["glass", "desk_widgets", "desktop_scene", "frame_rate", "corner_widget", "rgb", "voice_settings",
                 "lights", "track"],
-    "life": ["journal", "birthdays", "goodnight", "changelog", "speed_report", "recipe_card", "jokes", "weekly_letter"],
+    "life": ["wind_down", "price_watch", "journal", "birthdays", "goodnight", "changelog", "speed_report", "recipe_card", "jokes", "weekly_letter"],
     "studio": ["blender", "blender_expert", "unreal_expert"],
     "apps": [],              # the user's own connectors (MCP tools, names with "__")
 }
@@ -4398,7 +4466,8 @@ GROUP_HINTS = {
                 r"restart|lock|monitor|brightness|display|mouse|click|camera|webcam|look at me|text on|read (the|this|my) screen|"
                 r"what was i|earlier|yesterday|close|quit|kill|downloads|tidy|clean|doc|docs|document|word|excel|"
                 r"spreadsheet|sheet|powerpoint|slides|deck|presentation|pdf|zip|unzip|project|script|code|write|make|"
-                r"create|save|draft|letter|resume|essay|table|budget|txt|markdown|csv)\b",
+                r"create|save|draft|letter|resume|essay|table|budget|txt|markdown|csv|copied|copy|clipboard|paste|"
+                r"screenshot|screenshots|snip|duplicate|duplicates|space|free up)\b",
     "calendar_email": r"\b(calendar|event|meeting|appointment|schedule|tomorrow|next week|email|emails|inbox|mail)\b",
     "discord_phone": r"\b(discord|message|messages|dm|server|channel|phone|text(ed)?|notification|notifications|post)\b",
     "games": r"\b(game|games|gaming|steam|play next|what should i play|patch|dbd|dead by daylight|queue|ranked|lost|won|"
@@ -4409,7 +4478,8 @@ GROUP_HINTS = {
                r"hue|voice|sound like|accent|speak (faster|slower))\b",
     "life": r"\b(journal|diary|birthday|birthdays|goodnight|good night|bed|changelog|what'?s new|patch notes for you|"
             r"speed report|how fast|cook|cooking|recipe|dinner|lunch|breakfast|eat|food|fridge|ingredients?|gift|gifts|"
-            r"present|joke|jokes|funny|remember that|letter)\b",
+            r"present|joke|jokes|funny|remember that|letter|bedtime|bed|sleep|wind down|winding down|price|prices|"
+            r"drops?|cheaper|sale|deal|alert me|watch)\b",
     "automation": r"\b(when i (open|launch|start|get back|come back)|every (day|morning|night|weekday|weekend|monday|"
                   r"tuesday|wednesday|thursday|friday|saturday|sunday)|at \d|trigger|triggers|automat\w*|my voice|"
                   r"only (listen|answer)|private mode|privacy|whisper|quiet mode|conversation mode|"
@@ -4445,12 +4515,12 @@ def more_tools_spec(loaded):
     # always offered (with every group), so the list keeps its shape and older calls to it stay valid
     rest = [g for g in TOOL_GROUPS if g not in loaded and (TOOL_GROUPS[g] or (g == "apps" and _CONNECTORS is not None))] \
         or list(TOOL_GROUPS)
-    desc = {"media": "Spotify, YouTube, Netflix, Apple Music", "computer": "files, commands, PC doctor, power, displays, "
+    desc = {"media": "Spotify, YouTube, Netflix, Apple Music", "computer": "clipboard history, screenshot search, duplicate finder, files, commands, PC doctor, power, displays, "
             "mouse, camera, screen text, screen history", "calendar_email": "calendar and email", "discord_phone":
             "Discord and phone notifications", "games": "game mode, Steam, play time", "stocks": "stocks and markets",
             "automation": "triggers and schedules, voice ID, private / whisper / conversation modes",
             "desktop": "glass mode, desktop widgets and scene, RGB and smart lights, his voice settings", "life":
-            "journal, birthdays and gift ideas, goodnight, recipes, inside jokes, the weekly letter, his changelog, speed report", "studio": "Blender and Unreal",
+            "bedtime wind-down, price watching, journal, birthdays and gift ideas, goodnight, recipes, inside jokes, the weekly letter, his changelog, speed report", "studio": "Blender and Unreal",
             "apps": "the user's connected apps"}
     return {"name": "more_tools", "description": "Load more of your tools when the ones you have can't do the job. "
             "Groups: " + "; ".join(f"{g} ({desc.get(g, g)})" for g in rest) + ". They're available from your next step on.",

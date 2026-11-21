@@ -87,6 +87,18 @@ def _media(key, label):
     return f
 
 
+def _calc(m):
+    import calc
+    t = m.group(0)
+    if _DRY.on:
+        return HIT if calc.answer(t, offline=True) else None
+    r = calc.answer(t)
+    if not r:
+        return None
+    calc.show(t, *r)
+    return r[0] + ".", f"Calc: {r[1]}"
+
+
 def _undo(m):
     if _DRY.on:
         return HIT
@@ -448,6 +460,10 @@ RULES = [
     (r"^(?:clear (?:that|it|this|those|them|the (?:screen|panels?|desktop))|close (?:that|those|the panels?)|"
      r"put (?:that|those|it) away|get rid of (?:that|those))$", _panels("clear")),
     (r"^(?:back|go back|that'?s enough|ok(?:ay)? back|exit focus|close focus)$", _panels("back")),
+    # last: only reached when nothing above matched (it'd otherwise shadow rules like "what's the time")
+    (r"^(?:(?:what's|whats|what is|calculate|compute|convert|how many|how much is|work out)\s+)?[\d(].*[\d)a-z]$|"
+     r"^(?:what's|whats|what is|calculate|compute|convert|how many|how much is|work out|square root of)\s+.*\d.*$|"
+     r"^how many \w+ (?:in|are in) (?:a|an|one) \w+$", _calc),
 ]
 RULES = [(re.compile(p), f) for p, f in RULES]
 
