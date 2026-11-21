@@ -332,3 +332,33 @@ def test_what_he_knows_lists_and_deletes(tmp_path, monkeypatch):
     knows.act(None, "memory", "delete", mem["items"][0]["id"])
     assert not next(s for s in knows.sections(None) if s["id"] == "memory")["items"]
     assert "Everything I keep" in knows.summary(None)
+
+
+def test_month_report(monkeypatch):
+    from datetime import datetime
+    import gamemode
+    import gamestats
+    rows = [{"t": datetime(2026, 10, d, 22).timestamp(), "start": datetime(2026, 10, d, 20).timestamp(), "game": g, "minutes": m}
+            for d, g, m in ((3, "Dead by Daylight", 120), (4, "Dead by Daylight", 200), (10, "Valorant", 60))]
+    rows += [{"t": datetime(2026, 10, 4, 21).timestamp(), "result": "win", "game": "Dead by Daylight"}]
+    rows += [{"t": datetime(2026, 9, 5, 21).timestamp(), "start": datetime(2026, 9, 5, 20).timestamp(), "game": "Valorant", "minutes": 190}]
+    monkeypatch.setattr(gamemode, "_read_play", lambda: rows)
+    out = gamestats.month_report(2026, 10, show=False)
+    assert "October 2026: 6.3 hours" in out and "+100%" in out and "Dead by Daylight 5.3h (2 sessions)" in out
+    assert "1 wins, 0 losses" in out and "Longest sitting: 3.3 hours of Dead by Daylight" in out
+
+
+def test_clip_releases_modifiers_and_reports_missing_file(monkeypatch, tmp_path):
+    import sys
+    import types
+    import gamestats
+    import tools
+    pressed, released = [], []
+    fake = types.SimpleNamespace(hotkey=lambda *k, **kw: pressed.append(k), keyUp=lambda k: released.append(k))
+    monkeypatch.setitem(sys.modules, "pyautogui", fake)
+    monkeypatch.setattr(tools, "release_modifiers", lambda: released.append("ALL"))
+    monkeypatch.setattr(gamestats, "_newest_video", lambda since: None)
+    monkeypatch.setattr(gamestats.time, "sleep", lambda s: None)
+    monkeypatch.setenv("JARVIS_CLIP_WITH", "nvidia")
+    ok, msg = gamestats.clip()
+    assert not ok and pressed == [("alt", "f10")] and "ALL" in released and "Instant Replay" in msg

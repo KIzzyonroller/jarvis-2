@@ -202,6 +202,11 @@ class GameWatch:
         except Exception as e:
             print(f"[game] triggers: {e}")
         threading.Thread(target=self._patch_alert, args=(info["name"],), daemon=True).start()
+        try:
+            import gamestats
+            threading.Thread(target=gamestats.snapshot, args=(info["name"],), daemon=True).start()   # for post-match stats
+        except Exception as e:
+            print(f"[game] stats snapshot: {e}")
         hub = getattr(self.core, "glass", None)
         if hub is not None and hub.connected():
             try:
@@ -224,8 +229,20 @@ class GameWatch:
                 self.core.history.add("Game", f"Stopped playing {cur['name']} after {round(mins)} minutes")
         except Exception:
             pass
+        if not quiet and mins >= 10 and os.environ.get("JARVIS_POSTMATCH", "true").lower() != "false":
+            threading.Thread(target=self._postmatch, args=(cur["name"],), daemon=True).start()
         if not quiet and config.GAME_CHECKIN and mins >= CHECKIN_MINUTES:
             threading.Thread(target=self._checkin, args=(cur["name"], mins), daemon=True).start()
+
+    def _postmatch(self, name):
+        """Steam takes a minute or two to save a game's stats after it closes; then say what changed."""
+        import gamestats
+        time.sleep(90)
+        out = gamestats.tool("session", name)
+        if out and not out.startswith(("No post-match", "Steam hasn't", "Valorant stats need", "Couldn't")):
+            self.core.events.put(("moment", {"line": out, "cards": []}))
+        else:
+            print(f"[game] post-match: {out}")
 
     def _patch_alert(self, name):
         """The game updated in the last two days and he hasn't told you yet: say the gist while it loads."""

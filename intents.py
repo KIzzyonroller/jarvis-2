@@ -99,6 +99,14 @@ def _calc(m):
     return r[0] + ".", f"Calc: {r[1]}"
 
 
+def _clip(m):
+    if _DRY.on:
+        return HIT
+    import gamestats
+    ok, msg = gamestats.clip()
+    return ("Clipped." if ok else msg), f"Clip: {msg}"
+
+
 def _undo(m):
     if _DRY.on:
         return HIT
@@ -429,6 +437,7 @@ RULES = [
     (r"^(?:previous|last|go back(?: a)?|back)(?: (?:song|track|one))$|^previous$|^play the last song$|^go back a song$",
      _media("previous", "Previous")),
     (r"^(?:open|launch|start|run|pull up|bring up|show)(?: up)? (?:the |my )?glass(?: mode)?(?: tutorial| help)?$", _glass_open),
+    (r"^(?:clip (?:that|it|this)|save (?:that|the|a) clip|clip the last \w+(?: seconds| minutes)?|clip)$", _clip),
     (r"^(?:undo|undo that|undo it|take that back|put it back|reverse that|go back on that)$", _undo),
     (r"^(?:run|do|start|show me|redo)(?: the| your)? (?:first[- ]time )?(?:setup|tour|onboarding)(?: again)?$", _tour),
     (r"^(?:send|file|submit|make)(?: a| the)? (?:crash|bug|problem) report$", _report),

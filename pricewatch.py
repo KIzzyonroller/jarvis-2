@@ -94,7 +94,7 @@ def steam_price(name):
     app = steam.appid_for(name)
     if not app:
         raise ValueError(f"couldn't find {name} on Steam")
-    cc = (config.STEAM_CC if hasattr(config, "STEAM_CC") else "") or "us"
+    cc = (getattr(config, "COUNTRY", "") or "us").lower()
     url = f"https://store.steampowered.com/api/appdetails?appids={app}&cc={cc}&filters=price_overview,basic"
     with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=12) as r:
         d = json.loads(r.read().decode())[str(app)]["data"]

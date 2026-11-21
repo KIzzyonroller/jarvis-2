@@ -3924,6 +3924,11 @@ TOOL_SPECS = [
                            "desktop about their week, from you."),
     _spec("play_stats", "How long they've played today (days=1) or over N days, per game, and the wins/losses they "
                         "told you about.", {"days": N}),
+    _spec("game_stats", "Games, extra. session: how this / the last session went (Steam stats that changed since the "
+                        "game opened, or the last Valorant match); valorant: their last Valorant match; clip: save the "
+                        "last moments with NVIDIA Instant Replay or Game Bar (\"clip that\"); radar: Steam games on sale "
+                        "that are like what they play; month: their monthly gaming report.",
+          {"action": {"type": "string", "enum": ["session", "valorant", "clip", "radar", "month"]}, "game": S}, ["action"]),
     _spec("what_he_knows", "Everything you keep about them (memories, their words, jokes, birthdays, routines, "
                            "triggers, voiceprints, history, activity, screenshots text...). Use for 'what do you know "
                            "about me'. show=true opens Settings > What he knows where they can edit or delete any of it.",
@@ -4350,6 +4355,11 @@ def what_he_knows_tool(show=True):
     return knows.summary(_VOICE_CORE)
 
 
+def game_stats_tool(action="session", game=None):
+    import gamestats
+    return gamestats.tool(action, game)
+
+
 def undo_tool(action="undo", steps=1):
     import undo
     return undo.listing() if (action or "").lower() == "list" else undo.undo(steps or 1)
@@ -4537,7 +4547,7 @@ FUNCS = {
     "system_power": system_power, "system_info": system_info, "run_command": run_command, "files": files,
     "memory": memory, "reminders": reminders, "calendar": calendar_tool, "blender": blender, "blender_expert": blender_expert, "rgb": rgb_tool,
     "unreal_expert": unreal_expert, "spotify": spotify_tool, "youtube": youtube_tool, "discord": discord_tool, "email": email_tool, "netflix": netflix_tool, "apple_music": apple_music_tool, "voice_settings": voice_settings_tool, "frame_rate": frame_rate_tool, "desk_widgets": desk_widgets_tool, "game_mode": game_mode_tool, "phone": phone_tool, "file_butler": butler_tool, "lights": lights_tool, "journal": journal_tool, "speed_report": speed_report, "changelog": changelog_tool, "desktop_card": desktop_card, "pc_doctor": pc_doctor, "steam": steam_tool, "stocks": stocks_tool, "desktop_scene": desktop_scene_tool,
-    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "undo": undo_tool, "plugins": plugins_tool, "timeline": timeline_tool,
+    "pull_up": pull_up_tool, "panels": panels_tool, "track": track_tool, "browse": browse_tool, "diagnostics": diagnostics_tool, "undo": undo_tool, "game_stats": game_stats_tool, "plugins": plugins_tool, "timeline": timeline_tool,
     "habits": habits_tool, "what_he_knows": what_he_knows_tool, "lingo": lingo_tool, "explain": explain_tool, "clipboard_history": clipboard_history_tool,
     "screenshots": screenshots_tool, "duplicates": duplicates_tool, "calculate": calculate_tool, "price_watch": price_watch_tool,
     "wind_down": wind_down_tool, "crash_report": crash_report_tool, "voice_id": voice_id_tool, "privacy": privacy_tool, "triggers": triggers_tool,
@@ -4567,7 +4577,7 @@ TOOL_GROUPS = {
                  "look_at_camera", "watch", "activity", "close_app"],
     "calendar_email": ["calendar", "email"],
     "discord_phone": ["discord", "phone"],
-    "games": ["game_mode", "steam", "play_stats"],
+    "games": ["game_mode", "steam", "play_stats", "game_stats"],
     "automation": ["triggers", "voice_id", "privacy", "habits", "plugins"],
     "stocks": ["stocks"],
     "desktop": ["glass", "desk_widgets", "desktop_scene", "frame_rate", "corner_widget", "rgb", "voice_settings",
@@ -4588,7 +4598,8 @@ GROUP_HINTS = {
     "calendar_email": r"\b(calendar|event|meeting|appointment|schedule|tomorrow|next week|email|emails|inbox|mail)\b",
     "discord_phone": r"\b(discord|message|messages|dm|server|channel|phone|text(ed)?|notification|notifications|post)\b",
     "games": r"\b(game|games|gaming|steam|play next|what should i play|patch|dbd|dead by daylight|queue|ranked|lost|won|"
-             r"match|wishlist|sale|friends online|played|playing|hours|session|w/?l)\b",
+             r"match|wishlist|sale|friends online|played|playing|hours|session|w/?l|valorant|k/?d|kills|stats|clip|"
+             r"radar|month|monthly)\b",
     "stocks": r"\b(stock|stocks|share|shares|market|markets|ticker|nasdaq|s&p|dow|crypto|bitcoin|ethereum|earnings|"
               r"watchlist|portfolio|invest|investing|nvidia|tesla|apple|amd|etf)\b",
     "desktop": r"\b(track|tracking|score|scores|flight|download|downloading|glass|widget|widgets|desktop|wallpaper|scene|fps|frame rate|corner|rgb|keyboard lights|lights?|lamp|"
@@ -4635,7 +4646,7 @@ def more_tools_spec(loaded):
         or list(TOOL_GROUPS)
     desc = {"media": "Spotify, YouTube, Netflix, Apple Music", "computer": "clipboard history, screenshot search, duplicate finder, files, commands, PC doctor, power, displays, "
             "mouse, camera, screen text, screen history", "calendar_email": "calendar and email", "discord_phone":
-            "Discord and phone notifications", "games": "game mode, Steam, play time", "stocks": "stocks and markets",
+            "Discord and phone notifications", "games": "game mode, Steam, play time, post-match stats, clips, sales radar, monthly report", "stocks": "stocks and markets",
             "automation": "triggers and schedules, habits to automate, plugins, voice ID, private / whisper / conversation modes",
             "desktop": "glass mode, desktop widgets and scene, RGB and smart lights, his voice settings", "life":
             "past days (timeline), bedtime wind-down, price watching, journal, birthdays and gift ideas, goodnight, recipes, inside jokes, the weekly letter, his changelog, speed report", "studio": "Blender and Unreal",

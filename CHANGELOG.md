@@ -3,6 +3,14 @@
 Newest first. After an update, Jarvis shows everything added since the version you had before.
 Each release starts with a "## version" line: the same number you type when you run the Release workflow (1.0.12, 1.0.13...).
 
+## 1.0.41
+
+- **Post-match stats.** For Steam games that publish stats (Dead by Daylight, CS2 and lots more), he notes your Steam stats when the game opens and, a minute or two after it closes, tells you what changed: escapes, generators, kills, wins. "How did that go?" asks mid-session. Needs your Steam key and ID and Steam's "Game details" set to public.
+- **Valorant matches.** Valorant isn't on Steam, so with a free HenrikDev key (api.henrikdev.xyz) and your Riot ID (Settings > Games and alerts) he reads your last match: map, agent, K/D/A, win or loss, and counts the result toward your record.
+- **"Clip that."** He presses your recorder's save-replay shortcut (NVIDIA Instant Replay's Alt+F10, or Xbox Game Bar's Win+Alt+G), then checks a new video actually appeared, and tells you if it didn't (and why that usually is). It's an instant command, so it's fast mid-game, and he lets go of every key straight after.
+- **Sales radar.** Once a week (late in the week, when sales start) he checks what's on sale on Steam and tells you about games like the ones you actually play, matched by their Steam tags. Games you already own are left out. "Anything on sale I'd like?" checks now.
+- **Monthly gaming report.** On the 1st: hours per game, sessions, longest sitting, busiest day of the week, the wins and losses you told him about, and the change from the month before. "How was my gaming month?" any time.
+
 ## 1.0.40
 
 - **See everything he knows about you.** Settings > What he knows (or "what do you know about me?") lists every single thing he keeps: memories, your words, inside jokes, birthdays, routines, triggers, price watches, voiceprints, and how much conversation history, activity memory, screenshot text and play time he has. Change or delete any item, or wipe a whole section. It all lives on your PC in Documents\Jarvis and is never sent anywhere.

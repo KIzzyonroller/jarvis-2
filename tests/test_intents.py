@@ -17,6 +17,8 @@ def _which(text):
     ("run diagnostics", "_diag"),
     ("run a diagnostics check", "_diag"),
     ("undo that", "_undo"),
+    ("clip that", "_clip"),
+    ("what's 15% of 240", "_calc"),
     ("run the setup again", "_tour"),
     ("send a crash report", "_report"),
 ])

@@ -465,6 +465,8 @@ class Core:
             winddown.start(self)                 # half an hour before bedtime
             import patterns
             patterns.start(self)                 # notices habits and offers to automate them (once each)
+            import gamestats
+            gamestats.start(self)                # weekly sales radar, the monthly gaming report
             import triggers
             triggers.start(self)                 # "when I open DBD..." / "every weekday at 8..."
             import comeback
